@@ -1,0 +1,6 @@
+.direnv
+result
+*.test
+logs
+*.log
+.DS_Store
