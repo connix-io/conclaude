@@ -47,6 +47,7 @@
         lint = {
           exec = rooted ''
             cd "$REPO_ROOT"
+            bun install --frozen-lockfile
             bun run typecheck
             oxlint --fix
             biome lint --fix
@@ -56,10 +57,14 @@
           description = "Lint the project using bun";
         };
         tests = {
-          exec = ''
+          exec = rooted ''
+            cd "$REPO_ROOT"
+            bun install --frozen-lockfile
             bun test
+            cd -
           '';
           deps = [
+            pkgs.bun
             pkgs.pkg-config
             pkgs.openssl
             pkgs.openssl.dev
