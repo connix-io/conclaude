@@ -13,6 +13,7 @@ export interface StopConfig {
  */
 export interface RulesConfig {
 	preventRootAdditions: boolean;
+	uneditableFiles: string[];
 }
 
 /**
@@ -40,6 +41,7 @@ async function loadConclaudeConfig(): Promise<ConclaudeConfig> {
 			},
 			rules: {
 				preventRootAdditions: true,
+				uneditableFiles: [],
 			},
 		},
 	});

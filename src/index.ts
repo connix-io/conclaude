@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 /**
  * Claude Code Hook Handler CLI
  *
@@ -10,6 +11,7 @@
 
 /** biome-ignore-all lint/suspicious/noConsole: CLI requires console output for user feedback */
 
+import { minimatch } from "minimatch";
 import type { Logger } from "winston";
 import yargs, { type Arguments, type CommandModule } from "yargs";
 import { hideBin } from "yargs/helpers";
@@ -129,33 +131,33 @@ async function handlePreToolUse(_argv: Arguments): Promise<HookResult> {
 		tool_name: payload.tool_name,
 	});
 
-	// Check preventRootAdditions rule
-	if (config.rules.preventRootAdditions) {
-		const fileModifyingTools = [
-			"Write",
-			"Edit",
-			"MultiEdit",
-			"NotebookEdit",
-		];
+	const fileModifyingTools = [
+		"Write",
+		"Edit",
+		"MultiEdit",
+		"NotebookEdit",
+	];
 
-		if (fileModifyingTools.includes(payload.tool_name)) {
-			try {
-				const toolInput = payload.tool_input;
-				const filePath = (toolInput.file_path ||
-					toolInput.notebook_path) as string;
+	if (fileModifyingTools.includes(payload.tool_name)) {
+		try {
+			const toolInput = payload.tool_input;
+			const filePath = (toolInput.file_path ||
+				toolInput.notebook_path) as string;
 
-				if (filePath && typeof filePath === "string") {
-					// Resolve the file path to check if it targets the repository root
-					const path = await import("path");
+			if (filePath && typeof filePath === "string") {
+				const path = await import("path");
+				const cwd = process.cwd();
+				const resolvedPath = path.resolve(cwd, filePath);
+				const relativePath = path.relative(cwd, resolvedPath);
 
-					const cwd = process.cwd();
-					const resolvedPath = path.resolve(cwd, filePath);
-					const relativePath = path.relative(cwd, resolvedPath);
-
+				// Check preventRootAdditions rule - only applies to Write tool
+				if (config.rules.preventRootAdditions && payload.tool_name === "Write") {
 					// Check if the file is directly in the root directory (no subdirectories)
-					// Allow dotfiles and configuration files (like .conclaude, .gitignore, conclaude.config.ts)
+					// Allow dotfiles and configuration files (like .conclaude, .gitignore, conclaude.config.ts, package.json)
 					const fileName = path.basename(relativePath);
-					const isConfigFile = fileName.includes("config") || fileName.includes("settings");
+					const isConfigFile = fileName.includes("config") || fileName.includes("settings") || 
+										 fileName === "package.json" || fileName === "tsconfig.json" || 
+										 fileName === "bun.lockb" || fileName === "bun.lock";
 					const isInRoot =
 						!relativePath.includes(path.sep) &&
 						relativePath !== "" &&
@@ -164,7 +166,7 @@ async function handlePreToolUse(_argv: Arguments): Promise<HookResult> {
 						!isConfigFile;
 
 					if (isInRoot) {
-						const errorMessage = `Blocked ${payload.tool_name} operation: preventRootAdditions rule prevents creating/modifying files at repository root. File: ${filePath}`;
+						const errorMessage = `Blocked ${payload.tool_name} operation: preventRootAdditions rule prevents creating files at repository root. File: ${filePath}`;
 
 						logger.warn("PreToolUse blocked by preventRootAdditions rule", {
 							tool_name: payload.tool_name,
@@ -179,15 +181,52 @@ async function handlePreToolUse(_argv: Arguments): Promise<HookResult> {
 						};
 					}
 				}
-			} catch (error) {
-				// If tool_input doesn't contain expected fields or path resolution fails,
-				// log the error but don't block (defensive approach)
-				logger.warn("Error during preventRootAdditions check", {
-					tool_name: payload.tool_name,
-					tool_input: payload.tool_input,
-					error: error instanceof Error ? error.message : String(error),
-				});
+
+				// Check uneditableFiles rule
+				if (config.rules.uneditableFiles.length > 0) {
+					for (const pattern of config.rules.uneditableFiles) {
+						try {
+							// Test both the original file path and the relative path against the pattern
+							const matchesOriginal = minimatch(filePath, pattern);
+							const matchesRelative = minimatch(relativePath, pattern);
+							const matchesResolved = minimatch(resolvedPath, pattern);
+
+							if (matchesOriginal || matchesRelative || matchesResolved) {
+								const errorMessage = `Blocked ${payload.tool_name} operation: file matches uneditable pattern '${pattern}'. File: ${filePath}`;
+
+								logger.warn("PreToolUse blocked by uneditableFiles rule", {
+									tool_name: payload.tool_name,
+									file_path: filePath,
+									resolved_path: resolvedPath,
+									relative_path: relativePath,
+									matched_pattern: pattern,
+								});
+
+								return {
+									message: errorMessage,
+									blocked: true,
+								};
+							}
+						} catch (patternError) {
+							// If pattern matching fails, log warning but don't block (defensive approach)
+							logger.warn("Error during pattern matching", {
+								tool_name: payload.tool_name,
+								file_path: filePath,
+								pattern: pattern,
+								error: patternError instanceof Error ? patternError.message : String(patternError),
+							});
+						}
+					}
+				}
 			}
+		} catch (error) {
+			// If tool_input doesn't contain expected fields or path resolution fails,
+			// log the error but don't block (defensive approach)
+			logger.warn("Error during file path validation", {
+				tool_name: payload.tool_name,
+				tool_input: payload.tool_input,
+				error: error instanceof Error ? error.message : String(error),
+			});
 		}
 	}
 
@@ -557,6 +596,18 @@ bun test\`,
 		 * Helps maintain clean project structure
 		 */
 		preventRootAdditions: true,
+		
+		/**
+		 * Files that Claude cannot edit, using glob patterns
+		 * Examples:
+		 * - "package.json" - specific files
+		 * - "*.md" - file extensions  
+		 * - "src/**/*.ts" - nested patterns
+		 * - ".env*" - environment files
+		 * - "docs/**" - entire directories
+		 * - "{package,tsconfig}.json" - multiple specific files
+		 */
+		uneditableFiles: [],
 	},
 } as const;
 `;

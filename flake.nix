@@ -135,7 +135,7 @@
         conclaude = bun2nix.lib.${system}.mkBunDerivation {
           pname = "conclaude";
           src = self;
-          version = "0.0.1";
+          version = (builtins.fromJSON (builtins.readFile ./package.json)).version;
           bunNix = ./bun.nix;
           buildPhase = ''
             echo "🔧 Building application with bun..."
