@@ -1,8 +1,11 @@
 {
 	"$schema": "https://json.schemastore.org/tsconfig",
 	"compilerOptions": {
+		"declaration": true,
 		// Environment setup & latest features
-		"lib": ["ESNext"],
+		"lib": [
+			"ESNext"
+		],
 		"target": "ESNext",
 		"module": "Preserve",
 		"moduleDetection": "force",
