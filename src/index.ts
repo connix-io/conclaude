@@ -15,7 +15,7 @@ import { minimatch } from "minimatch";
 import type { Logger } from "winston";
 import yargs, { type Arguments, type CommandModule } from "yargs";
 import { hideBin } from "yargs/helpers";
-import { config, extractBashCommands } from "./config.ts";
+import { extractBashCommands, loadConclaudeConfig, type ConclaudeConfig } from "./config.ts";
 import { createLogger } from "./logger.ts";
 import type {
 	BasePayloadType,
@@ -29,6 +29,21 @@ import type {
 	SubagentStopPayload,
 	UserPromptSubmitPayload,
 } from "./types.ts";
+
+/**
+ * Cached configuration instance to avoid repeated loads
+ */
+let cachedConfig: ConclaudeConfig | null = null;
+
+/**
+ * Load configuration with caching to avoid repeated file system operations
+ */
+async function getConfig(): Promise<ConclaudeConfig> {
+	if (!cachedConfig) {
+		cachedConfig = await loadConclaudeConfig();
+	}
+	return cachedConfig;
+}
 
 /**
  * Wrapper function that standardizes hook result processing and process exit codes.
@@ -151,13 +166,21 @@ async function handlePreToolUse(_argv: Arguments): Promise<HookResult> {
 				const relativePath = path.relative(cwd, resolvedPath);
 
 				// Check preventRootAdditions rule - only applies to Write tool
-				if (config.rules.preventRootAdditions && payload.tool_name === "Write") {
+				const config = await getConfig();
+				if (
+					config.rules.preventRootAdditions &&
+					payload.tool_name === "Write"
+				) {
 					// Check if the file is directly in the root directory (no subdirectories)
 					// Allow dotfiles and configuration files (like .conclaude, .gitignore, conclaude.config.ts, package.json)
 					const fileName = path.basename(relativePath);
-					const isConfigFile = fileName.includes("config") || fileName.includes("settings") || 
-										 fileName === "package.json" || fileName === "tsconfig.json" || 
-										 fileName === "bun.lockb" || fileName === "bun.lock";
+					const isConfigFile =
+						fileName.includes("config") ||
+						fileName.includes("settings") ||
+						fileName === "package.json" ||
+						fileName === "tsconfig.json" ||
+						fileName === "bun.lockb" ||
+						fileName === "bun.lock";
 					const isInRoot =
 						!relativePath.includes(path.sep) &&
 						relativePath !== "" &&
@@ -213,7 +236,10 @@ async function handlePreToolUse(_argv: Arguments): Promise<HookResult> {
 								tool_name: payload.tool_name,
 								file_path: filePath,
 								pattern: pattern,
-								error: patternError instanceof Error ? patternError.message : String(patternError),
+								error:
+									patternError instanceof Error
+										? patternError.message
+										: String(patternError),
 							});
 						}
 					}
@@ -382,6 +408,7 @@ async function handleStop(_argv: Arguments): Promise<HookResult> {
 	});
 
 	// Extract and execute commands from config.stop.run
+	const config = await getConfig();
 	const commands = extractBashCommands(config.stop.run);
 
 	logger.info(`Executing ${commands.length} stop hook commands`, {
@@ -543,7 +570,7 @@ interface ClaudeSettings {
  *
  * This function doesn't use stdin JSON payloads like other handlers.
  * Instead, it creates configuration files and integrates with Claude Code settings.
- * 
+ *
  * @param argv - CLI arguments containing options like --config-path, --claude-path, --force
  * @returns Promise<void> (exits process directly rather than returning HookResult)
  */
@@ -552,7 +579,8 @@ async function handleInit(argv: Arguments): Promise<void> {
 	const fs = await import("fs/promises");
 
 	const cwd = process.cwd();
-	const configPath = (argv.configPath as string) || path.join(cwd, "conclaude.config.ts");
+	const configPath =
+		(argv.configPath as string) || path.join(cwd, "conclaude.config.ts");
 	const claudePath = (argv.claudePath as string) || path.join(cwd, ".claude");
 	const settingsPath = path.join(claudePath, "settings.json");
 	const force = argv.force as boolean;
@@ -561,8 +589,11 @@ async function handleInit(argv: Arguments): Promise<void> {
 
 	try {
 		// Check if config file exists
-		const configExists = await fs.access(configPath).then(() => true).catch(() => false);
-		
+		const configExists = await fs
+			.access(configPath)
+			.then(() => true)
+			.catch(() => false);
+
 		if (configExists && !force) {
 			console.log("⚠️  Configuration file already exists:");
 			console.log(`   ${configPath}`);
@@ -617,17 +648,22 @@ bun test\`,
 		console.log(`   ${configPath}`);
 
 		// Create .claude directory if it doesn't exist
-		await fs.mkdir(claudePath, { recursive: true });
+		await fs.mkdir(claudePath, {
+			recursive: true,
+		});
 
 		// Check if settings.json exists
-		const settingsExists = await fs.access(settingsPath).then(() => true).catch(() => false);
-		
+		const settingsExists = await fs
+			.access(settingsPath)
+			.then(() => true)
+			.catch(() => false);
+
 		let settings: ClaudeSettings = {
 			permissions: {
 				allow: [],
-				deny: []
+				deny: [],
 			},
-			hooks: {}
+			hooks: {},
 		};
 
 		if (settingsExists) {
@@ -646,12 +682,12 @@ bun test\`,
 		// Define all hook types and their commands
 		const hookTypes: readonly string[] = [
 			"UserPromptSubmit",
-			"PreToolUse", 
+			"PreToolUse",
 			"PostToolUse",
 			"Notification",
 			"Stop",
 			"SubagentStop",
-			"PreCompact"
+			"PreCompact",
 		] as const;
 
 		// Add hook configurations
@@ -662,10 +698,10 @@ bun test\`,
 					hooks: [
 						{
 							type: "command",
-							command: `npx conclaude@latest ${hookType}`
-						}
-					]
-				}
+							command: `npx conclaude@latest ${hookType}`,
+						},
+					],
+				},
 			];
 		}
 
@@ -680,9 +716,11 @@ bun test\`,
 			console.log(`   • ${hookType}`);
 		}
 		console.log("\nYou can now use Claude Code with conclaude hook handling.");
-
 	} catch (error) {
-		console.error("❌ Failed to initialize conclaude:", error instanceof Error ? error.message : String(error));
+		console.error(
+			"❌ Failed to initialize conclaude:",
+			error instanceof Error ? error.message : String(error),
+		);
 		process.exit(1);
 	}
 }
@@ -754,7 +792,7 @@ const initCommand: CommandModule = {
 			default: undefined,
 		},
 		"claude-path": {
-			type: "string", 
+			type: "string",
 			describe: "Path for .claude directory",
 			default: undefined,
 		},

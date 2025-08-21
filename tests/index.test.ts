@@ -1,4 +1,4 @@
-import { expect, test, describe, mock } from "bun:test";
+import { expect, test, describe } from "bun:test";
 import { minimatch } from "minimatch";
 
 describe("CLI integration", () => {

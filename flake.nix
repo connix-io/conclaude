@@ -135,13 +135,14 @@
         conclaude = bun2nix.lib.${system}.mkBunDerivation {
           pname = "conclaude";
           src = self;
-          version = (builtins.fromJSON (builtins.readFile ./package.json)).version;
+          inherit
+            (builtins.fromJSON (builtins.readFile ./package.json))
+            version
+            ;
           bunNix = ./bun.nix;
-          buildPhase = ''
-            echo "🔧 Building application with bun..."
-            bun run build
-          '';
+          index = "./src/index.ts";
         };
+        default = self.packages.${system}.conclaude;
       };
 
       formatter = let

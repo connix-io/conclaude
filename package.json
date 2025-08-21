@@ -35,7 +35,8 @@
 		"build": "echo 'No build step needed for Bun CLI - source files are distributed directly'",
 		"test": "bun test",
 		"lint": "bun x tsc --noEmit",
-		"typecheck": "bun x tsc --noEmit"
+		"typecheck": "bun x tsc --noEmit",
+		"postinstall": "bun2nix -o bun.nix"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
