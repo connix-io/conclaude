@@ -1,1 +1,87 @@
-{}
+{
+	"permissions": {
+		"allow": [
+			"Bash(mkdir:*)",
+			"Bash(uv:*)",
+			"Bash(find:*)",
+			"Bash(mv:*)",
+			"Bash(grep:*)",
+			"Bash(npm:*)",
+			"Bash(ls:*)",
+			"Bash(cp:*)",
+			"Write",
+			"Edit",
+			"Bash(chmod:*)",
+			"Bash(touch:*)"
+		],
+		"deny": []
+	},
+	"hooks": {
+		"UserPromptSubmit": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts UserPromptSubmit"
+					}
+				]
+			}
+		],
+		"PreToolUse": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts PreToolUse"
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts PostToolUse"
+					}
+				]
+			}
+		],
+		"Notification": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts Notification"
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts Stop"
+					}
+				]
+			}
+		],
+		"SubagentStop": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts SubagentStop"
+					}
+				]
+			}
+		]
+	}
+}

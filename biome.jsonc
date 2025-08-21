@@ -1,0 +1,220 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.1.4/schema.json",
+	"vcs": {
+		"enabled": false,
+		"clientKind": "git",
+		"useIgnoreFile": true,
+		"defaultBranch": "main"
+	},
+	"files": {
+		"ignoreUnknown": false,
+		"maxSize": 4194304,
+		"includes": [
+			"src/**/*.{ts,tsx}",
+			"tests/**/*.{ts,tsx}",
+			"scripts/**/*.{ts,tsx}"
+		]
+	},
+	"formatter": {
+		"enabled": true,
+		"attributePosition": "multiline",
+		"expand": "always",
+		"bracketSameLine": false,
+		"indentStyle": "tab",
+		"formatWithErrors": false,
+		"lineWidth": 79
+	},
+	"linter": {
+		"enabled": true,
+		"domains": {
+			"react": "all",
+			"test": "all"
+		},
+		"rules": {
+			"recommended": false,
+			"complexity": {
+				"noAdjacentSpacesInRegex": "error",
+				"noExtraBooleanCast": "error",
+				"noUselessCatch": "error",
+				"noUselessEscapeInRegex": "error"
+			},
+			"correctness": {
+				"noConstAssign": "error",
+				"noConstantCondition": "error",
+				"noEmptyCharacterClassInRegex": "error",
+				"noEmptyPattern": "error",
+				"noGlobalObjectCalls": "error",
+				"noInvalidBuiltinInstantiation": "error",
+				"noInvalidConstructorSuper": "error",
+				"noNonoctalDecimalEscape": "error",
+				"noPrecisionLoss": "error",
+				"noSelfAssign": "error",
+				"noSetterReturn": "error",
+				"noSwitchDeclarations": "error",
+				"noUndeclaredVariables": "error",
+				"noUnreachable": "error",
+				"noUnreachableSuper": "error",
+				"noUnsafeFinally": "error",
+				"noUnsafeOptionalChaining": "error",
+				"noUnusedLabels": "error",
+				"noUnusedPrivateClassMembers": "error",
+				"noUnusedVariables": "error",
+				"useIsNan": "error",
+				"useValidForDirection": "error",
+				"useValidTypeof": "error",
+				"useYield": "error"
+			},
+			"suspicious": {
+				"noAsyncPromiseExecutor": "error",
+				"noCatchAssign": "error",
+				"noClassAssign": "error",
+				"noCompareNegZero": "error",
+				"noControlCharactersInRegex": "error",
+				"noDebugger": "error",
+				"noDuplicateCase": "error",
+				"noDuplicateClassMembers": "error",
+				"noDuplicateElseIf": "error",
+				"noDuplicateObjectKeys": "error",
+				"noDuplicateParameters": "error",
+				"noEmptyBlockStatements": "error",
+				"noFallthroughSwitchClause": "error",
+				"noFunctionAssign": "error",
+				"noGlobalAssign": "error",
+				"noImportAssign": "error",
+				"noIrregularWhitespace": "error",
+				"noMisleadingCharacterClass": "error",
+				"noPrototypeBuiltins": "error",
+				"noRedeclare": "error",
+				"noShadowRestrictedNames": "error",
+				"noSparseArray": "error",
+				"noUnsafeNegation": "error",
+				"noWith": "error",
+				"useGetterReturn": "error"
+			}
+		},
+		"includes": [
+			"**",
+			"!dist/**",
+			"!.direnv/**",
+			"!build/**",
+			"!.output/**",
+			"!.tanstack/**",
+			"!node_modules/**",
+			"!*.min.js",
+			"!src/routeTree.gen.ts",
+			"!**/*.d.ts",
+			"!proto/**",
+			"!conn/**",
+			"!gateway/**",
+			"!tests/**",
+			"!result",
+			"!*.config.{js,ts}",
+			"!scripts/**",
+			"!**/*test*.{js,mjs,cjs}",
+			"!**/*-test*.{js,mjs,cjs}",
+			"!d/**",
+			"!public/sw.js",
+			"!src/disabled/**",
+			"!src/test/disabled/**",
+			"!src/test/examples/**",
+			"!src/test/integration/**",
+			"!src/lib/icons/index.tsx"
+		]
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double"
+		}
+	},
+	"overrides": [
+		{
+			"includes": [
+				"**/*.{ts,tsx}"
+			],
+			"javascript": {
+				"globals": [
+					"window",
+					"console",
+					"Headers",
+					"document",
+					"performance",
+					"setInterval",
+					"__dirname",
+					"exports",
+					"RequestInit",
+					"fetch",
+					"clearTimeout",
+					"setTimeout",
+					"require",
+					"clearInterval",
+					"__filename",
+					"global",
+					"module",
+					"process",
+					"Buffer",
+					"globalThis",
+					"navigator",
+					"location",
+					"NodeJS",
+					"Bun",
+					"Response",
+					"Request",
+					"Image"
+				]
+			},
+			"linter": {
+				"rules": {
+					"complexity": {
+						"useOptionalChain": "error"
+					},
+					"correctness": {
+						"noUnusedVariables": "error",
+						"useExhaustiveDependencies": "warn",
+						"useHookAtTopLevel": "error"
+					},
+					"style": {
+						"useConst": "error"
+					},
+					"suspicious": {
+						"noAlert": "error",
+						"noConsole": {
+							"level": "warn",
+							"options": {
+								"allow": [
+									"warn",
+									"error"
+								]
+							}
+						},
+						"noDebugger": "error",
+						"noExplicitAny": "error",
+						"noVar": "error"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"*.config.{js,ts}",
+				"vite.config.ts",
+				"eslint.config.js"
+			],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noConsole": "off",
+						"noExplicitAny": "off"
+					}
+				}
+			}
+		}
+	],
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	}
+}

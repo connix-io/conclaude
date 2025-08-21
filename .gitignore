@@ -4,3 +4,7 @@ result
 logs
 *.log
 .DS_Store
+conclaude.ts
+node_modules
+.crush
+bin

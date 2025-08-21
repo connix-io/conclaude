@@ -1,61 +1,20 @@
-/**
-# Go Development Shell Template
-
-## Description
-Complete Go development environment with modern tooling for building, testing,
-and maintaining Go applications. Includes the Go toolchain, linting, formatting,
-live reloading, and testing utilities for productive Go development.
-
-## Platform Support
-- ✅ x86_64-linux
-- ✅ aarch64-linux (ARM64 Linux)
-- ✅ x86_64-darwin (Intel macOS)
-- ✅ aarch64-darwin (Apple Silicon macOS)
-
-## What This Provides
-- **Go Toolchain**: Go 1.24 compiler and runtime
-- **Development Tools**: air (live reload), delve (debugger), gopls (language server)
-- **Code Quality**: golangci-lint, revive, gofmt, goimports
-- **Testing**: gotestfmt for enhanced test output
-- **Documentation**: gomarkdoc for generating markdown from Go code
-- **Formatting**: gofumpt for stricter Go formatting
-
-## Usage
-```bash
-# Create new project from template
-nix flake init -t github:conneroisu/dotfiles#go-shell
-
-# Enter development shell
-nix develop
-
-# Start live reload development
-air
-
-# Run tests with formatting
-go test ./... | gotestfmt
-
-# Format code
-nix fmt
-```
-
-## Development Workflow
-- Use air for automatic recompilation during development
-- golangci-lint provides comprehensive linting
-- gopls enables rich IDE integration
-- All tools configured for optimal Go development experience
-*/
 {
-  description = "A development shell for go";
+  description = "Conclaude Flake";
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+    bun2nix.url = "github:baileyluTCD/bun2nix";
+    bun2nix.inputs.nixpkgs.follows = "nixpkgs";
   };
+
   outputs = {
     self,
     nixpkgs,
     flake-utils,
+    bun2nix,
     treefmt-nix,
     ...
   }:
@@ -63,99 +22,141 @@ nix fmt
       pkgs = import nixpkgs {
         inherit system;
         overlays = [
-          (final: prev: {
-            # Add your overlays here
-            # Example:
-            # my-overlay = final: prev: {
-            #   my-package = prev.callPackage ./my-package { };
-            # };
-            final.buildGoModule = prev.buildGo124Module;
-          })
+          (final: prev: {})
         ];
       };
 
       rooted = exec:
         builtins.concatStringsSep "\n"
         [
-          ''REPO_ROOT="$(git rev-parse --show-toplevel)"''
+          ''
+            REPO_ROOT=$(git rev-parse --show-toplevel)
+            export REPO_ROOT
+          ''
           exec
         ];
 
       scripts = {
         dx = {
-          exec = rooted ''$EDITOR "$REPO_ROOT"/flake.nix'';
+          exec = rooted ''
+            $EDITOR "$REPO_ROOT"/flake.nix
+          '';
+          deps = [pkgs.git];
           description = "Edit flake.nix";
         };
-        gx = {
-          exec = rooted ''$EDITOR "$REPO_ROOT"/go.mod'';
-          description = "Edit go.mod";
+        lint = {
+          exec = rooted ''
+            cd "$REPO_ROOT"
+            bun run typecheck
+            oxlint --fix
+            biome lint --fix
+            cd -
+          '';
+          deps = [pkgs.bun pkgs.oxlint pkgs.biome];
+          description = "Lint the project using bun";
+        };
+        tests = {
+          exec = ''
+            bun test
+          '';
+          deps = [
+            pkgs.pkg-config
+            pkgs.openssl
+            pkgs.openssl.dev
+          ];
+          description = "Run tests with bun";
         };
       };
 
       scriptPackages =
         pkgs.lib.mapAttrs
         (
-          name: script:
-            pkgs.writeShellApplication {
-              inherit name;
-              text = script.exec;
-              runtimeInputs = script.deps or [];
-            }
+          name: script: let
+            scriptType = script.type or "app";
+          in
+            if script != {}
+            then
+              if scriptType == "script"
+              then pkgs.writeShellScriptBin name script.exec
+              else
+                pkgs.writeShellApplication {
+                  inherit name;
+                  bashOptions = scripts.baseOptions or ["errexit" "pipefail" "nounset"];
+                  text = script.exec;
+                  runtimeInputs = script.deps or [];
+                }
+            else null
         )
         scripts;
-
-      treefmtModule = {
-        projectRootFile = "flake.nix";
-        programs = {
-          alejandra.enable = true; # Nix formatter
+    in {
+      devShells = {
+        default = pkgs.mkShell {
+          env = {
+            NIX_CONFIG = "cores = 4\nmax-jobs = 4";
+            NODE_OPTIONS = "--max-old-space-size=4096";
+          };
+          packages =
+            (with pkgs; [
+              alejandra # Nix
+              nixd
+              statix
+              deadnix
+              just
+              sqlite
+              eslint
+              oxlint
+              bun
+              bun2nix.packages.${system}.default
+              openssl
+              openssl.dev
+              pkg-config
+              biome
+              typescript-language-server
+              vscode-langservers-extracted
+              tailwindcss-language-server
+              yaml-language-server
+            ])
+            ++ builtins.attrValues scriptPackages;
+          shellHook = ''
+            echo "🔥 Conclaude Development Environment"
+          '';
         };
       };
-    in {
-      devShells.default = pkgs.mkShell {
-        name = "dev";
 
-        # Available packages on https://search.nixos.org/packages
-        packages = with pkgs;
-          [
-            alejandra # Nix
-            nixd
-            statix
-            deadnix
-
-            go_1_24 # Go Tools
-            air
-            golangci-lint
-            gopls
-            revive
-            golines
-            golangci-lint-langserver
-            gomarkdoc
-            gotests
-            gotools
-            reftools
-            pprof
-            graphviz
-            goreleaser
-            cobra-cli
-          ]
-          ++ builtins.attrValues scriptPackages;
-      };
+      apps =
+        pkgs.lib.mapAttrs
+        (name: script: {
+          type = "app";
+          program = "${scriptPackages.${name}}/bin/${name}";
+        })
+        (pkgs.lib.filterAttrs (_: script: script != {}) scripts);
 
       packages = {
-        default = pkgs.buildGoModule {
-          pname = "my-go-project";
-          version = "0.0.1";
+        conclaude = bun2nix.lib.${system}.mkBunDerivation {
+          pname = "conclaude";
           src = self;
-          vendorHash = null;
-          meta = with pkgs.lib; {
-            description = "My Go project";
-            homepage = "https://github.com/conneroisu/my-go-project";
-            license = licenses.asl20;
-            maintainers = with maintainers; [connerohnesorge];
-          };
+          version = "0.0.1";
+          bunNix = ./bun.nix;
+          buildPhase = ''
+            echo "🔧 Building application with bun..."
+            bun run build
+          '';
         };
       };
 
-      formatter = treefmt-nix.lib.mkWrapper pkgs treefmtModule;
+      formatter = let
+        treefmtModule = {
+          projectRootFile = "flake.nix";
+          programs = {
+            alejandra.enable = true; # Nix formatter
+            biome.enable = true; ### TypeScript formatter
+          };
+          settings.formatter.biome = {
+            command = "${pkgs.biome}/bin/biome";
+            includes = ["*.ts" "*.tsx"];
+          };
+        };
+      in
+        treefmt-nix.lib.mkWrapper pkgs treefmtModule;
     });
 }
