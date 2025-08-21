@@ -36,7 +36,7 @@
 		"test": "bun test",
 		"lint": "bun x tsc --noEmit",
 		"typecheck": "bun x tsc --noEmit",
-		"postinstall": "bun2nix -o bun.nix"
+		"postinstall": "command -v bun2nix >/dev/null 2>&1 && bun2nix -o bun.nix || echo 'bun2nix not available, skipping bun.nix generation'"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
