@@ -15,7 +15,11 @@ import { minimatch } from "minimatch";
 import type { Logger } from "winston";
 import yargs, { type Arguments, type CommandModule } from "yargs";
 import { hideBin } from "yargs/helpers";
-import { extractBashCommands, loadConclaudeConfig, type ConclaudeConfig } from "./config.ts";
+import {
+	extractBashCommands,
+	loadConclaudeConfig,
+	type ConclaudeConfig,
+} from "./config.ts";
 import { createLogger } from "./logger.ts";
 import type {
 	BasePayloadType,
