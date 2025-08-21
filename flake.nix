@@ -47,6 +47,7 @@
         lint = {
           exec = rooted ''
             cd "$REPO_ROOT"
+            bun install --frozen-lockfile
             bun run typecheck
             oxlint --fix
             biome lint --fix
@@ -56,10 +57,14 @@
           description = "Lint the project using bun";
         };
         tests = {
-          exec = ''
+          exec = rooted ''
+            cd "$REPO_ROOT"
+            bun install --frozen-lockfile
             bun test
+            cd -
           '';
           deps = [
+            pkgs.bun
             pkgs.pkg-config
             pkgs.openssl
             pkgs.openssl.dev
@@ -135,13 +140,14 @@
         conclaude = bun2nix.lib.${system}.mkBunDerivation {
           pname = "conclaude";
           src = self;
-          version = "0.0.1";
+          inherit
+            (builtins.fromJSON (builtins.readFile ./package.json))
+            version
+            ;
           bunNix = ./bun.nix;
-          buildPhase = ''
-            echo "🔧 Building application with bun..."
-            bun run build
-          '';
+          index = "./src/index.ts";
         };
+        default = self.packages.${system}.conclaude;
       };
 
       formatter = let

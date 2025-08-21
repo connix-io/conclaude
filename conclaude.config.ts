@@ -27,5 +27,16 @@ nix develop -c tests
 		 * Helps maintain clean project structure
 		 */
 		preventRootAdditions: true,
+		/**
+		 * Files that Claude cannot edit, using glob patterns
+		 * Examples:
+		 * - "package.json" - specific files
+		 * - "*.md" - file extensions
+		 * - "src/**\/*.ts" - nested patterns
+		 * - ".env*" - environment files
+		 * - "docs/**" - entire directories
+		 * - "{package,tsconfig}.json" - multiple specific files
+		 */
+		uneditableFiles: [],
 	},
 } as const satisfies ConclaudeConfig;

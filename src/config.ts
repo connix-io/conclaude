@@ -13,6 +13,7 @@ export interface StopConfig {
  */
 export interface RulesConfig {
 	preventRootAdditions: boolean;
+	uneditableFiles: string[];
 }
 
 /**
@@ -27,7 +28,7 @@ export interface ConclaudeConfig {
  * Load layered configuration using c12
  * Priority (high to low): runtime overrides → project config → local RC → global RC → package.json → defaults
  */
-async function loadConclaudeConfig(): Promise<ConclaudeConfig> {
+export async function loadConclaudeConfig(): Promise<ConclaudeConfig> {
 	const { config } = await loadConfig<ConclaudeConfig>({
 		name: "conclaude",
 		configFile: "conclaude.config",
@@ -40,17 +41,13 @@ async function loadConclaudeConfig(): Promise<ConclaudeConfig> {
 			},
 			rules: {
 				preventRootAdditions: true,
+				uneditableFiles: [],
 			},
 		},
 	});
 
 	return config as ConclaudeConfig;
 }
-
-/**
- * Singleton configuration instance
- */
-export const config = await loadConclaudeConfig();
 
 /**
  * @param bashScript - the bash script to analyze

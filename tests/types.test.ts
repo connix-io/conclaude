@@ -2,7 +2,7 @@ import { expect, test, describe, beforeEach, afterEach } from "bun:test";
 import { writeFile, mkdir, rm } from "fs/promises";
 import { join } from "path";
 import { validateBasePayload, getInitialMessage, getAllMessages, getConversationHistory } from "../src/types.ts";
-import type { BasePayloadType, TranscriptMessage } from "../src/types.ts";
+import type { BasePayloadType } from "../src/types.ts";
 
 describe("validateBasePayload", () => {
 	test("validates valid payload", () => {

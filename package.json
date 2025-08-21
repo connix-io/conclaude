@@ -1,17 +1,46 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "conclaude",
-	"module": "src/index.ts",
-	"type": "module",
+	"description": "Claude Code hook handler CLI tool that processes hook events and manages lifecycle hooks for tool usage, session management, and transcript processing",
 	"version": "0.0.1",
+	"type": "module",
+	"main": "src/index.ts",
+	"module": "src/index.ts",
+	"bin": {
+		"conclaude": "./src/index.ts"
+	},
+	"files": [
+		"src/",
+		"docs/CHANGELOG.md",
+		"README.md"
+	],
+	"keywords": [
+		"claude",
+		"claude-code",
+		"hooks",
+		"cli",
+		"ai",
+		"automation"
+	],
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/anthropics/conclaude.git"
+	},
+	"bugs": {
+		"url": "https://github.com/anthropics/conclaude/issues"
+	},
+	"homepage": "https://github.com/anthropics/conclaude#readme",
+	"license": "MIT",
 	"scripts": {
-		"build": "bun build src/index.ts --target=bun",
+		"build": "echo 'No build step needed for Bun CLI - source files are distributed directly'",
 		"test": "bun test",
 		"lint": "bun x tsc --noEmit",
-		"typecheck": "bun x tsc --noEmit"
+		"typecheck": "bun x tsc --noEmit",
+		"postinstall": "command -v bun2nix >/dev/null 2>&1 && bun2nix -o bun.nix || echo 'bun2nix not available, skipping bun.nix generation'"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
+		"@types/minimatch": "^6.0.0",
 		"@types/yargs": "^17.0.33"
 	},
 	"peerDependencies": {
@@ -19,6 +48,7 @@
 	},
 	"dependencies": {
 		"c12": "^3.2.0",
+		"minimatch": "^10.0.3",
 		"winston": "^3.17.0",
 		"yargs": "^18.0.0"
 	}
