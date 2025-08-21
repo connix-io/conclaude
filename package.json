@@ -3,7 +3,7 @@
 	"name": "conclaude",
 	"module": "src/index.ts",
 	"type": "module",
-	"private": true,
+	"version": "0.0.1",
 	"scripts": {
 		"build": "bun build src/index.ts --target=bun",
 		"test": "bun test",
