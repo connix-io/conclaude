@@ -1,8 +1,8 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
+	"version": "0.0.2",
 	"name": "conclaude",
 	"description": "Claude Code hook handler CLI tool that processes hook events and manages lifecycle hooks for tool usage, session management, and transcript processing",
-	"version": "0.0.1",
 	"type": "module",
 	"main": "src/index.ts",
 	"module": "src/index.ts",
@@ -24,12 +24,12 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/anthropics/conclaude.git"
+		"url": "git+https://github.com/connix-io/conclaude.git"
 	},
 	"bugs": {
-		"url": "https://github.com/anthropics/conclaude/issues"
+		"url": "https://github.com/connix-io/conclaude/issues"
 	},
-	"homepage": "https://github.com/anthropics/conclaude#readme",
+	"homepage": "https://github.com/connix-io/conclaude#readme",
 	"license": "MIT",
 	"scripts": {
 		"build": "echo 'No build step needed for Bun CLI - source files are distributed directly'",
