@@ -1,44 +1,9 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
-<<<<<<< HEAD
-	"version": "0.0.2",
 	"name": "conclaude",
+	"version": "0.0.2",
 	"description": "Claude Code hook handler CLI tool that processes hook events and manages lifecycle hooks for tool usage, session management, and transcript processing",
-	"type": "module",
-	"main": "src/index.ts",
-	"module": "src/index.ts",
-	"bin": {
-		"conclaude": "./src/index.ts"
-	},
-	"files": [
-		"src/",
-		"docs/CHANGELOG.md",
-		"README.md"
-	],
-	"keywords": [
-		"claude",
-		"claude-code",
-		"hooks",
-		"cli",
-		"ai",
-		"automation"
-	],
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/connix-io/conclaude.git"
-	},
-	"bugs": {
-		"url": "https://github.com/connix-io/conclaude/issues"
-	},
-	"homepage": "https://github.com/connix-io/conclaude#readme",
-	"license": "MIT",
-	"scripts": {
-		"build": "echo 'No build step needed for Bun CLI - source files are distributed directly'",
-=======
-	"name": "conclaude",
-	"version": "0.0.2",
-	"description": "Claude Code hook handler CLI tool for processing hook events and managing session lifecycle",
-	"keywords": ["claude", "claude-code", "hooks", "cli", "typescript", "bun"],
+	"keywords": ["claude", "claude-code", "hooks", "cli", "typescript", "bun", "ai", "automation"],
 	"author": "Conner Ohnesorge",
 	"license": "MIT",
 	"type": "module",
@@ -54,7 +19,6 @@
 		"build": "bun build src/index.ts --target=node --outfile=dist/conclaude --external=c12 --external=winston --external=yargs && chmod +x dist/conclaude",
 		"build:js": "bun build src/index.ts --target=node --outfile=dist/index.js --external=c12 --external=winston --external=yargs",
 		"prepublishOnly": "bun run build:js && bun run build",
->>>>>>> 6df2d14 (fix bin packaging)
 		"test": "bun test",
 		"lint": "bun x tsc --noEmit",
 		"typecheck": "bun x tsc --noEmit",
