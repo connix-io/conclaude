@@ -11,13 +11,13 @@
 		"typecheck": "bun x tsc --noEmit"
 	},
 	"devDependencies": {
-		"@types/bun": "latest"
+		"@types/bun": "latest",
+		"@types/yargs": "^17.0.33"
 	},
 	"peerDependencies": {
 		"typescript": "^5"
 	},
 	"dependencies": {
-		"@types/yargs": "^17.0.33",
 		"c12": "^3.2.0",
 		"winston": "^3.17.0",
 		"yargs": "^18.0.0"
