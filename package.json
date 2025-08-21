@@ -1,9 +1,18 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "conclaude",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"description": "Claude Code hook handler CLI tool that processes hook events and manages lifecycle hooks for tool usage, session management, and transcript processing",
-	"keywords": ["claude", "claude-code", "hooks", "cli", "typescript", "bun", "ai", "automation"],
+	"keywords": [
+		"claude",
+		"claude-code",
+		"hooks",
+		"cli",
+		"typescript",
+		"bun",
+		"ai",
+		"automation"
+	],
 	"author": "Conner Ohnesorge",
 	"license": "MIT",
 	"type": "module",
