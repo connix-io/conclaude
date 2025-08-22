@@ -8,3 +8,5 @@ conclaude.ts
 node_modules
 .crush
 bin
+dist
+.output
