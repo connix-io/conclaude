@@ -1,7 +1,7 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "conclaude",
-	"version": "0.0.5",
+	"version": "0.0.6",
 	"description": "Claude Code hook handler CLI tool that processes hook events and manages lifecycle hooks for tool usage, session management, and transcript processing",
 	"keywords": [
 		"claude",
