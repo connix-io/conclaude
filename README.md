@@ -1,32 +1,76 @@
 # conclaude
 
-A Claude Code hook handler CLI tool that processes hook events from Claude Code by reading JSON payloads from stdin and executing handlers for each event type. The tool provides lifecycle hooks for tool usage, session management, and transcript processing with a powerful layered configuration system.
+A Claude Code hook handler CLI tool that processes hook events from Claude Code by reading JSON payloads from stdin and executing handlers for each event type. The tool provides lifecycle hooks for tool usage, session management, and transcript processing with YAML-based configuration.
 
 ## Features
 
 - **Comprehensive Hook System**: Handle all Claude Code lifecycle events (PreToolUse, PostToolUse, Stop, etc.)
-- **Layered Configuration**: Project → Local → Global → Environment-specific configs with c12
+- **YAML Configuration**: Simple, readable YAML configuration files with cosmiconfig
 - **Command Execution**: Run linting, testing, and validation commands during Stop hooks
 - **File Protection**: Prevent unwanted root-level file creation via `preventRootAdditions` rule
 - **Session Logging**: Winston-based logging with session-specific file output
-- **Environment Awareness**: Support for development, production, and test-specific configurations
+- **Pattern Matching**: Glob pattern support for file protection rules
 
 ## Installation
 
+### Global Installation (Recommended)
+
 ```bash
+# Install globally with bun
+bun install -g conclaude
+
+# Or install from npm
+npm install -g conclaude
+```
+
+### Nix Flake Installation
+
+```bash
+# Use the flake directly
+nix run github:conneroisu/conclaude -- --help
+
+# Add to your flake inputs
+# flake.nix
+{
+  inputs.conclaude.url = "github:conneroisu/conclaude";
+}
+
+# Use in development shell
+nix develop
+```
+
+### Development Installation
+
+```bash
+# Clone and install for development
+git clone https://github.com/conneroisu/conclaude.git
+cd conclaude
 bun install
 ```
 
 ## Configuration System
 
-conclaude uses [c12](https://github.com/unjs/c12) for layered configuration management with the following priority order (high to low):
+conclaude uses [cosmiconfig](https://github.com/cosmiconfig/cosmiconfig) with YAML configuration files. The system searches for configuration in the following order:
 
-1. **Runtime Overrides** - Passed to configuration loader
-2. **Project Config** - `conclaude.config.{ts,js,yaml,json}`
-3. **Local RC File** - `./.conclaude` (project-specific overrides)
-4. **Global RC File** - `~/.conclaude` (user's global preferences)
-5. **Package.json** - `"conclaude"` field
-6. **Schema Defaults** - Fallback configuration
+1. `.conclaude.yaml` - Primary configuration file
+2. `.conclaude.yml` - Alternative YAML extension
+
+### Configuration Schema
+
+```yaml
+# .conclaude.yaml
+stop:
+  run: |
+    nix develop -c "lint"
+    bun test
+
+rules:
+  preventRootAdditions: true
+  uneditableFiles:
+    - "./package.json"
+    - "*.lock"
+    - ".env*"
+```
 
 ### Configuration Schema
 
@@ -37,17 +81,10 @@ interface ConclaudeConfig {
   };
   rules: {
     preventRootAdditions: boolean;  // Block file creation at repo root
+    uneditableFiles: string[];      // Glob patterns for protected files
   };
 }
 ```
-
-### Environment-Specific Overrides
-
-Configurations support environment-specific sections:
-
-- `$development` - Applied when `NODE_ENV=development`
-- `$production` - Applied when `NODE_ENV=production`
-- `$test` - Applied when `NODE_ENV=test`
 
 ## Hook Types
 
@@ -78,66 +115,136 @@ Fired when Claude session terminates. Enables:
 
 ## Configuration Examples
 
-### Project Configuration (`conclaude.config.ts`)
-
-```typescript
-export default {
-  stop: {
-    run: `bun x tsc --noEmit`,
-  },
-  rules: {
-    preventRootAdditions: true,
-  },
-  $development: {
-    stop: {
-      run: `echo "Development mode - skipping lint checks"`,
-    },
-  },
-  $production: {
-    stop: {
-      run: `bun x tsc --noEmit
-bun test
-bun build`,
-    },
-  },
-};
-```
-
-### Global User Config (`~/.conclaude`)
+### Basic Configuration (`.conclaude.yaml`)
 
 ```yaml
+# Commands to run during Stop hook
 stop:
   run: |
-    bun run lint
-    bun run test
-    bun run build
+    bun x tsc --noEmit
+    bun test
+    bun build
+
+# Validation rules
 rules:
-  preventRootAdditions: false
+  # Block file creation at repository root
+  preventRootAdditions: true
+  
+  # Files that cannot be edited (glob patterns)
+  uneditableFiles:
+    - "./package.json"
+    - "./bun.lockb"
+    - ".env*"
+    - "*.lock"
 ```
 
-### Project-Specific Override (`./.conclaude`)
+### Development Configuration Example
 
 ```yaml
+# Minimal checks for development
 stop:
-  run: echo "Project-specific commands"
+  run: |
+    echo "Running development checks..."
+    bun x tsc --noEmit
+
 rules:
-  preventRootAdditions: false  # Allow root edits for this project
+  preventRootAdditions: false  # Allow root edits during development
+  uneditableFiles:
+    - "./package.json"  # Still protect package.json
+```
+
+### Production Configuration Example
+
+```yaml
+# Comprehensive validation for production
+stop:
+  run: |
+    echo "Running production validation..."
+    bun x tsc --noEmit
+    bun test
+    bun run lint
+    bun run build
+
+rules:
+  preventRootAdditions: true
+  uneditableFiles:
+    - "./package.json"
+    - "./bun.lockb"
+    - ".env*"
+    - "dist/**"
+    - "node_modules/**"
 ```
 
 ## Usage
 
 ### Claude Code Integration
 
-conclaude is designed to be used as a hook handler in Claude Code. Configure it in your Claude Code settings:
+conclaude is designed to be used as a hook handler in Claude Code. After global installation, use the `conclaude init` command to automatically configure Claude Code hooks:
+
+```bash
+# Initialize conclaude in your project
+conclaude init
+```
+
+This creates:
+- `.conclaude.yaml` - Your project configuration
+- `.claude/settings.json` - Claude Code hook configuration
+
+#### Manual Claude Code Configuration
+
+If you prefer manual setup, configure hooks in your Claude Code settings:
 
 ```json
 {
   "hooks": {
-    "PreToolUse": "bun /path/to/conclaude/src/index.ts PreToolUse",
-    "PostToolUse": "bun /path/to/conclaude/src/index.ts PostToolUse", 
-    "Stop": "bun /path/to/conclaude/src/index.ts Stop"
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "conclaude PreToolUse"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "conclaude PostToolUse"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "conclaude Stop"
+          }
+        ]
+      }
+    ]
   }
 }
+```
+
+### Initialize Configuration
+
+```bash
+# Create initial .conclaude.yaml configuration
+conclaude init
+
+# Force overwrite existing configuration
+conclaude init --force
+
+# Specify custom paths
+conclaude init --config-path ./custom.yaml --claude-path ./.claude-custom
 ```
 
 ### Manual Testing
@@ -145,11 +252,15 @@ conclaude is designed to be used as a hook handler in Claude Code. Configure it 
 ```bash
 # Test Stop hook
 echo '{"session_id":"test","transcript_path":"/tmp/test.jsonl","hook_event_name":"Stop","stop_hook_active":true}' | \
-  bun src/index.ts Stop
+  conclaude Stop
 
 # Test PreToolUse hook  
 echo '{"session_id":"test","transcript_path":"/tmp/test.jsonl","hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"test.txt"}}' | \
-  bun src/index.ts PreToolUse
+  conclaude PreToolUse
+
+# Get help
+conclaude --help
+conclaude Stop --help
 ```
 
 ### Exit Codes
@@ -198,13 +309,20 @@ Read → /repo/package.json          ✓ Allowed (read-only)
 
 ```bash
 # Type checking
-bun x tsc --noEmit
+bun run lint
 
-# Build
-bun build src/index.ts --target=bun
+# Run tests
+bun test
 
-# Run directly
+# Build for distribution
+bun run build
+
+# Run hooks directly (development)
 bun src/index.ts <hook-type>
+
+# Use Nix development environment
+nix develop -c lint    # Run linting
+nix develop -c tests   # Run tests
 ```
 
 ### Project Structure
@@ -212,25 +330,23 @@ bun src/index.ts <hook-type>
 ```
 ├── src/
 │   ├── index.ts      # Main CLI with hook handlers
-│   ├── config.ts     # Configuration loading with c12
+│   ├── config.ts     # Configuration loading with cosmiconfig
 │   ├── types.ts      # TypeScript payload definitions
 │   └── logger.ts     # Winston logging configuration
-├── conclaude.config.ts    # Project configuration
-├── conclaude.schema.json  # JSON schema for validation
+├── .conclaude.yaml        # YAML configuration file
+├── flake.nix              # Nix development environment
+├── package.json           # Package configuration
 └── README.md
 ```
 
 ### Configuration Loading
 
-Configuration is loaded once at startup using c12's layered system:
+Configuration is loaded using cosmiconfig with YAML files:
 
-1. Base defaults from JSON schema
-2. Package.json `conclaude` field
-3. Global RC file (`~/.conclaude`)
-4. Local RC file (`./.conclaude`) 
-5. Project config file (`conclaude.config.*`)
-6. Environment-specific overrides
-7. Runtime overrides
+1. `.conclaude.yaml` - Primary configuration file
+2. `.conclaude.yml` - Alternative YAML extension
+
+If no configuration file is found, conclaude will throw an error requiring you to run `conclaude init` first.
 
 ### Adding New Hooks
 
@@ -250,7 +366,7 @@ stdin JSON → readPayload() → validateFields() → handler() → HookResult �
 ### Configuration Resolution
 
 ```
-Schema Defaults → Package.json → Global RC → Local RC → Project Config → ENV Overrides
+.conclaude.yaml → YAML parsing → ConclaudeConfig interface
 ```
 
 ### Command Execution (Stop Hook)
