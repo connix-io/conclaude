@@ -1,0 +1,10 @@
+stop:
+  run: |
+      nix develop -c "lint"
+      nix develop -c "tests"
+rules:
+  preventRootAdditions: false
+  uneditableFiles:
+    - "./flake.lock"
+    - "./package.json"
+    - ".conclaude.yaml"

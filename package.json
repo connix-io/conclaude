@@ -25,8 +25,8 @@
 		"README.md"
 	],
 	"scripts": {
-		"build": "bun build src/index.ts --target=node --outfile=dist/conclaude --external=c12 --external=winston --external=yargs && chmod +x dist/conclaude",
-		"build:js": "bun build src/index.ts --target=node --outfile=dist/index.js --external=c12 --external=winston --external=yargs",
+		"build": "bun build src/index.ts --target=node --outfile=dist/conclaude --external=cosmiconfig --external=yaml --external=winston --external=yargs && chmod +x dist/conclaude",
+		"build:js": "bun build src/index.ts --target=node --outfile=dist/index.js --external=cosmiconfig --external=yaml --external=winston --external=yargs",
 		"prepublishOnly": "bun run build:js && bun run build",
 		"test": "bun test",
 		"lint": "bun x tsc --noEmit",
@@ -42,9 +42,10 @@
 		"typescript": "^5"
 	},
 	"dependencies": {
-		"c12": "^3.2.0",
+		"cosmiconfig": "^9.0.0",
 		"minimatch": "^10.0.3",
 		"winston": "^3.17.0",
+		"yaml": "^2.8.1",
 		"yargs": "^18.0.0"
 	},
 	"engines": {
@@ -52,6 +53,6 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/connerohnesorge/conclaude.git"
+		"url": "git+https://github.com/conneroisu/conclaude.git"
 	}
 }

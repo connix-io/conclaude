@@ -1,4 +1,5 @@
-import { loadConfig } from "c12";
+import { cosmiconfig } from "cosmiconfig";
+import { parse as parseYaml } from "yaml";
 import { type SpawnSyncReturns, spawnSync } from "child_process";
 
 /**
@@ -25,28 +26,62 @@ export interface ConclaudeConfig {
 }
 
 /**
- * Load layered configuration using c12
- * Priority (high to low): runtime overrides → project config → local RC → global RC → package.json → defaults
+ * Load layered configuration using cosmiconfig
+ * Supports JSON, YAML, JS, and TS configuration files
+ * Search order: .conclaude.(yaml|yml|json|js|ts), conclaude.config.(js|ts|json|yaml|yml), package.json
  */
 export async function loadConclaudeConfig(): Promise<ConclaudeConfig> {
-	const { config } = await loadConfig<ConclaudeConfig>({
-		name: "conclaude",
-		configFile: "conclaude.config",
-		rcFile: ".conclaude",
-		globalRc: true,
-		packageJson: "conclaude",
-		defaults: {
-			stop: {
-				run: 'nix develop -c "lint"\nbun test',
-			},
-			rules: {
-				preventRootAdditions: true,
-				uneditableFiles: [],
-			},
+	const explorer = cosmiconfig("conclaude", {
+		searchPlaces: [
+			".conclaude.yaml",
+			".conclaude.yml", 
+			".conclaude.json",
+			".conclaude.js",
+			".conclaude.ts",
+			"conclaude.config.yaml",
+			"conclaude.config.yml",
+			"conclaude.config.json",
+			"conclaude.config.js",
+			"conclaude.config.ts",
+			"package.json",
+		],
+		loaders: {
+			".yaml": (filepath, content) => parseYaml(content),
+			".yml": (filepath, content) => parseYaml(content),
 		},
 	});
 
-	return config as ConclaudeConfig;
+	const result = await explorer.search();
+	
+	const defaults: ConclaudeConfig = {
+		stop: {
+			run: 'nix develop -c "lint"\nbun test',
+		},
+		rules: {
+			preventRootAdditions: true,
+			uneditableFiles: [],
+		},
+	};
+
+	if (!result) {
+		return defaults;
+	}
+
+	// Merge with defaults
+	const config = {
+		...defaults,
+		...result.config,
+		stop: {
+			...defaults.stop,
+			...result.config.stop,
+		},
+		rules: {
+			...defaults.rules,
+			...result.config.rules,
+		},
+	};
+
+	return config;
 }
 
 /**
