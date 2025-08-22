@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Claude Code Hook Handler CLI
  *
@@ -12,6 +12,7 @@
 /** biome-ignore-all lint/suspicious/noConsole: CLI requires console output for user feedback */
 
 import { minimatch } from "minimatch";
+import pkg from "../package.json";
 import type { Logger } from "winston";
 import yargs, { type Arguments, type CommandModule } from "yargs";
 import { hideBin } from "yargs/helpers";
@@ -827,7 +828,7 @@ const cli = yargs(hideBin(process.argv))
 	.demandCommand(1, "You need to specify a command")
 	.help("h")
 	.alias("h", "help")
-	.version("1.0.0")
+	.version(pkg.version)
 	.alias("V", "version")
 	.wrap(120)
 	.epilog(

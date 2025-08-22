@@ -6,15 +6,12 @@
     flake-utils.url = "github:numtide/flake-utils";
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
-    bun2nix.url = "github:baileyluTCD/bun2nix";
-    bun2nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = {
     self,
     nixpkgs,
     flake-utils,
-    bun2nix,
     treefmt-nix,
     ...
   }:
@@ -111,7 +108,6 @@
               eslint
               oxlint
               bun
-              bun2nix.packages.${system}.default
               openssl
               openssl.dev
               pkg-config
@@ -137,15 +133,24 @@
         (pkgs.lib.filterAttrs (_: script: script != {}) scripts);
 
       packages = {
-        conclaude = bun2nix.lib.${system}.mkBunDerivation {
+        conclaude = pkgs.buildNpmPackage {
           pname = "conclaude";
-          src = self;
           inherit
             (builtins.fromJSON (builtins.readFile ./package.json))
             version
             ;
-          bunNix = ./bun.nix;
-          index = "./src/index.ts";
+          src = self;
+          npmDepsHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          nativeBuildInputs = [ pkgs.bun ];
+          buildPhase = ''
+            bun install --frozen-lockfile
+            bun run build
+          '';
+          installPhase = ''
+            mkdir -p $out/bin
+            cp dist/conclaude.js $out/bin/conclaude
+            chmod +x $out/bin/conclaude
+          '';
         };
         default = self.packages.${system}.conclaude;
       };
