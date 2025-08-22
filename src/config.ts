@@ -26,24 +26,15 @@ export interface ConclaudeConfig {
 }
 
 /**
- * Load layered configuration using cosmiconfig
- * Supports JSON, YAML, JS, and TS configuration files
- * Search order: .conclaude.(yaml|yml|json|js|ts), conclaude.config.(js|ts|json|yaml|yml), package.json
+ * Load YAML configuration using cosmiconfig
+ * Only supports YAML configuration files
+ * Search order: .conclaude.(yaml|yml)
  */
 export async function loadConclaudeConfig(): Promise<ConclaudeConfig> {
 	const explorer = cosmiconfig("conclaude", {
 		searchPlaces: [
 			".conclaude.yaml",
-			".conclaude.yml", 
-			".conclaude.json",
-			".conclaude.js",
-			".conclaude.ts",
-			"conclaude.config.yaml",
-			"conclaude.config.yml",
-			"conclaude.config.json",
-			"conclaude.config.js",
-			"conclaude.config.ts",
-			"package.json",
+			".conclaude.yml",
 		],
 		loaders: {
 			".yaml": (filepath, content) => parseYaml(content),
@@ -52,36 +43,12 @@ export async function loadConclaudeConfig(): Promise<ConclaudeConfig> {
 	});
 
 	const result = await explorer.search();
-	
-	const defaults: ConclaudeConfig = {
-		stop: {
-			run: 'nix develop -c "lint"\nbun test',
-		},
-		rules: {
-			preventRootAdditions: true,
-			uneditableFiles: [],
-		},
-	};
 
 	if (!result) {
-		return defaults;
+		throw new Error("No .conclaude.yaml configuration file found. Please create one with stop and rules sections.");
 	}
 
-	// Merge with defaults
-	const config = {
-		...defaults,
-		...result.config,
-		stop: {
-			...defaults.stop,
-			...result.config.stop,
-		},
-		rules: {
-			...defaults.rules,
-			...result.config.rules,
-		},
-	};
-
-	return config;
+	return result.config as ConclaudeConfig;
 }
 
 /**

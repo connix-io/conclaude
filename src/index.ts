@@ -176,7 +176,7 @@ async function handlePreToolUse(_argv: Arguments): Promise<HookResult> {
 					payload.tool_name === "Write"
 				) {
 					// Check if the file is directly in the root directory (no subdirectories)
-					// Allow dotfiles and configuration files (like .conclaude, .gitignore, conclaude.config.ts, package.json)
+					// Allow dotfiles and configuration files (like .conclaude.yaml, .gitignore, package.json)
 					const fileName = path.basename(relativePath);
 					const isConfigFile =
 						fileName.includes("config") ||
@@ -584,7 +584,7 @@ async function handleInit(argv: Arguments): Promise<void> {
 
 	const cwd = process.cwd();
 	const configPath =
-		(argv.configPath as string) || path.join(cwd, "conclaude.config.ts");
+		(argv.configPath as string) || path.join(cwd, ".conclaude.yaml");
 	const claudePath = (argv.claudePath as string) || path.join(cwd, ".claude");
 	const settingsPath = path.join(claudePath, "settings.json");
 	const force = argv.force as boolean;
@@ -605,46 +605,32 @@ async function handleInit(argv: Arguments): Promise<void> {
 			process.exit(1);
 		}
 
-		// Create conclaude.config.ts
-		const configContent = `import type { ConclaudeConfig } from "./src/config.ts";
+		// Create .conclaude.yaml
+		const configContent = `# Conclaude YAML Configuration
+# This configuration defines how conclaude handles Claude Code hook events
 
-/**
- * Conclaude configuration file
- * This configuration defines how conclaude handles Claude Code hook events
- */
-export default {
-	/**
-	 * Commands to run during Stop hook
-	 * Each line is executed as a separate bash command
-	 */
-	stop: {
-		run: \`nix develop -c "lint"
-bun test\`,
-	},
+# Commands to run during Stop hook
+# Each line is executed as a separate bash command
+stop:
+  run: |
+    nix develop -c "lint"
+    bun test
 
-	/**
-	 * Validation rules for hook processing
-	 */
-	rules: {
-		/**
-		 * Prevent Claude from creating or modifying files at the repository root
-		 * Helps maintain clean project structure
-		 */
-		preventRootAdditions: true,
-		
-		/**
-		 * Files that Claude cannot edit, using glob patterns
-		 * Examples:
-		 * - "package.json" - specific files
-		 * - "*.md" - file extensions  
-		 * - "src/**/*.ts" - nested patterns
-		 * - ".env*" - environment files
-		 * - "docs/**" - entire directories
-		 * - "{package,tsconfig}.json" - multiple specific files
-		 */
-		uneditableFiles: [],
-	},
-} as const;
+# Validation rules for hook processing
+rules:
+  # Prevent Claude from creating or modifying files at the repository root
+  # Helps maintain clean project structure
+  preventRootAdditions: true
+  
+  # Files that Claude cannot edit, using glob patterns
+  # Examples:
+  # - "./package.json" - specific files
+  # - "*.md" - file extensions  
+  # - "src/**/*.ts" - nested patterns
+  # - ".env*" - environment files
+  # - "docs/**" - entire directories
+  # - "{package,tsconfig}.json" - multiple specific files
+  uneditableFiles: []
 `;
 
 		await fs.writeFile(configPath, configContent);
@@ -792,7 +778,7 @@ const initCommand: CommandModule = {
 	builder: {
 		"config-path": {
 			type: "string",
-			describe: "Path for conclaude.config.ts file",
+			describe: "Path for .conclaude.yaml file",
 			default: undefined,
 		},
 		"claude-path": {
