@@ -16,9 +16,9 @@ import type { Logger } from "winston";
 import yargs, { type Arguments, type CommandModule } from "yargs";
 import { hideBin } from "yargs/helpers";
 import {
+	type ConclaudeConfig,
 	extractBashCommands,
 	loadConclaudeConfig,
-	type ConclaudeConfig,
 } from "./config.ts";
 import { createLogger } from "./logger.ts";
 import type {
@@ -440,7 +440,9 @@ async function handleStop(_argv: Arguments): Promise<HookResult> {
 			const stderr = await new Response(result.stderr).text();
 
 			if (output !== 0) {
-				const errorMessage = `Command failed with exit code ${output}: ${command}${stderr ? `\nStderr: ${stderr}` : ""}`;
+				const stdoutSection = stdout ? `\nStdout: ${stdout}` : "";
+				const stderrSection = stderr ? `\nStderr: ${stderr}` : "";
+				const errorMessage = `Command failed with exit code ${output}: ${command}${stdoutSection}${stderrSection}`;
 				logger.error("Stop hook command failed", {
 					command,
 					exitCode: output,
