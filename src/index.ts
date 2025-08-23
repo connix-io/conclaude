@@ -11,11 +11,12 @@
 
 /** biome-ignore-all lint/suspicious/noConsole: CLI requires console output for user feedback */
 
+import { spawn } from "child_process";
 import { minimatch } from "minimatch";
-import pkg from "../package.json";
 import type { Logger } from "winston";
 import yargs, { type Arguments, type CommandModule } from "yargs";
 import { hideBin } from "yargs/helpers";
+import pkg from "../package.json";
 import {
 	type ConclaudeConfig,
 	extractBashCommands,
@@ -426,27 +427,34 @@ async function handleStop(_argv: Arguments): Promise<HookResult> {
 		);
 
 		try {
-			const result = Bun.spawn({
-				cmd: [
-					"bash",
-					"-c",
-					command,
-				],
-				stdout: "pipe",
-				stderr: "pipe",
+			const child = spawn("bash", ["-c", command], {
+				stdio: ["ignore", "pipe", "pipe"]
 			});
 
-			const output = await result.exited;
-			const stdout = await new Response(result.stdout).text();
-			const stderr = await new Response(result.stderr).text();
+			let stdout = "";
+			let stderr = "";
 
-			if (output !== 0) {
+			child.stdout?.on("data", (data) => {
+				stdout += data.toString();
+			});
+
+			child.stderr?.on("data", (data) => {
+				stderr += data.toString();
+			});
+
+			const exitCode = await new Promise<number>((resolve) => {
+				child.on("close", (code) => {
+					resolve(code ?? 1);
+				});
+			});
+
+			if (exitCode !== 0) {
 				const stdoutSection = stdout ? `\nStdout: ${stdout}` : "";
 				const stderrSection = stderr ? `\nStderr: ${stderr}` : "";
-				const errorMessage = `Command failed with exit code ${output}: ${command}${stdoutSection}${stderrSection}`;
+				const errorMessage = `Command failed with exit code ${exitCode}: ${command}${stdoutSection}${stderrSection}`;
 				logger.error("Stop hook command failed", {
 					command,
-					exitCode: output,
+					exitCode,
 					stdout,
 					stderr,
 				});
