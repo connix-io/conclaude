@@ -141,8 +141,6 @@
             ;
           src = self;
           npmDepsHash = "sha256-+LyhSCJHfStHpMlLRTrAggYrxwtnS66mjEvqkXfiAMI=";
-          makeCacheWritable = true;
-          npmFlags = [ "--ignore-scripts" "--offline" ];
           nativeBuildInputs = [pkgs.bun];
           buildPhase = ''
             runHook preBuild
