@@ -145,7 +145,6 @@
           npmFlags = [ "--legacy-peer-deps" ];
           nativeBuildInputs = [pkgs.bun];
           buildPhase = ''
-            bun install --frozen-lockfile
             bun run build
           '';
           installPhase = ''
