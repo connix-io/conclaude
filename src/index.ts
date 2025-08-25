@@ -484,6 +484,19 @@ async function handleStop(_argv: Arguments): Promise<HookResult> {
 
 	logger.info("All stop hook commands completed successfully");
 
+	// Check if infinite mode is enabled
+	if (config.stop.infinite) {
+		const infiniteMessage = config.stop.infiniteMessage || "continue working on the task";
+		logger.info("Infinite mode enabled, sending continuation message", {
+			infiniteMessage,
+		});
+
+		return {
+			message: infiniteMessage,
+			blocked: false,
+		};
+	}
+
 	return {
 		message: undefined,
 		blocked: false,
@@ -626,6 +639,12 @@ stop:
   run: |
     nix develop -c "lint"
     bun test
+  
+  # Ultra-thinking (infinite) mode - allows Claude to continue automatically
+  # When enabled, Claude receives the infiniteMessage to continue working
+  # instead of ending the session after stop hook commands succeed
+  infinite: false
+  infiniteMessage: "continue working on the task"
 
 # Validation rules for hook processing
 rules:
