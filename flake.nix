@@ -140,8 +140,8 @@
             version
             ;
           src = self;
-          npmDepsHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-          nativeBuildInputs = [ pkgs.bun ];
+          npmDepsHash = "sha256-+LyhSCJHfStHpMlLRTrAggYrxwtnS66mjEvqkXfiAMI=";
+          nativeBuildInputs = [pkgs.bun];
           buildPhase = ''
             bun install --frozen-lockfile
             bun run build
