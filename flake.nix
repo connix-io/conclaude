@@ -142,15 +142,19 @@
           src = self;
           npmDepsHash = "sha256-+LyhSCJHfStHpMlLRTrAggYrxwtnS66mjEvqkXfiAMI=";
           makeCacheWritable = true;
-          npmFlags = [ "--legacy-peer-deps" ];
+          npmFlags = [ "--ignore-scripts" "--offline" ];
           nativeBuildInputs = [pkgs.bun];
           buildPhase = ''
+            runHook preBuild
             bun run build
+            runHook postBuild
           '';
           installPhase = ''
+            runHook preInstall
             mkdir -p $out/bin
             cp dist/conclaude.js $out/bin/conclaude
             chmod +x $out/bin/conclaude
+            runHook postInstall
           '';
         };
         default = self.packages.${system}.conclaude;
