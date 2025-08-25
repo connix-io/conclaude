@@ -141,6 +141,8 @@
             ;
           src = self;
           npmDepsHash = "sha256-+LyhSCJHfStHpMlLRTrAggYrxwtnS66mjEvqkXfiAMI=";
+          makeCacheWritable = true;
+          npmFlags = [ "--legacy-peer-deps" ];
           nativeBuildInputs = [pkgs.bun];
           buildPhase = ''
             bun install --frozen-lockfile
