@@ -7,6 +7,8 @@ import { type SpawnSyncReturns, spawnSync } from "child_process";
  */
 export interface StopConfig {
 	run: string;
+	infinite?: boolean;
+	infiniteMessage?: string;
 }
 
 /**

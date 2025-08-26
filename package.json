@@ -3,6 +3,10 @@
 	"name": "conclaude",
 	"version": "0.0.9",
 	"description": "Claude Code hook handler CLI tool that processes hook events and manages lifecycle hooks for tool usage, session management, and transcript processing",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/conneroisu/conclaude.git"
+	},
 	"keywords": [
 		"claude",
 		"claude-code",
@@ -48,9 +52,5 @@
 	},
 	"engines": {
 		"node": ">=18.0.0"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/conneroisu/conclaude.git"
 	}
 }

@@ -132,25 +132,70 @@
         })
         (pkgs.lib.filterAttrs (_: script: script != {}) scripts);
 
-      packages = {
-        conclaude = pkgs.buildNpmPackage {
-          pname = "conclaude";
-          inherit
-            (builtins.fromJSON (builtins.readFile ./package.json))
-            version
-            ;
+      packages = let
+        nodeModules = pkgs.stdenv.mkDerivation {
+          pname = "conclaude-node-modules";
+          inherit (with builtins; fromJSON (readFile ./package.json)) version;
           src = self;
-          npmDepsHash = "sha256-+LyhSCJHfStHpMlLRTrAggYrxwtnS66mjEvqkXfiAMI=";
-          nativeBuildInputs = [pkgs.bun];
+
+          nativeBuildInputs = with pkgs; [bun];
+
           buildPhase = ''
-            bun install --frozen-lockfile
-            bun run build
+            export HOME=$(mktemp -d)
+            export BUN_INSTALL_CACHE_DIR=$(mktemp -d)
+            bun install --frozen-lockfile --no-verify
           '';
+
           installPhase = ''
+            mkdir -p $out
+            cp -r node_modules $out/
+          '';
+
+          outputHashMode = "recursive";
+          outputHashAlgo = "sha256";
+          outputHash = "sha256-FMGbP7V66qRXBkxdMEYmOFWbL3U6Z0/zEBY8CaP/fb4=";
+        };
+      in {
+        conclaude = pkgs.stdenv.mkDerivation {
+          pname = "conclaude";
+          inherit (with builtins; fromJSON (readFile ./package.json)) version;
+          src = self;
+
+          nativeBuildInputs = with pkgs; [
+            bun
+            nodejs
+          ];
+
+          buildPhase = ''
+            runHook preBuild
+
+            # Copy pre-built node_modules
+            cp -r ${nodeModules}/node_modules ./
+            chmod -R u+w node_modules
+
+            # Build the project
+            bun build src/index.ts --target=node --outfile=dist/conclaude.js
+            chmod +x dist/conclaude.js
+
+            runHook postBuild
+          '';
+
+          installPhase = ''
+            runHook preInstall
+
             mkdir -p $out/bin
             cp dist/conclaude.js $out/bin/conclaude
-            chmod +x $out/bin/conclaude
+
+            runHook postInstall
           '';
+
+          meta = with pkgs.lib; {
+            description = "Claude Code hook handler CLI tool that processes hook events and manages lifecycle hooks.";
+            homepage = "https://github.com/connix-io/conclaude";
+            license = licenses.mit;
+            maintainers = with maintainers; [connerohnsorge];
+            platforms = platforms.all;
+          };
         };
         default = self.packages.${system}.conclaude;
       };
