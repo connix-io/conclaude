@@ -1,6 +1,8 @@
 import { cosmiconfig } from "cosmiconfig";
 import { parse as parseYaml } from "yaml";
 import { type SpawnSyncReturns, spawnSync } from "child_process";
+import * as path from "path";
+import * as fs from "fs";
 
 /**
  * Configuration interface for stop hook commands
@@ -28,29 +30,111 @@ export interface ConclaudeConfig {
 }
 
 /**
- * Load YAML configuration using cosmiconfig
- * Only supports YAML configuration files
- * Search order: .conclaude.(yaml|yml)
+ * Find the git root directory starting from a given directory
+ * @param startDir - Directory to start searching from
+ * @returns Path to git root or null if not found
  */
-export async function loadConclaudeConfig(): Promise<ConclaudeConfig> {
-	const explorer = cosmiconfig("conclaude", {
-		searchPlaces: [
-			".conclaude.yaml",
-			".conclaude.yml",
-		],
-		loaders: {
-			".yaml": (filepath, content) => parseYaml(content),
-			".yml": (filepath, content) => parseYaml(content),
-		},
-	});
+function findGitRoot(startDir: string): string | null {
+	let currentDir = path.resolve(startDir);
+	
+	while (true) {
+		const gitDir = path.join(currentDir, ".git");
+		if (fs.existsSync(gitDir)) {
+			return currentDir;
+		}
+		
+		const parentDir = path.dirname(currentDir);
+		if (parentDir === currentDir) {
+			// Reached filesystem root
+			return null;
+		}
+		currentDir = parentDir;
+	}
+}
 
-	const result = await explorer.search();
+/**
+ * Search for config file in directories, starting from startDir and going up
+ * @param startDir - Directory to start searching from
+ * @param maxLevels - Maximum number of parent directories to search
+ * @returns Object with config path and content, or null if not found
+ */
+function searchConfigFile(startDir: string, maxLevels: number = 2): { filePath: string; content: string; searchedPaths: string[] } | { filePath: null; content: null; searchedPaths: string[] } {
+	const configFilenames = [".conclaude.yaml", ".conclaude.yml"];
+	const searchedPaths: string[] = [];
+	let currentDir = path.resolve(startDir);
+	
+	// Find git root to limit search scope
+	const gitRoot = findGitRoot(startDir);
+	
+	for (let level = 0; level <= maxLevels; level++) {
+		for (const filename of configFilenames) {
+			const configPath = path.join(currentDir, filename);
+			searchedPaths.push(configPath);
+			
+			if (fs.existsSync(configPath)) {
+				try {
+					const content = fs.readFileSync(configPath, 'utf8');
+					return { filePath: configPath, content, searchedPaths };
+				} catch (error) {
+					// Continue searching if file exists but can't be read
+					console.warn(`Warning: Found config file at ${configPath} but couldn't read it: ${error}`);
+				}
+			}
+		}
+		
+		// Stop if we've reached the git root
+		if (gitRoot && currentDir === gitRoot) {
+			break;
+		}
+		
+		// Move to parent directory
+		const parentDir = path.dirname(currentDir);
+		if (parentDir === currentDir) {
+			// Reached filesystem root
+			break;
+		}
+		currentDir = parentDir;
+	}
+	
+	return { filePath: null, content: null, searchedPaths };
+}
 
-	if (!result) {
-		throw new Error("No .conclaude.yaml configuration file found. Please create one with stop and rules sections.");
+/**
+ * Load YAML configuration using enhanced search strategy
+ * Searches for .conclaude.yaml or .conclaude.yml files starting from current directory
+ * and going up to git root (maximum 2 parent directories)
+ */
+export async function loadConclaudeConfig(startDir: string = process.cwd()): Promise<ConclaudeConfig> {
+	// Search for config file using our enhanced search
+	const searchResult = searchConfigFile(startDir);
+	
+	if (!searchResult.filePath) {
+		// Create helpful error message showing where we searched
+		const searchedPathsFormatted = searchResult.searchedPaths
+			.map(p => `  - ${p}`)
+			.join('\n');
+		
+		const gitRoot = findGitRoot(startDir);
+		const gitRootMessage = gitRoot 
+			? `\n\nSearch was limited to git repository root: ${gitRoot}`
+			: '\n\nNo git repository found - searched up to filesystem root or maximum 2 parent directories.';
+		
+		throw new Error(
+			`No .conclaude.yaml or .conclaude.yml configuration file found.\n\n` +
+			`Searched locations:\n${searchedPathsFormatted}${gitRootMessage}\n\n` +
+			`Please create a configuration file with stop and rules sections in one of the searched locations.`
+		);
 	}
 
-	return result.config as ConclaudeConfig;
+	// Parse the YAML content
+	try {
+		const config = parseYaml(searchResult.content);
+		return config as ConclaudeConfig;
+	} catch (error) {
+		throw new Error(
+			`Found configuration file at ${searchResult.filePath} but failed to parse YAML content: ${error}`
+		);
+	}
 }
 
 /**
