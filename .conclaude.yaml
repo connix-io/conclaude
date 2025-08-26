@@ -1,5 +1,6 @@
 stop:
   run: |
+      nix build .
       nix develop -c "lint"
       nix develop -c "tests"
 rules:
