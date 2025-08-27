@@ -427,9 +427,20 @@ async function handleStop(_argv: Arguments): Promise<HookResult> {
 		);
 
 		try {
-			const child = spawn("bash", ["-c", command], {
-				stdio: ["ignore", "pipe", "pipe"]
-			});
+			const child = spawn(
+				"bash",
+				[
+					"-c",
+					command,
+				],
+				{
+					stdio: [
+						"ignore",
+						"pipe",
+						"pipe",
+					],
+				},
+			);
 
 			let stdout = "";
 			let stderr = "";
@@ -486,7 +497,8 @@ async function handleStop(_argv: Arguments): Promise<HookResult> {
 
 	// Check if infinite mode is enabled
 	if (config.stop.infinite) {
-		const infiniteMessage = config.stop.infiniteMessage || "continue working on the task";
+		const infiniteMessage =
+			config.stop.infiniteMessage || "continue working on the task";
 		logger.info("Infinite mode enabled, sending continuation message", {
 			infiniteMessage,
 		});
@@ -640,7 +652,7 @@ stop:
     nix develop -c "lint"
     bun test
   
-  # Ultra-thinking (infinite) mode - allows Claude to continue automatically
+  # infinite mode - allows Claude to continue automatically
   # When enabled, Claude receives the infiniteMessage to continue working
   # instead of ending the session after stop hook commands succeed
   infinite: false

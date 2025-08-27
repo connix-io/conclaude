@@ -27,13 +27,15 @@ export interface ConclaudeConfig {
 	rules: RulesConfig;
 }
 
+
 /**
- * Load YAML configuration using cosmiconfig
+ * Load YAML configuration using cosmiconfig's native search strategies
  * Only supports YAML configuration files
- * Search order: .conclaude.(yaml|yml)
+ * Search strategy: project - searches up directory tree until package.json is found
  */
 export async function loadConclaudeConfig(): Promise<ConclaudeConfig> {
 	const explorer = cosmiconfig("conclaude", {
+		searchStrategy: "project",
 		searchPlaces: [
 			".conclaude.yaml",
 			".conclaude.yml",
@@ -44,13 +46,46 @@ export async function loadConclaudeConfig(): Promise<ConclaudeConfig> {
 		},
 	});
 
-	const result = await explorer.search();
+	try {
+		const result = await explorer.search();
+		
+		if (!result) {
+			// Show common locations that would be searched
+			const commonLocations = [
+				process.cwd(),
+				require("path").dirname(process.cwd()),
+			].map(dir => [
+				require("path").join(dir, ".conclaude.yaml"),
+				require("path").join(dir, ".conclaude.yml"),
+			]).flat();
 
-	if (!result) {
-		throw new Error("No .conclaude.yaml configuration file found. Please create one with stop and rules sections.");
+			const errorMessage = [
+				"Configuration file not found.",
+				"",
+				"Searched the following locations (and parent directories up to project root):",
+				...commonLocations.map(location => `  • ${location}`),
+				"",
+				"Search strategy: Current directory up to project root (directory containing package.json)",
+				"",
+				"Create a .conclaude.yaml or .conclaude.yml file with stop and rules sections.",
+				"Run 'conclaude init' to generate a template configuration."
+			].join("\n");
+
+			throw new Error(errorMessage);
+		}
+
+		return result.config as ConclaudeConfig;
+	} catch (error) {
+		// If it's already our formatted error, re-throw it
+		if (error instanceof Error && error.message.includes("Configuration file not found")) {
+			throw error;
+		}
+		
+		// Otherwise, it's a parsing error
+		throw new Error(
+			`Failed to parse configuration file: ${error instanceof Error ? error.message : String(error)}`
+		);
 	}
-
-	return result.config as ConclaudeConfig;
 }
 
 /**
