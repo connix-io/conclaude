@@ -27,15 +27,44 @@ npm install -g conclaude
 
 ```bash
 # Use the flake directly
-nix run github:conneroisu/conclaude -- --help
+nix run github:connix-io/conclaude -- --help
+```
 
-# Add to your flake inputs
+#### Adding conclaude to your development shell
+
+Add conclaude as a flake input and include it in your development shell:
+
+```nix
 # flake.nix
 {
-  inputs.conclaude.url = "github:conneroisu/conclaude";
-}
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    conclaude.url = "github:connix-io/conclaude";
+  };
 
-# Use in development shell
+  outputs = { self, nixpkgs, conclaude, ... }:
+    let
+      system = "x86_64-linux"; # or your system
+      pkgs = nixpkgs.legacyPackages.${system};
+    in {
+      devShells.default = pkgs.mkShell {
+        packages = [
+          conclaude.packages.${system}.default
+          # your other packages...
+        ];
+        
+        shellHook = ''
+          echo "conclaude available in development environment"
+          conclaude --help
+        '';
+      };
+    };
+}
+```
+
+Then enter the development shell:
+
+```bash
 nix develop
 ```
 
@@ -43,14 +72,14 @@ nix develop
 
 ```bash
 # Clone and install for development
-git clone https://github.com/conneroisu/conclaude.git
+git clone https://github.com/connix-io/conclaude.git
 cd conclaude
 bun install
 ```
 
 ## Configuration System
 
-conclaude uses [cosmiconfig](https://github.com/cosmiconfig/cosmiconfig) with YAML configuration files. The system searches for configuration in the following order:
+`conclaude` uses [cosmiconfig](https://github.com/cosmiconfig/cosmiconfig) with YAML configuration files. The system searches for configuration in the following order:
 
 1. `.conclaude.yaml` - Primary configuration file
 2. `.conclaude.yml` - Alternative YAML extension
