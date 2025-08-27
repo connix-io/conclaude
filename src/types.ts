@@ -10,6 +10,14 @@ import * as fs from "fs";
 import * as readline from "readline";
 
 /**
+ * Configuration options for controlling logger behavior.
+ */
+export interface LoggingConfig {
+	/** Whether to enable file logging to temporary directory */
+	fileLogging: boolean;
+}
+
+/**
  * Response structure returned by hook handlers to control execution flow.
  */
 export interface HookResult {
