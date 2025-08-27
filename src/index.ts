@@ -515,7 +515,7 @@ async function handleStop(argv: Arguments): Promise<HookResult> {
 
 		return {
 			message: infiniteMessage,
-			blocked: false,
+			blocked: true,
 		};
 	}
 
@@ -876,7 +876,8 @@ const cli = yargs(hideBin(process.argv))
 	})
 	.option("disable-file-logging", {
 		type: "boolean",
-		description: "Disable logging to temporary files (overrides CONCLAUDE_DISABLE_FILE_LOGGING)",
+		description:
+			"Disable logging to temporary files (overrides CONCLAUDE_DISABLE_FILE_LOGGING)",
 		global: true,
 	})
 	.demandCommand(1, "You need to specify a command")
