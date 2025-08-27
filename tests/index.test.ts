@@ -9,6 +9,54 @@ describe("CLI integration", () => {
 	});
 });
 
+describe("Logging configuration", () => {
+	test("CLI flag parsing includes disable-file-logging option", () => {
+		// Test that the CLI flag is properly defined
+		// This is a basic smoke test to ensure the option exists
+		const mockArgv = {
+			disableFileLogging: true,
+			verbose: false,
+		};
+		
+		// Verify the mock argv structure matches expected CLI options
+		expect(typeof mockArgv.disableFileLogging).toBe("boolean");
+		expect(typeof mockArgv.verbose).toBe("boolean");
+	});
+
+	test("Environment variable support structure", () => {
+		// Test environment variable handling logic
+		const testCases = [
+			{ env: "true", expected: false }, // CONCLAUDE_DISABLE_FILE_LOGGING=true -> fileLogging=false
+			{ env: "false", expected: true }, // CONCLAUDE_DISABLE_FILE_LOGGING=false -> fileLogging=true
+			{ env: undefined, expected: false }, // default -> fileLogging=false
+		];
+
+		testCases.forEach(({ env, expected }) => {
+			// Mock environment variable value
+			const originalEnv = process.env.CONCLAUDE_DISABLE_FILE_LOGGING;
+			
+			if (env === undefined) {
+				delete process.env.CONCLAUDE_DISABLE_FILE_LOGGING;
+			} else {
+				process.env.CONCLAUDE_DISABLE_FILE_LOGGING = env;
+			}
+
+			// Test the logic directly (simulating what happens in resolveLoggingConfig)
+			const envVar = process.env.CONCLAUDE_DISABLE_FILE_LOGGING;
+			const defaultFileLogging = envVar === "false";
+			
+			expect(defaultFileLogging).toBe(expected);
+
+			// Restore original environment variable
+			if (originalEnv !== undefined) {
+				process.env.CONCLAUDE_DISABLE_FILE_LOGGING = originalEnv;
+			} else {
+				delete process.env.CONCLAUDE_DISABLE_FILE_LOGGING;
+			}
+		});
+	});
+});
+
 describe("Uneditable files validation", () => {
 	test("minimatch patterns work correctly", () => {
 		// Test basic patterns

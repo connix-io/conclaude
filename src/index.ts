@@ -26,6 +26,7 @@ import { createLogger } from "./logger.ts";
 import type {
 	BasePayloadType,
 	HookResult,
+	LoggingConfig,
 	NotificationPayload,
 	PostToolUsePayload,
 	PreCompactPayload,
@@ -90,14 +91,17 @@ export function handleHookResult(
  * This function:
  * - Reads all data from stdin as JSON
  * - Validates required base fields (session_id, transcript_path, hook_event_name)
- * - Creates a Winston logger tagged with the session ID
+ * - Creates a Winston logger tagged with the session ID and configured logging options
  * - Returns both the typed payload and logger for use in handlers
  *
  * @template T - The specific hook payload type expected
+ * @param argv - CLI arguments containing logging configuration options
  * @returns Promise containing the validated payload and session logger
  * @throws {Error} When required fields are missing or JSON is invalid
  */
-async function readPayload<T extends BasePayloadType>(): Promise<{
+async function readPayload<T extends BasePayloadType>(
+	argv: Arguments,
+): Promise<{
 	payload: T;
 	logger: Logger;
 }> {
@@ -116,8 +120,14 @@ async function readPayload<T extends BasePayloadType>(): Promise<{
 	if (!payload.hook_event_name)
 		throw new Error("Missing required field: hook_event_name");
 
-	// Create logger with session ID
-	const logger = createLogger(payload.session_id);
+	// Resolve logging configuration from CLI flags
+	const loggingConfig: Partial<LoggingConfig> = {};
+	if (argv.disableFileLogging !== undefined) {
+		loggingConfig.fileLogging = !argv.disableFileLogging;
+	}
+
+	// Create logger with session ID and logging configuration
+	const logger = createLogger(payload.session_id, undefined, loggingConfig);
 
 	return {
 		payload,
@@ -135,11 +145,11 @@ async function readPayload<T extends BasePayloadType>(): Promise<{
  * - Modifying tool inputs or validating parameters
  * - Rate limiting or resource management
  *
- * @param _argv - CLI arguments (unused, hook data comes from stdin)
+ * @param argv - CLI arguments including logging configuration options
  * @returns HookResult indicating whether to allow tool execution
  */
-async function handlePreToolUse(_argv: Arguments): Promise<HookResult> {
-	const { payload, logger } = await readPayload<PreToolUsePayload>();
+async function handlePreToolUse(argv: Arguments): Promise<HookResult> {
+	const { payload, logger } = await readPayload<PreToolUsePayload>(argv);
 
 	if (!payload.tool_name) throw new Error("Missing required field: tool_name");
 	if (!payload.tool_input)
@@ -277,11 +287,11 @@ async function handlePreToolUse(_argv: Arguments): Promise<HookResult> {
  * - Updating external systems based on tool execution
  * - Collecting usage statistics and success rates
  *
- * @param _argv - CLI arguments (unused, hook data comes from stdin)
+ * @param argv - CLI arguments including logging configuration options
  * @returns HookResult for any post-execution feedback
  */
-async function handlePostToolUse(_argv: Arguments): Promise<HookResult> {
-	const { payload, logger } = await readPayload<PostToolUsePayload>();
+async function handlePostToolUse(argv: Arguments): Promise<HookResult> {
+	const { payload, logger } = await readPayload<PostToolUsePayload>(argv);
 
 	if (!payload.tool_name) throw new Error("Missing required field: tool_name");
 	if (!payload.tool_input)
@@ -311,11 +321,11 @@ async function handlePostToolUse(_argv: Arguments): Promise<HookResult> {
  * - Integration with external monitoring systems
  * - User preference-based notification handling
  *
- * @param _argv - CLI arguments (unused, hook data comes from stdin)
+ * @param argv - CLI arguments including logging configuration options
  * @returns HookResult for notification processing
  */
-async function handleNotification(_argv: Arguments): Promise<HookResult> {
-	const { payload, logger } = await readPayload<NotificationPayload>();
+async function handleNotification(argv: Arguments): Promise<HookResult> {
+	const { payload, logger } = await readPayload<NotificationPayload>(argv);
 
 	if (!payload.message) throw new Error("Missing required field: message");
 
@@ -340,11 +350,11 @@ async function handleNotification(_argv: Arguments): Promise<HookResult> {
  * - Usage tracking and analytics
  * - Custom authentication or authorization checks
  *
- * @param _argv - CLI arguments (unused, hook data comes from stdin)
+ * @param argv - CLI arguments including logging configuration options
  * @returns HookResult indicating whether to allow the prompt
  */
-async function handleUserPromptSubmit(_argv: Arguments): Promise<HookResult> {
-	const { payload, logger } = await readPayload<UserPromptSubmitPayload>();
+async function handleUserPromptSubmit(argv: Arguments): Promise<HookResult> {
+	const { payload, logger } = await readPayload<UserPromptSubmitPayload>(argv);
 
 	if (!payload.prompt) throw new Error("Missing required field: prompt");
 
@@ -369,11 +379,11 @@ async function handleUserPromptSubmit(_argv: Arguments): Promise<HookResult> {
  * - Resource allocation and environment preparation
  * - Logging session metadata and context
  *
- * @param _argv - CLI arguments (unused, hook data comes from stdin)
+ * @param argv - CLI arguments including logging configuration options
  * @returns HookResult for session initialization
  */
-async function handleSessionStart(_argv: Arguments): Promise<HookResult> {
-	const { payload, logger } = await readPayload<SessionStartPayload>();
+async function handleSessionStart(argv: Arguments): Promise<HookResult> {
+	const { payload, logger } = await readPayload<SessionStartPayload>(argv);
 
 	if (!payload.source) throw new Error("Missing required field: source");
 
@@ -398,11 +408,11 @@ async function handleSessionStart(_argv: Arguments): Promise<HookResult> {
  * - Data persistence and state saving
  * - Notification of session completion
  *
- * @param _argv - CLI arguments (unused, hook data comes from stdin)
+ * @param argv - CLI arguments including logging configuration options
  * @returns HookResult for session cleanup
  */
-async function handleStop(_argv: Arguments): Promise<HookResult> {
-	const { payload, logger } = await readPayload<StopPayload>();
+async function handleStop(argv: Arguments): Promise<HookResult> {
+	const { payload, logger } = await readPayload<StopPayload>(argv);
 
 	if (payload.stop_hook_active === undefined)
 		throw new Error("Missing required field: stop_hook_active");
@@ -524,11 +534,11 @@ async function handleStop(_argv: Arguments): Promise<HookResult> {
  * - Error handling for failed subagent operations
  * - Resource cleanup for subagent-specific allocations
  *
- * @param _argv - CLI arguments (unused, hook data comes from stdin)
+ * @param argv - CLI arguments including logging configuration options
  * @returns HookResult for subagent completion handling
  */
-async function handleSubagentStop(_argv: Arguments): Promise<HookResult> {
-	const { payload, logger } = await readPayload<SubagentStopPayload>();
+async function handleSubagentStop(argv: Arguments): Promise<HookResult> {
+	const { payload, logger } = await readPayload<SubagentStopPayload>(argv);
 
 	if (payload.stop_hook_active === undefined)
 		throw new Error("Missing required field: stop_hook_active");
@@ -555,11 +565,11 @@ async function handleSubagentStop(_argv: Arguments): Promise<HookResult> {
  * - Notification of data loss due to compaction
  * - Analytics on conversation length and patterns
  *
- * @param _argv - CLI arguments (unused, hook data comes from stdin)
+ * @param argv - CLI arguments including logging configuration options
  * @returns HookResult for pre-compaction processing
  */
-async function handlePreCompact(_argv: Arguments): Promise<HookResult> {
-	const { payload, logger } = await readPayload<PreCompactPayload>();
+async function handlePreCompact(argv: Arguments): Promise<HookResult> {
+	const { payload, logger } = await readPayload<PreCompactPayload>(argv);
 
 	if (!payload.trigger) throw new Error("Missing required field: trigger");
 	if (payload.trigger !== "manual" && payload.trigger !== "auto") {
@@ -862,6 +872,11 @@ const cli = yargs(hideBin(process.argv))
 		alias: "v",
 		type: "boolean",
 		description: "Enable verbose logging output",
+		global: true,
+	})
+	.option("disable-file-logging", {
+		type: "boolean",
+		description: "Disable logging to temporary files (overrides CONCLAUDE_DISABLE_FILE_LOGGING)",
 		global: true,
 	})
 	.demandCommand(1, "You need to specify a command")
