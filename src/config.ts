@@ -9,6 +9,7 @@ export interface StopConfig {
 	run: string;
 	infinite?: boolean;
 	infiniteMessage?: string;
+	customErrorMessage?: string;
 }
 
 /**

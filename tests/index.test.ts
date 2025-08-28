@@ -1,4 +1,4 @@
-import { expect, test, describe } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { minimatch } from "minimatch";
 
 describe("CLI integration", () => {
@@ -17,7 +17,7 @@ describe("Logging configuration", () => {
 			disableFileLogging: true,
 			verbose: false,
 		};
-		
+
 		// Verify the mock argv structure matches expected CLI options
 		expect(typeof mockArgv.disableFileLogging).toBe("boolean");
 		expect(typeof mockArgv.verbose).toBe("boolean");
@@ -26,15 +26,24 @@ describe("Logging configuration", () => {
 	test("Environment variable support structure", () => {
 		// Test environment variable handling logic
 		const testCases = [
-			{ env: "true", expected: false }, // CONCLAUDE_DISABLE_FILE_LOGGING=true -> fileLogging=false
-			{ env: "false", expected: true }, // CONCLAUDE_DISABLE_FILE_LOGGING=false -> fileLogging=true
-			{ env: undefined, expected: false }, // default -> fileLogging=false
+			{
+				env: "true",
+				expected: false,
+			}, // CONCLAUDE_DISABLE_FILE_LOGGING=true -> fileLogging=false
+			{
+				env: "false",
+				expected: true,
+			}, // CONCLAUDE_DISABLE_FILE_LOGGING=false -> fileLogging=true
+			{
+				env: undefined,
+				expected: false,
+			}, // default -> fileLogging=false
 		];
 
 		testCases.forEach(({ env, expected }) => {
 			// Mock environment variable value
 			const originalEnv = process.env.CONCLAUDE_DISABLE_FILE_LOGGING;
-			
+
 			if (env === undefined) {
 				delete process.env.CONCLAUDE_DISABLE_FILE_LOGGING;
 			} else {
@@ -44,7 +53,7 @@ describe("Logging configuration", () => {
 			// Test the logic directly (simulating what happens in resolveLoggingConfig)
 			const envVar = process.env.CONCLAUDE_DISABLE_FILE_LOGGING;
 			const defaultFileLogging = envVar === "false";
-			
+
 			expect(defaultFileLogging).toBe(expected);
 
 			// Restore original environment variable
@@ -65,15 +74,15 @@ describe("Uneditable files validation", () => {
 		expect(minimatch("src/index.ts", "src/**/*.ts")).toBe(true);
 		expect(minimatch("docs/README.md", "docs/**")).toBe(true);
 		expect(minimatch(".env.local", ".env*")).toBe(true);
-		
+
 		// Test brace expansion
 		expect(minimatch("package.json", "{package,tsconfig}.json")).toBe(true);
 		expect(minimatch("tsconfig.json", "{package,tsconfig}.json")).toBe(true);
 		expect(minimatch("other.json", "{package,tsconfig}.json")).toBe(false);
-		
+
 		// Test negation patterns
 		expect(minimatch("src/generated/types.ts", "src/**/*.ts")).toBe(true);
-		
+
 		// Test case sensitivity
 		expect(minimatch("README.md", "*.MD")).toBe(false);
 		expect(minimatch("README.md", "*.md")).toBe(true);
@@ -81,17 +90,38 @@ describe("Uneditable files validation", () => {
 
 	test("file path normalization scenarios", () => {
 		const testCases = [
-			{ path: "./package.json", pattern: "package.json", expected: true },
-			{ path: "src/../package.json", pattern: "package.json", expected: true },
-			{ path: "/absolute/path/package.json", pattern: "package.json", expected: true },
-			{ path: "src/nested/file.ts", pattern: "src/**/*.ts", expected: true },
-			{ path: "src\\nested\\file.ts", pattern: "src/**/*.ts", expected: true }, // Windows paths
+			{
+				path: "./package.json",
+				pattern: "package.json",
+				expected: true,
+			},
+			{
+				path: "src/../package.json",
+				pattern: "package.json",
+				expected: true,
+			},
+			{
+				path: "/absolute/path/package.json",
+				pattern: "package.json",
+				expected: true,
+			},
+			{
+				path: "src/nested/file.ts",
+				pattern: "src/**/*.ts",
+				expected: true,
+			},
+			{
+				path: "src\\nested\\file.ts",
+				pattern: "src/**/*.ts",
+				expected: true,
+			}, // Windows paths
 		];
 
 		for (const { path, pattern, expected } of testCases) {
-			const result = minimatch(path, pattern) || 
-							minimatch(path.replace(/\\/g, "/"), pattern) ||
-							minimatch(path.split("/").pop() || "", pattern);
+			const result =
+				minimatch(path, pattern) ||
+				minimatch(path.replace(/\\/g, "/"), pattern) ||
+				minimatch(path.split("/").pop() || "", pattern);
 			expect(result).toBe(expected);
 		}
 	});

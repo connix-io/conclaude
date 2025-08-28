@@ -1,11 +1,13 @@
-import { expect, test, describe } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { extractBashCommands } from "../src/config.ts";
 
 describe("extractBashCommands", () => {
 	test("extracts single command", () => {
 		const script = "echo hello";
 		const commands = extractBashCommands(script);
-		expect(commands).toEqual(["echo hello"]);
+		expect(commands).toEqual([
+			"echo hello",
+		]);
 	});
 
 	test("extracts multiple commands", () => {
@@ -13,7 +15,11 @@ describe("extractBashCommands", () => {
 npm install
 npm test`;
 		const commands = extractBashCommands(script);
-		expect(commands).toEqual(["echo hello", "npm install", "npm test"]);
+		expect(commands).toEqual([
+			"echo hello",
+			"npm install",
+			"npm test",
+		]);
 	});
 
 	test("ignores empty lines", () => {
@@ -22,7 +28,10 @@ npm test`;
 npm test
 `;
 		const commands = extractBashCommands(script);
-		expect(commands).toEqual(["echo hello", "npm test"]);
+		expect(commands).toEqual([
+			"echo hello",
+			"npm test",
+		]);
 	});
 
 	test("ignores comments", () => {
@@ -31,7 +40,10 @@ echo hello
 # Another comment
 npm test`;
 		const commands = extractBashCommands(script);
-		expect(commands).toEqual(["echo hello", "npm test"]);
+		expect(commands).toEqual([
+			"echo hello",
+			"npm test",
+		]);
 	});
 
 	test("handles mixed whitespace and comments", () => {
@@ -42,7 +54,11 @@ echo hello
 npm test
    echo world   `;
 		const commands = extractBashCommands(script);
-		expect(commands).toEqual(["echo hello", "npm test", "   echo world   "]);
+		expect(commands).toEqual([
+			"echo hello",
+			"npm test",
+			"   echo world   ",
+		]);
 	});
 
 	test("handles complex bash commands", () => {
@@ -53,7 +69,7 @@ cd /tmp && echo "test"`;
 		expect(commands).toEqual([
 			'nix develop -c "lint"',
 			"bun x tsc --noEmit",
-			'cd /tmp && echo "test"'
+			'cd /tmp && echo "test"',
 		]);
 	});
 

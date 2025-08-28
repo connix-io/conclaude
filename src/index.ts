@@ -400,6 +400,217 @@ async function handleSessionStart(argv: Arguments): Promise<HookResult> {
 }
 
 /**
+ * Identifies the type and purpose of a command to provide better error context.
+ *
+ * @param command - The command string to analyze
+ * @returns Object with command type information and user-friendly descriptions
+ */
+function identifyCommand(command: string): {
+	type: string;
+	description: string;
+	purpose: string;
+	suggestions: string[];
+} {
+	const cmd = command.toLowerCase().trim();
+
+	// Build commands
+	if (cmd.includes("build") || cmd.includes("compile")) {
+		return {
+			type: "build",
+			description: "Build process failed",
+			purpose:
+				"Building the project ensures all code compiles correctly and dependencies are resolved.",
+			suggestions: [
+				"Check for compilation errors in the output above",
+				"Look for missing dependencies or import issues",
+				"Verify that all required files exist",
+				"Fix any syntax errors that were reported",
+			],
+		};
+	}
+
+	// Linting commands
+	if (
+		cmd.includes("lint") ||
+		cmd.includes("eslint") ||
+		cmd.includes("biome") ||
+		cmd.includes("fmt")
+	) {
+		return {
+			type: "lint",
+			description: "Code linting found issues",
+			purpose:
+				"Linting ensures code follows style guidelines and catches potential issues.",
+			suggestions: [
+				"Fix the linting errors shown in the output above",
+				"Run the linter with --fix flag if available to auto-fix issues",
+				"Check for unused variables, formatting issues, or style violations",
+				"Review any eslint/biome rule violations mentioned",
+			],
+		};
+	}
+
+	// Test commands
+	if (
+		cmd.includes("test") ||
+		cmd.includes("spec") ||
+		cmd.includes("jest") ||
+		cmd.includes("vitest") ||
+		cmd.includes("bun test")
+	) {
+		return {
+			type: "test",
+			description: "Tests are failing",
+			purpose:
+				"Tests verify that your code changes work correctly and don't break existing functionality.",
+			suggestions: [
+				"Review the failing test cases shown in the output above",
+				"Update tests if you made intentional changes to functionality",
+				"Fix any bugs that are causing tests to fail",
+				"Check for missing test setup or configuration issues",
+			],
+		};
+	}
+
+	// Type checking
+	if (
+		cmd.includes("typecheck") ||
+		cmd.includes("tsc") ||
+		cmd.includes("typescript")
+	) {
+		return {
+			type: "typecheck",
+			description: "Type checking found errors",
+			purpose:
+				"Type checking ensures your code is type-safe and catches potential runtime errors.",
+			suggestions: [
+				"Fix the TypeScript errors shown in the output above",
+				"Add missing type annotations where needed",
+				"Resolve any type mismatches or incompatible assignments",
+				"Check for missing imports or incorrect type definitions",
+			],
+		};
+	}
+
+	// Generic fallback
+	return {
+		type: "command",
+		description: `Command failed: ${command}`,
+		purpose:
+			"This command is part of the project's quality assurance process.",
+		suggestions: [
+			"Review the error output above for specific issues",
+			"Check if any files need to be modified or fixed",
+			"Ensure all required dependencies are installed",
+			"Look for any configuration issues mentioned in the error",
+		],
+	};
+}
+
+/**
+ * Extracts the most relevant error information from command output.
+ *
+ * @param stdout - Standard output from the command
+ * @param stderr - Standard error from the command
+ * @param command - The original command that was executed
+ * @returns Formatted string with key error details
+ */
+function extractKeyErrors(
+	stdout: string,
+	stderr: string,
+	command: string,
+): string {
+	const errors: string[] = [];
+	const maxLines = 10; // Limit output to prevent overwhelming Claude
+
+	// Combine and clean up all output
+	const allOutput = (stdout + "\n" + stderr).trim();
+	if (!allOutput) {
+		return "No specific error details were provided.";
+	}
+
+	const lines = allOutput.split("\n").filter((line) => line.trim());
+
+	// Look for common error patterns
+	const errorPatterns = [
+		/error:/i,
+		/failed:/i,
+		/exception:/i,
+		/✗/,
+		/❌/,
+		/\[ERROR\]/i,
+		/\berror\b/i,
+		/cannot find/i,
+		/not found/i,
+		/undefined/i,
+		/unexpected/i,
+		/invalid/i,
+		/missing/i,
+	];
+
+	// Extract lines that look like errors
+	const errorLines = lines.filter((line) =>
+		errorPatterns.some((pattern) => pattern.test(line)),
+	);
+
+	if (errorLines.length > 0) {
+		// Take the first few error lines
+		errors.push("Key errors found:");
+		errorLines.slice(0, maxLines).forEach((line, index) => {
+			errors.push(`${index + 1}. ${line.trim()}`);
+		});
+
+		if (errorLines.length > maxLines) {
+			errors.push(`... and ${errorLines.length - maxLines} more errors`);
+		}
+	} else {
+		// No obvious error patterns, just show last few lines of output
+		errors.push("Command output:");
+		const lastLines = lines.slice(-Math.min(maxLines, lines.length));
+		lastLines.forEach((line, index) => {
+			errors.push(`${index + 1}. ${line.trim()}`);
+		});
+	}
+
+	return errors.join("\n");
+}
+
+/**
+ * Formats a user-friendly error message for Claude when stop hook commands fail.
+ *
+ * @param command - The command that failed
+ * @param exitCode - Exit code from the command
+ * @param stdout - Standard output from the command
+ * @param stderr - Standard error from the command
+ * @returns Formatted error message designed to be actionable for Claude
+ */
+function formatStopHookError(
+	command: string,
+	exitCode: number,
+	stdout: string,
+	stderr: string,
+): string {
+	const commandInfo = identifyCommand(command);
+	const keyErrors = extractKeyErrors(stdout, stderr, command);
+
+	const sections = [
+		`❌ ${commandInfo.description}`,
+		"",
+		commandInfo.purpose,
+		"",
+		keyErrors,
+		"",
+		"What you can do:",
+		...commandInfo.suggestions.map((suggestion) => `• ${suggestion}`),
+		"",
+		`Command: ${command}`,
+		`Exit code: ${exitCode}`,
+	];
+
+	return sections.join("\n");
+}
+
+/**
  * Handles Stop hook events when a Claude session is terminating.
  *
  * This hook provides cleanup opportunities when sessions end, enabling:
@@ -470,9 +681,9 @@ async function handleStop(argv: Arguments): Promise<HookResult> {
 			});
 
 			if (exitCode !== 0) {
-				const stdoutSection = stdout ? `\nStdout: ${stdout}` : "";
-				const stderrSection = stderr ? `\nStderr: ${stderr}` : "";
-				const errorMessage = `Command failed with exit code ${exitCode}: ${command}${stdoutSection}${stderrSection}`;
+				const errorMessage =
+					config.stop.customErrorMessage ||
+					formatStopHookError(command, exitCode, stdout, stderr);
 				logger.error("Stop hook command failed", {
 					command,
 					exitCode,
@@ -490,10 +701,13 @@ async function handleStop(argv: Arguments): Promise<HookResult> {
 				stdout: stdout.trim(),
 			});
 		} catch (error) {
-			const errorMessage = `Command execution failed: ${command}\nError: ${error instanceof Error ? error.message : String(error)}`;
+			const errorText = error instanceof Error ? error.message : String(error);
+			const errorMessage =
+				config.stop.customErrorMessage ||
+				formatStopHookError(command, 1, "", errorText);
 			logger.error("Stop hook command execution error", {
 				command,
-				error: error instanceof Error ? error.message : String(error),
+				error: errorText,
 			});
 
 			return {
@@ -667,6 +881,10 @@ stop:
   # instead of ending the session after stop hook commands succeed
   infinite: false
   infiniteMessage: "continue working on the task"
+  
+  # Custom error message to show Claude when stop hook commands fail
+  # If not provided, conclaude will generate user-friendly error messages automatically
+  # customErrorMessage: "Some commands failed. Please review and fix the issues before continuing."
 
 # Validation rules for hook processing
 rules:

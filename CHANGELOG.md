@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.3] - 2025-08-28
+
+### Added
+- **User-friendly Stop Hook Error Messages**: Implemented intelligent error message formatting for Claude when stop hook commands fail
+  - Added `identifyCommand()` function to classify commands (build, lint, test, typecheck) and provide context
+  - Added `extractKeyErrors()` function to parse command output and extract relevant error information
+  - Added `formatStopHookError()` function to create structured, actionable error messages for Claude
+  - Error messages now include command description, purpose, key errors, and actionable suggestions
+  - Added support for custom error messages via `customErrorMessage` configuration option
+- **Stop Hook Configuration Enhancement**: Extended stop configuration with optional `customErrorMessage` field
+  - Allows users to override automatic error formatting with custom messages
+  - Updated init command template to document the new configuration option
+
+### Changed
+- **Improved Stop Hook Error Handling**: Stop hook failures now generate user-friendly messages instead of raw command output
+  - Messages are structured with clear headings, context, extracted errors, and actionable suggestions
+  - Command output is intelligently parsed to highlight the most relevant error information
+  - Error messages are designed to help Claude understand what failed and how to fix it
+  - Maintains full technical details in logs while presenting clean messages to Claude
+
+### Fixed
+- Stop hook error messages are now actionable and understandable for AI assistants instead of being purely technical
+
 ## [0.0.2] - 2025-08-21
 
 ### Added

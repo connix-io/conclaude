@@ -1,8 +1,13 @@
-import { expect, test, describe, beforeEach, afterEach } from "bun:test";
-import { writeFile, mkdir, rm } from "fs/promises";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdir, rm, writeFile } from "fs/promises";
 import { join } from "path";
-import { validateBasePayload, getInitialMessage, getAllMessages, getConversationHistory } from "../src/types.ts";
 import type { BasePayloadType } from "../src/types.ts";
+import {
+	getAllMessages,
+	getConversationHistory,
+	getInitialMessage,
+	validateBasePayload,
+} from "../src/types.ts";
 
 describe("validateBasePayload", () => {
 	test("validates valid payload", () => {
@@ -11,7 +16,7 @@ describe("validateBasePayload", () => {
 			transcript_path: "/path/to/transcript.jsonl",
 			hook_event_name: "PreToolUse",
 			tool_name: "Edit",
-			tool_input: {}
+			tool_input: {},
 		};
 
 		expect(() => validateBasePayload(payload, "PreToolUse")).not.toThrow();
@@ -22,10 +27,12 @@ describe("validateBasePayload", () => {
 			transcript_path: "/path/to/transcript.jsonl",
 			hook_event_name: "PreToolUse",
 			tool_name: "Edit",
-			tool_input: {}
+			tool_input: {},
 		} as BasePayloadType;
 
-		expect(() => validateBasePayload(payload, "PreToolUse")).toThrow("Missing required field: session_id");
+		expect(() => validateBasePayload(payload, "PreToolUse")).toThrow(
+			"Missing required field: session_id",
+		);
 	});
 
 	test("throws on missing transcript_path", () => {
@@ -33,10 +40,12 @@ describe("validateBasePayload", () => {
 			session_id: "test-session",
 			hook_event_name: "PreToolUse",
 			tool_name: "Edit",
-			tool_input: {}
+			tool_input: {},
 		} as BasePayloadType;
 
-		expect(() => validateBasePayload(payload, "PreToolUse")).toThrow("Missing required field: transcript_path");
+		expect(() => validateBasePayload(payload, "PreToolUse")).toThrow(
+			"Missing required field: transcript_path",
+		);
 	});
 
 	test("throws on missing hook_event_name", () => {
@@ -44,10 +53,12 @@ describe("validateBasePayload", () => {
 			session_id: "test-session",
 			transcript_path: "/path/to/transcript.jsonl",
 			tool_name: "Edit",
-			tool_input: {}
+			tool_input: {},
 		} as BasePayloadType;
 
-		expect(() => validateBasePayload(payload, "PreToolUse")).toThrow("Missing required field: hook_event_name");
+		expect(() => validateBasePayload(payload, "PreToolUse")).toThrow(
+			"Missing required field: hook_event_name",
+		);
 	});
 
 	test("throws on wrong hook_event_name", () => {
@@ -57,10 +68,14 @@ describe("validateBasePayload", () => {
 			hook_event_name: "PostToolUse",
 			tool_name: "Edit",
 			tool_input: {},
-			tool_response: { success: true }
+			tool_response: {
+				success: true,
+			},
 		};
 
-		expect(() => validateBasePayload(payload, "PreToolUse")).toThrow("Expected hook_event_name to be PreToolUse, got PostToolUse");
+		expect(() => validateBasePayload(payload, "PreToolUse")).toThrow(
+			"Expected hook_event_name to be PreToolUse, got PostToolUse",
+		);
 	});
 });
 
@@ -69,11 +84,16 @@ describe("transcript parsing functions", () => {
 	const transcriptPath = join(tempDir, "test-transcript.jsonl");
 
 	beforeEach(async () => {
-		await mkdir(tempDir, { recursive: true });
+		await mkdir(tempDir, {
+			recursive: true,
+		});
 	});
 
 	afterEach(async () => {
-		await rm(tempDir, { recursive: true, force: true });
+		await rm(tempDir, {
+			recursive: true,
+			force: true,
+		});
 	});
 
 	describe("getInitialMessage", () => {
@@ -143,11 +163,20 @@ invalid json line
 
 			await writeFile(transcriptPath, transcript);
 			const conversation = await getConversationHistory(transcriptPath);
-			
+
 			expect(conversation).toEqual([
-				{ role: "user", content: "What is 2+2?" },
-				{ role: "assistant", content: "The answer is 4." },
-				{ role: "user", content: "Thanks!" }
+				{
+					role: "user",
+					content: "What is 2+2?",
+				},
+				{
+					role: "assistant",
+					content: "The answer is 4.",
+				},
+				{
+					role: "user",
+					content: "Thanks!",
+				},
 			]);
 		});
 
@@ -157,10 +186,16 @@ invalid json line
 
 			await writeFile(transcriptPath, transcript);
 			const conversation = await getConversationHistory(transcriptPath);
-			
+
 			expect(conversation).toEqual([
-				{ role: "user", content: "Hello" },
-				{ role: "assistant", content: "Hi there!" }
+				{
+					role: "user",
+					content: "Hello",
+				},
+				{
+					role: "assistant",
+					content: "Hi there!",
+				},
 			]);
 		});
 	});
