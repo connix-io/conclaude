@@ -1,4 +1,4 @@
-import { expect, test, describe, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createLogger } from "../src/logger.ts";
 import type { LoggingConfig } from "../src/types.ts";
 
@@ -27,7 +27,7 @@ describe("Logger configuration", () => {
 
 		// Check that logger was created successfully
 		expect(logger).toBeDefined();
-		
+
 		// Logger should have console transport only (file logging disabled by default)
 		expect(logger.transports).toHaveLength(1);
 	});
@@ -39,7 +39,7 @@ describe("Logger configuration", () => {
 
 		// Check that logger was created successfully
 		expect(logger).toBeDefined();
-		
+
 		// Logger should have both console and file transports
 		expect(logger.transports).toHaveLength(2);
 	});
@@ -51,7 +51,7 @@ describe("Logger configuration", () => {
 
 		// Check that logger was created successfully
 		expect(logger).toBeDefined();
-		
+
 		// Logger should have console transport only
 		expect(logger.transports).toHaveLength(1);
 	});
@@ -59,12 +59,14 @@ describe("Logger configuration", () => {
 	test("config parameter overrides environment variable (enable file logging)", () => {
 		process.env.CONCLAUDE_DISABLE_FILE_LOGGING = "true";
 
-		const config: Partial<LoggingConfig> = { fileLogging: true };
+		const config: Partial<LoggingConfig> = {
+			fileLogging: true,
+		};
 		const logger = createLogger("test-session", "test-project", config);
 
 		// Check that logger was created successfully
 		expect(logger).toBeDefined();
-		
+
 		// Logger should have both console and file transports (config overrides env)
 		expect(logger.transports).toHaveLength(2);
 	});
@@ -72,23 +74,27 @@ describe("Logger configuration", () => {
 	test("config parameter overrides environment variable (disable file logging)", () => {
 		process.env.CONCLAUDE_DISABLE_FILE_LOGGING = "false";
 
-		const config: Partial<LoggingConfig> = { fileLogging: false };
+		const config: Partial<LoggingConfig> = {
+			fileLogging: false,
+		};
 		const logger = createLogger("test-session", "test-project", config);
 
 		// Check that logger was created successfully
 		expect(logger).toBeDefined();
-		
+
 		// Logger should have console transport only (config overrides env)
 		expect(logger.transports).toHaveLength(1);
 	});
 
 	test("creates logger with custom session ID and project name", () => {
-		const config: Partial<LoggingConfig> = { fileLogging: true };
+		const config: Partial<LoggingConfig> = {
+			fileLogging: true,
+		};
 		const logger = createLogger("custom-session", "custom-project", config);
 
 		// Check that logger was created successfully
 		expect(logger).toBeDefined();
-		
+
 		// Logger should have both transports
 		expect(logger.transports).toHaveLength(2);
 	});
@@ -107,13 +113,15 @@ describe("Logger configuration", () => {
 	});
 
 	test("logger includes correct metadata and format", () => {
-		const config: Partial<LoggingConfig> = { fileLogging: true };
+		const config: Partial<LoggingConfig> = {
+			fileLogging: true,
+		};
 		const logger = createLogger("test-session", "test-project", config);
 
 		// Verify logger has correct level and format
 		expect(logger.level).toBe("info"); // Default level
 		expect(logger).toBeDefined();
-		
+
 		// Test that logger can log without errors
 		expect(() => {
 			logger.info("Test log message");

@@ -29,13 +29,13 @@ function getProjectName(): string {
 
 /**
  * Resolves logging configuration from environment variables and optional overrides.
- * 
+ *
  * @param config - Optional logging configuration to override defaults
  * @returns Resolved logging configuration
  */
 function resolveLoggingConfig(config?: Partial<LoggingConfig>): LoggingConfig {
 	// Check environment variable CONCLAUDE_DISABLE_FILE_LOGGING
-	// - If "true", disable file logging  
+	// - If "true", disable file logging
 	// - If "false", enable file logging
 	// - If unset, default to disabled (breaking change)
 	const envVar = process.env.CONCLAUDE_DISABLE_FILE_LOGGING;
@@ -56,7 +56,10 @@ export function createLogger(
 	const filename = `conclaude-${project}-sess-${session}.jsonl`;
 	const loggingConfig = resolveLoggingConfig(config);
 
-	const loggerTransports: Array<InstanceType<typeof transports.Console> | InstanceType<typeof transports.File>> = [
+	const loggerTransports: Array<
+		| InstanceType<typeof transports.Console>
+		| InstanceType<typeof transports.File>
+	> = [
 		new transports.Console({
 			format: format.combine(format.colorize(), format.simple()),
 		}),

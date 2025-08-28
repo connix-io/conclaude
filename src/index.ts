@@ -19,7 +19,10 @@ import { hideBin } from "yargs/helpers";
 import pkg from "../package.json";
 import {
 	type ConclaudeConfig,
+	checkFileGrepRules,
+	executeGrepRules,
 	extractBashCommands,
+	type GrepRuleViolation,
 	loadConclaudeConfig,
 } from "./config.ts";
 import { createLogger } from "./logger.ts";
@@ -182,9 +185,9 @@ async function handlePreToolUse(argv: Arguments): Promise<HookResult> {
 				const relativePath = path.relative(cwd, resolvedPath);
 
 				// Check preventRootAdditions rule - only applies to Write tool
-				const config = await getConfig();
+				const preToolConfig = await getConfig();
 				if (
-					config.rules.preventRootAdditions &&
+					preToolConfig.rules.preventRootAdditions &&
 					payload.tool_name === "Write"
 				) {
 					// Check if the file is directly in the root directory (no subdirectories)
@@ -222,8 +225,8 @@ async function handlePreToolUse(argv: Arguments): Promise<HookResult> {
 				}
 
 				// Check uneditableFiles rule
-				if (config.rules.uneditableFiles.length > 0) {
-					for (const pattern of config.rules.uneditableFiles) {
+				if (preToolConfig.rules.uneditableFiles.length > 0) {
+					for (const pattern of preToolConfig.rules.uneditableFiles) {
 						try {
 							// Test both the original file path and the relative path against the pattern
 							const matchesOriginal = minimatch(filePath, pattern);
@@ -259,6 +262,66 @@ async function handlePreToolUse(argv: Arguments): Promise<HookResult> {
 							});
 						}
 					}
+				}
+
+				// Check grep rules for PreToolUse hook
+				if (
+					preToolConfig.preToolUse?.grepRules &&
+					preToolConfig.preToolUse.grepRules.length > 0
+				) {
+					logger.info(
+						`Checking ${preToolConfig.preToolUse.grepRules.length} PreToolUse grep rules for file: ${filePath}`,
+					);
+
+					const violations = checkFileGrepRules(
+						filePath,
+						preToolConfig.preToolUse.grepRules,
+					);
+
+					if (violations.length > 0) {
+						// Build detailed error message
+						const violationsByRule = new Map<string, GrepRuleViolation[]>();
+						for (const violation of violations) {
+							const ruleKey = `${violation.rule.description} (${violation.rule.forbiddenPattern})`;
+							if (!violationsByRule.has(ruleKey)) {
+								violationsByRule.set(ruleKey, []);
+							}
+							violationsByRule.get(ruleKey)!.push(violation);
+						}
+
+						const errorMessages: string[] = [];
+						for (const [ruleDescription, ruleViolations] of violationsByRule) {
+							errorMessages.push(`\n❌ ${ruleDescription}:`);
+							for (const violation of ruleViolations) {
+								errorMessages.push(
+									`   Line ${violation.lineNumber}: ${violation.lineContent}`,
+								);
+							}
+						}
+
+						const errorMessage = `Blocked ${payload.tool_name} operation: File '${filePath}' contains ${violations.length} grep rule violation${violations.length === 1 ? "" : "s"}:${errorMessages.join("\n")}`;
+
+						logger.warn("PreToolUse blocked by grep rules", {
+							tool_name: payload.tool_name,
+							file_path: filePath,
+							violationCount: violations.length,
+							violations: violations.map((v) => ({
+								rule: v.rule.description,
+								pattern: v.rule.forbiddenPattern,
+								line: v.lineNumber,
+								content: v.lineContent.substring(0, 100), // Truncate for logging
+							})),
+						});
+
+						return {
+							message: errorMessage,
+							blocked: true,
+						};
+					}
+
+					logger.info(
+						`All PreToolUse grep rules passed for file: ${filePath}`,
+					);
 				}
 			}
 		} catch (error) {
@@ -423,8 +486,61 @@ async function handleStop(argv: Arguments): Promise<HookResult> {
 		transcript_path: payload.transcript_path,
 	});
 
-	// Extract and execute commands from config.stop.run
+	// Load configuration
 	const config = await getConfig();
+
+	// Execute grep rules before other commands
+	if (config.stop.grepRules && config.stop.grepRules.length > 0) {
+		logger.info(
+			`Checking ${config.stop.grepRules.length} grep rules before executing stop commands`,
+		);
+
+		const violations = executeGrepRules(config.stop.grepRules);
+
+		if (violations.length > 0) {
+			// Build detailed error message
+			const violationsByRule = new Map<string, GrepRuleViolation[]>();
+			for (const violation of violations) {
+				const ruleKey = `${violation.rule.description} (${violation.rule.forbiddenPattern})`;
+				if (!violationsByRule.has(ruleKey)) {
+					violationsByRule.set(ruleKey, []);
+				}
+				violationsByRule.get(ruleKey)!.push(violation);
+			}
+
+			const errorMessages: string[] = [];
+			for (const [ruleDescription, ruleViolations] of violationsByRule) {
+				errorMessages.push(`\n❌ ${ruleDescription}:`);
+				for (const violation of ruleViolations) {
+					errorMessages.push(
+						`   ${violation.file}:${violation.lineNumber}: ${violation.lineContent}`,
+					);
+				}
+			}
+
+			const errorMessage = `Stop hook blocked: Found ${violations.length} grep rule violation${violations.length === 1 ? "" : "s"}:${errorMessages.join("\n")}`;
+
+			logger.error("Stop hook blocked by grep rules", {
+				violationCount: violations.length,
+				violations: violations.map((v) => ({
+					rule: v.rule.description,
+					pattern: v.rule.forbiddenPattern,
+					file: v.file,
+					line: v.lineNumber,
+					content: v.lineContent.substring(0, 100), // Truncate for logging
+				})),
+			});
+
+			return {
+				message: errorMessage,
+				blocked: true,
+			};
+		}
+
+		logger.info("All grep rules passed successfully");
+	}
+
+	// Extract and execute commands from config.stop.run
 	const commands = extractBashCommands(config.stop.run);
 
 	logger.info(`Executing ${commands.length} stop hook commands`, {
@@ -667,6 +783,27 @@ stop:
   # instead of ending the session after stop hook commands succeed
   infinite: false
   infiniteMessage: "continue working on the task"
+  
+  # Grep rules for Stop hook - check entire codebase for violations before session ends
+  # These rules are executed before the 'run' commands above
+  # grepRules:
+  #   - filePattern: "**/*.ts"
+  #     forbiddenPattern: "TODO|FIXME"
+  #     description: "No TODO/FIXME comments should remain before session ends"
+  #   - filePattern: "src/**/*.js"
+  #     forbiddenPattern: "console\\.log"
+  #     description: "Production JavaScript should not contain console.log statements"
+
+# PreToolUse hook validation - check files being edited for violations
+preToolUse:
+  # Grep rules for PreToolUse hook - check individual files before allowing modifications
+  # grepRules:
+  #   - filePattern: "*.ts"
+  #     forbiddenPattern: "eslint-disable"
+  #     description: "TypeScript files should not contain eslint-disable comments"
+  #   - filePattern: "src/**/*.js"
+  #     forbiddenPattern: "debugger"
+  #     description: "JavaScript files should not contain debugger statements"
 
 # Validation rules for hook processing
 rules:

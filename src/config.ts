@@ -1,6 +1,18 @@
 import { type SpawnSyncReturns, spawnSync } from "child_process";
 import { cosmiconfig } from "cosmiconfig";
+import * as fs from "fs";
+import { minimatch } from "minimatch";
+import * as path from "path";
 import { parse as parseYaml } from "yaml";
+
+/**
+ * Configuration interface for grep rules
+ */
+export interface GrepRule {
+	filePattern: string;
+	forbiddenPattern: string;
+	description: string;
+}
 
 /**
  * Configuration interface for stop hook commands
@@ -9,6 +21,14 @@ export interface StopConfig {
 	run: string;
 	infinite?: boolean;
 	infiniteMessage?: string;
+	grepRules?: GrepRule[];
+}
+
+/**
+ * Configuration interface for PreToolUse hook validation
+ */
+export interface PreToolUseConfig {
+	grepRules?: GrepRule[];
 }
 
 /**
@@ -24,6 +44,7 @@ export interface RulesConfig {
  */
 export interface ConclaudeConfig {
 	stop: StopConfig;
+	preToolUse?: PreToolUseConfig;
 	rules: RulesConfig;
 }
 
@@ -158,4 +179,271 @@ EOF
 	}
 
 	return commands;
+}
+
+/**
+ * Result of grep rule validation
+ */
+export interface GrepRuleViolation {
+	rule: GrepRule;
+	file: string;
+	lineNumber: number;
+	lineContent: string;
+}
+
+/**
+ * Execute grep rules across the entire codebase for Stop hook validation
+ *
+ * @param grepRules - Array of grep rules to validate
+ * @param baseDir - Base directory to search (defaults to current working directory)
+ * @returns Array of violations found
+ */
+export function executeGrepRules(
+	grepRules: GrepRule[],
+	baseDir: string = process.cwd(),
+): GrepRuleViolation[] {
+	const violations: GrepRuleViolation[] = [];
+
+	for (const rule of grepRules) {
+		try {
+			// Use ripgrep if available, otherwise fall back to grep
+			const grepCommand = isRipgrepAvailable() ? "rg" : "grep";
+			const args = buildGrepArgs(grepCommand, rule, baseDir);
+
+			const result = spawnSync(grepCommand, args, {
+				encoding: "utf8",
+				shell: false,
+				cwd: baseDir,
+			});
+
+			if (result.status === 0 && result.stdout) {
+				const matches = parseGrepOutput(result.stdout, rule);
+				violations.push(...matches);
+			}
+		} catch (error) {
+			// If grep command fails, log the error but don't throw
+			console.error(
+				`Failed to execute grep rule for pattern '${rule.forbiddenPattern}':`,
+				error,
+			);
+		}
+	}
+
+	return violations;
+}
+
+/**
+ * Check a specific file against grep rules for PreToolUse hook validation
+ *
+ * @param filePath - Path to the file to check
+ * @param grepRules - Array of grep rules to validate
+ * @param baseDir - Base directory for relative path resolution (defaults to current working directory)
+ * @returns Array of violations found in the file
+ */
+export function checkFileGrepRules(
+	filePath: string,
+	grepRules: GrepRule[],
+	baseDir: string = process.cwd(),
+): GrepRuleViolation[] {
+	const violations: GrepRuleViolation[] = [];
+
+	// Resolve the full path
+	const resolvedPath = path.resolve(baseDir, filePath);
+	const relativePath = path.relative(baseDir, resolvedPath);
+
+	// Check if file exists
+	if (!fs.existsSync(resolvedPath)) {
+		return violations; // File doesn't exist yet (new file), no violations
+	}
+
+	for (const rule of grepRules) {
+		try {
+			// Check if file matches the pattern
+			const matchesPattern =
+				minimatch(filePath, rule.filePattern) ||
+				minimatch(relativePath, rule.filePattern) ||
+				minimatch(resolvedPath, rule.filePattern);
+
+			if (!matchesPattern) {
+				continue; // Skip this rule if file doesn't match the pattern
+			}
+
+			// Use ripgrep if available, otherwise fall back to grep
+			const grepCommand = isRipgrepAvailable() ? "rg" : "grep";
+			const args = buildGrepArgsForFile(grepCommand, rule, resolvedPath);
+
+			const result = spawnSync(grepCommand, args, {
+				encoding: "utf8",
+				shell: false,
+			});
+
+			if (result.status === 0 && result.stdout) {
+				const matches = parseGrepOutput(result.stdout, rule, filePath);
+				violations.push(...matches);
+			}
+		} catch (error) {
+			// If grep command fails, log the error but don't throw
+			console.error(
+				`Failed to check file '${filePath}' against rule '${rule.forbiddenPattern}':`,
+				error,
+			);
+		}
+	}
+
+	return violations;
+}
+
+/**
+ * Check if ripgrep (rg) is available on the system
+ *
+ * @returns true if ripgrep is available, false otherwise
+ */
+function isRipgrepAvailable(): boolean {
+	try {
+		const result = spawnSync(
+			"rg",
+			[
+				"--version",
+			],
+			{
+				stdio: "pipe",
+				encoding: "utf8",
+			},
+		);
+		return result.status === 0;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Build grep command arguments for codebase-wide search
+ *
+ * @param grepCommand - The grep command to use ("rg" or "grep")
+ * @param rule - The grep rule to apply
+ * @param baseDir - Base directory to search
+ * @returns Array of command arguments
+ */
+function buildGrepArgs(
+	grepCommand: string,
+	rule: GrepRule,
+	baseDir: string,
+): string[] {
+	const args: string[] = [];
+
+	if (grepCommand === "rg") {
+		// Ripgrep arguments
+		args.push(
+			"--line-number", // Show line numbers
+			"--no-heading", // Don't show filename headers
+			"--color=never", // No color output
+			"--glob",
+			rule.filePattern, // File pattern matching
+			rule.forbiddenPattern, // Search pattern
+			".", // Search current directory
+		);
+	} else {
+		// Traditional grep arguments
+		args.push(
+			"-r", // Recursive
+			"-n", // Show line numbers
+			"--include=" + rule.filePattern.replace("**", "*"), // File pattern (simplified)
+			rule.forbiddenPattern, // Search pattern
+			baseDir, // Search directory
+		);
+	}
+
+	return args;
+}
+
+/**
+ * Build grep command arguments for single file search
+ *
+ * @param grepCommand - The grep command to use ("rg" or "grep")
+ * @param rule - The grep rule to apply
+ * @param filePath - Path to the specific file to check
+ * @returns Array of command arguments
+ */
+function buildGrepArgsForFile(
+	grepCommand: string,
+	rule: GrepRule,
+	filePath: string,
+): string[] {
+	const args: string[] = [];
+
+	if (grepCommand === "rg") {
+		// Ripgrep arguments for single file
+		args.push(
+			"--line-number", // Show line numbers
+			"--no-heading", // Don't show filename headers
+			"--color=never", // No color output
+			rule.forbiddenPattern, // Search pattern
+			filePath, // Specific file
+		);
+	} else {
+		// Traditional grep arguments for single file
+		args.push(
+			"-n", // Show line numbers
+			rule.forbiddenPattern, // Search pattern
+			filePath, // Specific file
+		);
+	}
+
+	return args;
+}
+
+/**
+ * Parse grep output and convert to GrepRuleViolation objects
+ *
+ * @param grepOutput - Raw output from grep/rg command
+ * @param rule - The rule that was being checked
+ * @param specificFile - If checking a specific file, use this path instead of parsing from output
+ * @returns Array of parsed violations
+ */
+function parseGrepOutput(
+	grepOutput: string,
+	rule: GrepRule,
+	specificFile?: string,
+): GrepRuleViolation[] {
+	const violations: GrepRuleViolation[] = [];
+	const lines = grepOutput.trim().split("\n");
+
+	for (const line of lines) {
+		if (!line.trim()) continue;
+
+		let file: string;
+		let lineNumber: number;
+		let lineContent: string;
+
+		if (specificFile) {
+			// For single file checks, parse line number and content only
+			const match = line.match(/^(\d+):(.*)$/);
+			if (match?.[1] && match[2] !== undefined) {
+				file = specificFile;
+				lineNumber = Number.parseInt(match[1]);
+				lineContent = match[2];
+			} else {
+				continue; // Skip malformed lines
+			}
+		} else {
+			// For recursive searches, parse file:line:content format
+			const match = line.match(/^([^:]+):(\d+):(.*)$/);
+			if (match?.[1] && match[2] && match[3] !== undefined) {
+				file = match[1];
+				lineNumber = Number.parseInt(match[2]);
+				lineContent = match[3];
+			} else {
+				continue; // Skip malformed lines
+			}
+		}
+
+		violations.push({
+			rule,
+			file,
+			lineNumber,
+			lineContent: lineContent.trim(),
+		});
+	}
+
+	return violations;
 }
