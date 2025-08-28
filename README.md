@@ -29,7 +29,7 @@ Imagine starting every Claude Code session knowing that:
 ✅ **Your tests must pass** - Sessions only complete when your test suite is green  
 ✅ **Your files stay organized** - No mysterious root-level files cluttering your project  
 ✅ **Your workflows are enforced** - Build processes, validation, and quality checks run automatically  
-✅ **Everything is logged** - Complete visibility into what Claude did during each session  
+✅ **Everything is configurably logged** - Complete visibility into what Claude did during each session  
 
 This isn't just wishful thinking—it's what conclaude delivers every single time.
 
