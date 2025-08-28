@@ -210,7 +210,7 @@ export function executeGrepRules(
 			const useRipgrep = isRipgrepAvailable();
 			
 			if (useRipgrep) {
-				const args = buildRipgrepArgs(rule, baseDir);
+				const args = buildRipgrepArgs(rule);
 				const result = spawnSync("rg", args, {
 					encoding: "utf8",
 					shell: false,
@@ -274,18 +274,37 @@ export function checkFileGrepRules(
 				continue; // Skip this rule if file doesn't match the pattern
 			}
 
-			// Use ripgrep if available, otherwise fall back to grep
-			const grepCommand = isRipgrepAvailable() ? "rg" : "grep";
-			const args = buildGrepArgsForFile(grepCommand, rule, resolvedPath);
+			// Use ripgrep if available, otherwise fall back to traditional grep
+			const useRipgrep = isRipgrepAvailable();
+			
+			if (useRipgrep) {
+				const args = buildRipgrepArgsForFile(rule, resolvedPath);
+				const result = spawnSync("rg", args, {
+					encoding: "utf8",
+					shell: false,
+				});
 
-			const result = spawnSync(grepCommand, args, {
-				encoding: "utf8",
-				shell: false,
-			});
+				if (result.status === 0 && result.stdout) {
+					const matches = parseGrepOutput(result.stdout, rule, filePath);
+					violations.push(...matches);
+				}
+			} else {
+				// Traditional grep for single file
+				const result = spawnSync("grep", [
+					"-E", // Extended regular expressions
+					"-H", // Always show filename
+					"-n", // Show line numbers
+					rule.forbiddenPattern,
+					resolvedPath,
+				], {
+					encoding: "utf8",
+					shell: false,
+				});
 
-			if (result.status === 0 && result.stdout) {
-				const matches = parseGrepOutput(result.stdout, rule, filePath);
-				violations.push(...matches);
+				if (result.status === 0 && result.stdout) {
+					const matches = parseGrepOutput(result.stdout, rule, filePath);
+					violations.push(...matches);
+				}
 			}
 		} catch (error) {
 			// If grep command fails, log the error but don't throw
@@ -317,7 +336,7 @@ function isRipgrepAvailable(): boolean {
 			},
 		);
 		return result.status === 0;
-	} catch (error) {
+	} catch {
 		return false;
 	}
 }
@@ -326,13 +345,9 @@ function isRipgrepAvailable(): boolean {
  * Build ripgrep command arguments for codebase-wide search
  *
  * @param rule - The grep rule to apply
- * @param baseDir - Base directory to search
  * @returns Array of command arguments
  */
-function buildRipgrepArgs(
-	rule: GrepRule,
-	baseDir: string,
-): string[] {
+function buildRipgrepArgs(rule: GrepRule): string[] {
 	return [
 		"--line-number", // Show line numbers
 		"--no-heading", // Don't show filename headers
@@ -364,6 +379,7 @@ function executeTraditionalGrepRule(
 		// Then grep each matching file
 		for (const file of matchingFiles) {
 			const result = spawnSync("grep", [
+				"-E", // Extended regular expressions
 				"-H", // Always show filename
 				"-n", // Show line numbers
 				rule.forbiddenPattern,
@@ -429,37 +445,6 @@ function findMatchingFiles(pattern: string, baseDir: string): string[] {
 }
 
 /**
- * Build grep command arguments for single file search
- *
- * @param grepCommand - The grep command to use ("rg" or "grep")  
- * @param rule - The grep rule to apply
- * @param filePath - Path to the specific file to check
- * @returns Array of command arguments
- */
-function buildGrepArgsForFile(
-	grepCommand: string,
-	rule: GrepRule,
-	filePath: string,
-): string[] {
-	if (grepCommand === "rg") {
-		return [
-			"--line-number", // Show line numbers
-			"--no-heading", // Don't show filename headers
-			"--color=never", // No color output
-			rule.forbiddenPattern, // Search pattern
-			filePath, // Specific file
-		];
-	} else {
-		return [
-			"-H", // Always show filename
-			"-n", // Show line numbers
-			rule.forbiddenPattern, // Search pattern
-			filePath, // Specific file
-		];
-	}
-}
-
-/**
  * Build ripgrep command arguments for single file search
  *
  * @param rule - The grep rule to apply
@@ -478,6 +463,7 @@ function buildRipgrepArgsForFile(
 		filePath, // Specific file
 	];
 }
+
 
 /**
  * Parse grep output and convert to GrepRuleViolation objects
@@ -503,12 +489,13 @@ function parseGrepOutput(
 		let lineContent: string;
 
 		if (specificFile) {
-			// For single file checks, parse line number and content only
-			const match = line.match(/^(\d+):(.*)$/);
-			if (match?.[1] && match[2] !== undefined) {
-				file = specificFile;
-				lineNumber = Number.parseInt(match[1]);
-				lineContent = match[2];
+			// For single file checks with -H flag, we still get file:line:content format
+			// So we parse it the same way but use the specificFile path
+			const match = line.match(/^([^:]+):(\d+):(.*)$/);
+			if (match?.[1] && match[2] && match[3] !== undefined) {
+				file = specificFile; // Use the specificFile parameter instead of the parsed path
+				lineNumber = Number.parseInt(match[2]);
+				lineContent = match[3];
 			} else {
 				continue; // Skip malformed lines
 			}
