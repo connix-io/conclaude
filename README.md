@@ -92,6 +92,8 @@ stop:
   run: |
     nix develop -c "lint"
     bun test
+  infinite: false  # Optional: run once and exit (default)
+  infiniteMessage: "Validation complete"  # Optional: custom message
 
 rules:
   preventRootAdditions: true
@@ -106,7 +108,9 @@ rules:
 ```typescript
 interface ConclaudeConfig {
   stop: {
-    run: string;  // Commands to execute during Stop hook
+    run: string;                    // Commands to execute during Stop hook
+    infinite?: boolean;             // Keep running infinitely (default: false)
+    infiniteMessage?: string;       // Message to display when in infinite mode
   };
   rules: {
     preventRootAdditions: boolean;  // Block file creation at repo root
@@ -134,6 +138,7 @@ Fired when Claude session terminates. Enables:
 - Command execution (lint, test, build)
 - Session cleanup and validation
 - **Blocks session if any command fails**
+- **Infinite mode**: Optionally keep running indefinitely for continuous monitoring
 
 ### Other Hooks
 - **UserPromptSubmit** - Process user input before Claude sees it
@@ -202,6 +207,24 @@ rules:
     - ".env*"
     - "dist/**"
     - "node_modules/**"
+```
+
+### Infinite Mode Configuration Example
+
+```yaml
+# Continuous monitoring with infinite mode
+stop:
+  run: |
+    echo "Starting continuous monitoring..."
+    bun x tsc --noEmit
+    bun test
+  infinite: true
+  infiniteMessage: "Monitoring active - press Ctrl+C to stop"
+
+rules:
+  preventRootAdditions: false  # Allow file changes during development
+  uneditableFiles:
+    - "./package.json"
 ```
 
 ## Usage
