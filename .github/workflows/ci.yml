@@ -58,6 +58,30 @@ jobs:
         
       - name: Run linting
         run: bun run lint
+      
+      - name: Validate schema generation
+        run: |
+          echo "📦 Generating JSON schema..."
+          bun run schema:generate
+          
+          if [ ! -f "schema.json" ]; then
+            echo "❌ Schema file was not generated"
+            exit 1
+          fi
+          
+          # Validate JSON syntax
+          cat schema.json | jq . > /dev/null || {
+            echo "❌ Generated schema is not valid JSON"
+            exit 1
+          }
+          
+          # Check schema structure
+          if ! jq -e '.definitions.ConclaudeConfig' schema.json > /dev/null; then
+            echo "❌ Schema missing ConclaudeConfig definition"
+            exit 1
+          fi
+          
+          echo "✅ Schema generation validation passed"
 
   nix:
     name: Nix Build & Test

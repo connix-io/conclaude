@@ -652,7 +652,9 @@ async function handleInit(argv: Arguments): Promise<void> {
 		}
 
 		// Create .conclaude.yaml
-		const configContent = `# Conclaude YAML Configuration
+		const configContent = `# yaml-language-server: $schema=https://raw.githubusercontent.com/conneroisu/conclaude/main/schema.json
+
+# Conclaude YAML Configuration
 # This configuration defines how conclaude handles Claude Code hook events
 
 # Commands to run during Stop hook

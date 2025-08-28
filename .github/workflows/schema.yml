@@ -1,0 +1,128 @@
+name: Generate and Publish JSON Schema
+
+on:
+  push:
+    branches: [ main, schema ]
+    paths:
+      - 'src/config.ts'
+      - 'package.json'
+      - '.github/workflows/schema.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/config.ts'
+      - 'package.json'
+      - '.github/workflows/schema.yml'
+
+jobs:
+  generate-schema:
+    name: Generate JSON Schema
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        
+      - name: Generate JSON schema
+        run: bun run schema:generate
+        
+      - name: Validate generated schema
+        run: |
+          if [ ! -f "schema.json" ]; then
+            echo "❌ Schema file was not generated"
+            exit 1
+          fi
+          
+          # Basic validation - check if it's valid JSON
+          cat schema.json | jq . > /dev/null || {
+            echo "❌ Generated schema is not valid JSON"
+            exit 1
+          }
+          
+          # Check if schema contains expected structure
+          if ! jq -e '.definitions.ConclaudeConfig' schema.json > /dev/null; then
+            echo "❌ Schema does not contain ConclaudeConfig definition"
+            exit 1
+          fi
+          
+          echo "✅ Schema validation successful"
+          
+      - name: Show schema size and preview
+        run: |
+          echo "📊 Schema file size:"
+          ls -lh schema.json
+          echo ""
+          echo "📄 Schema preview (first 20 lines):"
+          head -20 schema.json
+          
+      - name: Upload schema artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: conclaude-schema
+          path: schema.json
+          
+  publish-schema:
+    name: Publish Schema to Repository
+    needs: generate-schema
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        
+      - name: Generate JSON schema
+        run: bun run schema:generate
+        
+      - name: Check for schema changes
+        id: changes
+        run: |
+          # Check if schema.json has changed compared to the committed version
+          if git diff --quiet schema.json 2>/dev/null; then
+            echo "No schema changes detected"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Schema changes detected"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Commit and push schema updates
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          git add schema.json
+          git commit -m "chore: update JSON schema from types
+
+          - Generated from ConclaudeConfig type in src/config.ts
+          - Enables IDE autocomplete for .conclaude.yaml files
+          - Auto-updated via GitHub Actions"
+          
+          git push
+          
+      - name: Create schema release info
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          echo "📦 Schema updated and committed to main branch"
+          echo "🔗 Schema URL: https://raw.githubusercontent.com/${{ github.repository }}/main/schema.json"
+          echo "📋 Usage in .conclaude.yaml files:"
+          echo "# yaml-language-server: \$schema=https://raw.githubusercontent.com/${{ github.repository }}/main/schema.json"

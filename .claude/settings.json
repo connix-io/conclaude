@@ -24,7 +24,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts UserPromptSubmit"
+						"command": "npx conclaude@latest UserPromptSubmit"
 					}
 				]
 			}
@@ -35,7 +35,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts PreToolUse"
+						"command": "npx conclaude@latest PreToolUse"
 					}
 				]
 			}
@@ -46,7 +46,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts PostToolUse"
+						"command": "npx conclaude@latest PostToolUse"
 					}
 				]
 			}
@@ -57,7 +57,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts Notification"
+						"command": "npx conclaude@latest Notification"
 					}
 				]
 			}
@@ -68,7 +68,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts Stop"
+						"command": "npx conclaude@latest Stop"
 					}
 				]
 			}
@@ -79,7 +79,18 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts SubagentStop"
+						"command": "npx conclaude@latest SubagentStop"
+					}
+				]
+			}
+		],
+		"PreCompact": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "npx conclaude@latest PreCompact"
 					}
 				]
 			}

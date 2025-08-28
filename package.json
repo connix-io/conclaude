@@ -35,12 +35,14 @@
 		"prepublishOnly": "bun run build:js && bun run build",
 		"test": "bun test",
 		"lint": "bun x tsc --noEmit",
-		"typecheck": "bun x tsc --noEmit"
+		"typecheck": "bun x tsc --noEmit",
+		"schema:generate": "ts-json-schema-generator --path 'src/config.ts' --type 'ConclaudeConfig' --out 'schema.json' --strict-tuples"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
 		"@types/minimatch": "^6.0.0",
 		"@types/yargs": "^17.0.33",
+		"ts-json-schema-generator": "^2.3.0",
 		"typescript": "^5.9.2"
 	},
 	"dependencies": {

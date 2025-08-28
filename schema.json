@@ -1,0 +1,62 @@
+{
+  "$ref": "#/definitions/ConclaudeConfig",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "ConclaudeConfig": {
+      "additionalProperties": false,
+      "description": "Main configuration interface matching conclaude.schema.json",
+      "properties": {
+        "rules": {
+          "$ref": "#/definitions/RulesConfig"
+        },
+        "stop": {
+          "$ref": "#/definitions/StopConfig"
+        }
+      },
+      "required": [
+        "stop",
+        "rules"
+      ],
+      "type": "object"
+    },
+    "RulesConfig": {
+      "additionalProperties": false,
+      "description": "Configuration interface for validation rules",
+      "properties": {
+        "preventRootAdditions": {
+          "type": "boolean"
+        },
+        "uneditableFiles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "preventRootAdditions",
+        "uneditableFiles"
+      ],
+      "type": "object"
+    },
+    "StopConfig": {
+      "additionalProperties": false,
+      "description": "Configuration interface for stop hook commands",
+      "properties": {
+        "infinite": {
+          "type": "boolean"
+        },
+        "infiniteMessage": {
+          "type": "string"
+        },
+        "run": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "run"
+      ],
+      "type": "object"
+    }
+  }
+}
