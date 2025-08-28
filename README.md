@@ -1,17 +1,111 @@
 # conclaude
 
-A Claude Code hook handler CLI tool that processes hook events from Claude Code by reading JSON payloads from stdin and executing handlers for each event type. The tool provides lifecycle hooks for tool usage, session management, and transcript processing with YAML-based configuration.
+**The guardrails your Claude Code sessions need.**
 
-## Features
+Picture this: You're deep in a coding session with Claude, building something amazing. Claude is writing tests, refactoring code, fixing bugs—it's incredibly productive. But then you notice something troubling. Your carefully configured linting rules? Ignored. Your test suite that was green this morning? Now broken. Root-level files appearing where they shouldn't. The AI is powerful, but it doesn't know your project's rules.
 
-- **Comprehensive Hook System**: Handle all Claude Code lifecycle events (PreToolUse, PostToolUse, Stop, etc.)
-- **YAML Configuration**: Simple, readable YAML configuration files with cosmiconfig
-- **Command Execution**: Run linting, testing, and validation commands during Stop hooks
-- **File Protection**: Prevent unwanted root-level file creation via `preventRootAdditions` rule
+This is the story of why `conclaude` exists.
+
+Born from real developer frustration, conclaude transforms chaotic AI coding sessions into controlled, validated workflows. It's not just another CLI tool—it's your project's guardian, ensuring that every Claude Code session respects your standards, follows your rules, and maintains your code quality.
+
+## The Problem We Solve
+
+AI-assisted coding is revolutionary, but it comes with a challenge: **How do you maintain control and quality standards when an AI is making rapid changes to your codebase?**
+
+Without guardrails, Claude Code sessions can:
+- Break existing linting and formatting rules
+- Create files in wrong locations
+- Skip essential validation steps
+- Leave your project in an inconsistent state
+- Bypass your carefully crafted development workflows
+
+**conclaude changes this story.**
+
+## How conclaude Changes Everything
+
+Imagine starting every Claude Code session knowing that:
+
+✅ **Your linting rules will be respected** - No more broken formatting or style violations  
+✅ **Your tests must pass** - Sessions only complete when your test suite is green  
+✅ **Your files stay organized** - No mysterious root-level files cluttering your project  
+✅ **Your workflows are enforced** - Build processes, validation, and quality checks run automatically  
+✅ **Everything is logged** - Complete visibility into what Claude did during each session  
+
+This isn't just wishful thinking—it's what conclaude delivers every single time.
+
+## What Makes conclaude Different
+
+While other tools try to bolt-on AI safety as an afterthought, conclaude was built from the ground up specifically for Claude Code workflows. Here's what sets it apart:
+
+🎯 **Purpose-Built for Claude Code**: Native integration with Claude's lifecycle hooks—no hacks, no workarounds  
+⚡ **Zero Configuration Friction**: Simple YAML config that just works, powered by cosmiconfig  
+🛡️ **Fail-Fast Protection**: Catches problems immediately, not after damage is done  
+🔄 **Extensible Hook System**: Handle PreToolUse, PostToolUse, Stop, and more lifecycle events  
+📊 **Session-Aware Logging**: Every action is tracked with session context for complete auditability  
+
+## Core Capabilities
+
+- **Comprehensive Hook System**: Handle all Claude Code lifecycle events with precision
+- **YAML Configuration**: Human-readable configuration that scales with your team
+- **Command Execution**: Run your existing lint, test, and build commands automatically
+- **File Protection**: Prevent unwanted file creation with intelligent pattern matching
 - **Session Logging**: Winston-based logging with session-specific file output
-- **Pattern Matching**: Glob pattern support for file protection rules
+- **Infinite Monitoring**: Optional continuous monitoring for long-running development sessions
 
-## Installation
+## Real-World Scenarios
+
+### Scenario 1: The "Oops, My Tests Are Broken" Prevention
+
+**Before conclaude:**
+```
+Developer: "Claude, add user authentication to my app"
+Claude: *writes beautiful auth code*
+Developer: *tries to deploy*
+CI/CD: ❌ 47 test failures, linting errors everywhere
+Developer: *spends 2 hours fixing what should have been caught*
+```
+
+**With conclaude:**
+```
+Developer: "Claude, add user authentication to my app"
+Claude: *writes beautiful auth code*
+conclaude: ✅ All tests pass, linting clean
+Developer: *deploys confidently*
+```
+
+### Scenario 2: The "Where Did This File Come From?" Mystery
+
+**The Problem:**
+You're reviewing Claude's work and find `config.json`, `temp.js`, and `debug.log` scattered in your project root. Your clean directory structure is now a mess.
+
+**The conclaude Solution:**
+```yaml
+# .conclaude.yaml
+rules:
+  preventRootAdditions: true  # No more mystery files!
+```
+
+Claude tries to create a root file → conclaude blocks it → Claude puts it in the right place.
+
+### Scenario 3: The "Continuous Refactoring" Workflow
+
+**The Vision:**
+You're pair programming with Claude for hours, making incremental improvements. You want validation after every change, not just at the end.
+
+**The Setup:**
+```yaml
+# .conclaude.yaml
+stop:
+  infinite: true
+  run: |
+    bun x tsc --noEmit
+    bun test --silent
+  infiniteMessage: "🛡️ Monitoring active - your code stays clean!"
+```
+
+Now every small change gets validated immediately. No surprises at the end of a long session.
+
+## Getting Started
 
 ### Global Installation (Recommended)
 
@@ -77,40 +171,96 @@ cd conclaude
 bun install
 ```
 
-## Configuration System
+## Configuration: Your Project's Rulebook
 
-`conclaude` uses [cosmiconfig](https://github.com/cosmiconfig/cosmiconfig) with YAML configuration files. The system searches for configuration in the following order:
+Think of conclaude's configuration as your project's constitution—the fundamental rules that govern how Claude Code can interact with your codebase. It's designed to be simple enough to set up in minutes, yet powerful enough to handle complex enterprise workflows.
 
-1. `.conclaude.yaml` - Primary configuration file
+### How Configuration Works
+
+conclaude finds your rules automatically using [cosmiconfig](https://github.com/cosmiconfig/cosmiconfig), looking for:
+
+1. `.conclaude.yaml` - Your main configuration file (recommended)
 2. `.conclaude.yml` - Alternative YAML extension
 
-### Configuration Schema
+No complex setup, no environment variables to manage. Just drop a `.conclaude.yaml` file in your project root and you're protected.
+
+### Your First Configuration
+
+Here's what a real-world configuration looks like:
 
 ```yaml
-# .conclaude.yaml
+# .conclaude.yaml - Your project's guardrails
+
+# Commands that MUST pass before any session ends
 stop:
   run: |
-    nix develop -c "lint"
-    bun test
-  infinite: false  # Optional: run once and exit (default)
-  infiniteMessage: "Validation complete"  # Optional: custom message
+    bun x tsc --noEmit    # TypeScript check
+    bun test              # All tests must pass
+    bun run lint          # Code style enforced
+  
+# File protection rules
+rules:
+  preventRootAdditions: true    # Keep project root clean
+  uneditableFiles:              # Protect critical files
+    - "./package.json"          # Don't touch dependencies
+    - "*.lock"                  # Lock files are sacred
+    - ".env*"                   # Secrets stay secret
+```
+
+**What this accomplishes:**
+- 🛡️ Claude can't break your TypeScript compilation
+- ✅ All tests must pass before session completion  
+- 🎨 Your linting rules are automatically enforced
+- 📁 No surprise files cluttering your project root
+- 🔒 Critical configuration files stay untouched
+
+### Advanced Scenarios
+
+#### Continuous Monitoring During Long Sessions
+```yaml
+# Perfect for refactoring sessions or long pair-programming
+stop:
+  run: |
+    bun x tsc --noEmit
+    bun test --silent
+  infinite: true  # Validate after every change
+  infiniteMessage: "🔍 Watching your code quality..."
+```
+
+#### Enterprise-Grade Protection
+```yaml
+# Maximum security for production codebases
+stop:
+  run: |
+    npm audit --audit-level moderate
+    bun x tsc --noEmit
+    bun test --coverage
+    bun run lint
+    bun run build
 
 rules:
   preventRootAdditions: true
   uneditableFiles:
     - "./package.json"
-    - "*.lock"
+    - "./package-lock.json"
     - ".env*"
+    - "dist/**"
+    - "build/**"
+    - "node_modules/**"
+    - ".github/workflows/**"
 ```
 
-### Configuration Schema
+### Configuration Reference
+
+<details>
+<summary>Complete Configuration Schema</summary>
 
 ```typescript
 interface ConclaudeConfig {
   stop: {
-    run: string;                    // Commands to execute during Stop hook
-    infinite?: boolean;             // Keep running infinitely (default: false)
-    infiniteMessage?: string;       // Message to display when in infinite mode
+    run: string;                    // Shell commands to execute
+    infinite?: boolean;             // Keep running infinitely (default: false)  
+    infiniteMessage?: string;       // Custom message for infinite mode
   };
   rules: {
     preventRootAdditions: boolean;  // Block file creation at repo root
@@ -118,34 +268,54 @@ interface ConclaudeConfig {
   };
 }
 ```
+</details>
 
-## Hook Types
+## Understanding the Hook System
 
-### PreToolUse Hook
-Fired before Claude executes any tool. Enables:
-- Tool execution blocking based on custom rules
-- Input validation and security checks
-- Root file creation prevention via `preventRootAdditions`
+conclaude taps into Claude Code's lifecycle through strategic intervention points called "hooks." Think of hooks as security checkpoints in your development workflow—each one serves a specific purpose in keeping your codebase safe and consistent.
 
-### PostToolUse Hook
-Fired after tool execution. Enables:
-- Result logging and analysis
-- Performance monitoring
-- Post-processing of tool outputs
+### The Three Critical Moments
 
-### Stop Hook
-Fired when Claude session terminates. Enables:
-- Command execution (lint, test, build)
-- Session cleanup and validation
-- **Blocks session if any command fails**
-- **Infinite mode**: Optionally keep running indefinitely for continuous monitoring
+#### 🚦 PreToolUse Hook: The Gatekeeper
+*Fired the moment before Claude tries to use any tool*
 
-### Other Hooks
-- **UserPromptSubmit** - Process user input before Claude sees it
-- **SessionStart** - Session initialization
-- **SubagentStop** - Subagent completion handling
-- **Notification** - System notification processing
-- **PreCompact** - Transcript compaction preprocessing
+**What it protects against:**
+- Claude creating files in your project root (when you prefer organized subdirectories)
+- Modifications to protected files like `package.json` or `.env` files
+- Any tool usage that violates your project's rules
+
+**Real example:** Claude wants to create `debug.log` in your project root, but your `preventRootAdditions` rule blocks it. Claude adapts and creates `logs/debug.log` instead.
+
+#### 📊 PostToolUse Hook: The Observer  
+*Fired immediately after Claude completes any tool operation*
+
+**What it enables:**
+- Complete audit trail of every change Claude makes
+- Performance monitoring (how long did that operation take?)
+- Session-specific logging with full context
+- Post-processing and validation of tool results
+
+**Real example:** After Claude edits a file, PostToolUse logs exactly what changed, when, and in which session—giving you complete traceability.
+
+#### ⚡ Stop Hook: The Validator (Most Important)
+*Fired when Claude thinks the session is complete*
+
+**This is where the magic happens.** The Stop hook is your last line of defense and your quality assurance engine:
+
+- **Runs your validation commands** (lint, test, build, etc.)
+- **Blocks session completion** if any check fails  
+- **Forces Claude to fix issues** before you see "success"
+- **Optional infinite mode** for continuous validation during long sessions
+
+**Real example:** Claude finishes implementing a feature. Stop hook runs your tests, finds 3 failures, blocks completion. Claude sees the errors and fixes them automatically. Only then does the session complete successfully.
+
+### Supporting Cast of Hooks
+
+- **UserPromptSubmit** - Intercept and potentially modify your prompts before Claude sees them
+- **SessionStart** - Initialize logging, set up monitoring, prepare your workspace  
+- **SubagentStop** - Handle completion of Claude's internal subprocesses
+- **Notification** - Process and potentially filter system notifications
+- **PreCompact** - Prepare transcripts before they're compressed or archived
 
 ## Configuration Examples
 

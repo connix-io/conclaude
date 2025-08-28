@@ -1,10 +1,10 @@
 stop:
   run: |
-      nix build .
-      nix develop -c "lint"
-      nix develop -c "tests"
+    nix build .
+    nix develop -c "lint"
+    nix develop -c "tests"
 rules:
-  preventRootAdditions: false
+  preventRootAdditions: true
   uneditableFiles:
     - "./flake.lock"
     - "./package.json"
