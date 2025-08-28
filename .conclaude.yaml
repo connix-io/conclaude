@@ -1,10 +1,12 @@
 stop:
   run: |
-      nix build .
-      nix develop -c "lint"
-      nix develop -c "tests"
+    nix build .
+    nix develop -c "lint"
+    nix develop -c "tests"
+    latest
+    gh  release create --generate-notes --title "v$version" --draft --prerelease
 rules:
-  preventRootAdditions: false
+  preventRootAdditions: true
   uneditableFiles:
     - "./flake.lock"
     - "./package.json"
