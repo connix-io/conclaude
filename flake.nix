@@ -153,7 +153,7 @@
 
           outputHashMode = "recursive";
           outputHashAlgo = "sha256";
-          outputHash = "sha256-j8G4a1uHJxXNw0bnpuVEog4RrWTwiVnlesX9n0TojKM=";
+          outputHash = "sha256-FMGbP7V66qRXBkxdMEYmOFWbL3U6Z0/zEBY8CaP/fb4=";
         };
       in {
         conclaude = pkgs.stdenv.mkDerivation {
