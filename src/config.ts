@@ -1,6 +1,6 @@
+import { type SpawnSyncReturns, spawnSync } from "child_process";
 import { cosmiconfig } from "cosmiconfig";
 import { parse as parseYaml } from "yaml";
-import { type SpawnSyncReturns, spawnSync } from "child_process";
 
 /**
  * Configuration interface for stop hook commands
@@ -27,7 +27,6 @@ export interface ConclaudeConfig {
 	rules: RulesConfig;
 }
 
-
 /**
  * Load YAML configuration using cosmiconfig's native search strategies
  * Only supports YAML configuration files
@@ -48,27 +47,29 @@ export async function loadConclaudeConfig(): Promise<ConclaudeConfig> {
 
 	try {
 		const result = await explorer.search();
-		
+
 		if (!result) {
 			// Show common locations that would be searched
 			const commonLocations = [
 				process.cwd(),
 				require("path").dirname(process.cwd()),
-			].map(dir => [
-				require("path").join(dir, ".conclaude.yaml"),
-				require("path").join(dir, ".conclaude.yml"),
-			]).flat();
+			]
+				.map((dir) => [
+					require("path").join(dir, ".conclaude.yaml"),
+					require("path").join(dir, ".conclaude.yml"),
+				])
+				.flat();
 
 			const errorMessage = [
 				"Configuration file not found.",
 				"",
 				"Searched the following locations (and parent directories up to project root):",
-				...commonLocations.map(location => `  • ${location}`),
+				...commonLocations.map((location) => `  • ${location}`),
 				"",
 				"Search strategy: Current directory up to project root (directory containing package.json)",
 				"",
 				"Create a .conclaude.yaml or .conclaude.yml file with stop and rules sections.",
-				"Run 'conclaude init' to generate a template configuration."
+				"Run 'conclaude init' to generate a template configuration.",
 			].join("\n");
 
 			throw new Error(errorMessage);
@@ -77,13 +78,16 @@ export async function loadConclaudeConfig(): Promise<ConclaudeConfig> {
 		return result.config as ConclaudeConfig;
 	} catch (error) {
 		// If it's already our formatted error, re-throw it
-		if (error instanceof Error && error.message.includes("Configuration file not found")) {
+		if (
+			error instanceof Error &&
+			error.message.includes("Configuration file not found")
+		) {
 			throw error;
 		}
-		
+
 		// Otherwise, it's a parsing error
 		throw new Error(
-			`Failed to parse configuration file: ${error instanceof Error ? error.message : String(error)}`
+			`Failed to parse configuration file: ${error instanceof Error ? error.message : String(error)}`,
 		);
 	}
 }

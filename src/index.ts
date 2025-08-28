@@ -611,6 +611,7 @@ interface ClaudePermissions {
 }
 
 interface ClaudeSettings {
+	$schema: string;
 	permissions: ClaudePermissions;
 	hooks: Record<string, ClaudeHookMatcher[]>;
 }
@@ -701,6 +702,7 @@ rules:
 			.catch(() => false);
 
 		let settings: ClaudeSettings = {
+			$schema: "https://www.schemastore.org/claude-code-settings.json",
 			permissions: {
 				allow: [],
 				deny: [],
