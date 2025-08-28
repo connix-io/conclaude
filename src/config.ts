@@ -206,18 +206,24 @@ export function executeGrepRules(
 
 	for (const rule of grepRules) {
 		try {
-			// Use ripgrep if available, otherwise fall back to grep
-			const grepCommand = isRipgrepAvailable() ? "rg" : "grep";
-			const args = buildGrepArgs(grepCommand, rule, baseDir);
+			// Use ripgrep if available, otherwise fall back to find + grep pipeline
+			const useRipgrep = isRipgrepAvailable();
+			
+			if (useRipgrep) {
+				const args = buildRipgrepArgs(rule, baseDir);
+				const result = spawnSync("rg", args, {
+					encoding: "utf8",
+					shell: false,
+					cwd: baseDir,
+				});
 
-			const result = spawnSync(grepCommand, args, {
-				encoding: "utf8",
-				shell: false,
-				cwd: baseDir,
-			});
-
-			if (result.status === 0 && result.stdout) {
-				const matches = parseGrepOutput(result.stdout, rule);
+				if (result.status === 0 && result.stdout) {
+					const matches = parseGrepOutput(result.stdout, rule);
+					violations.push(...matches);
+				}
+			} else {
+				// Use find + grep pipeline for complex patterns
+				const matches = executeTraditionalGrepRule(rule, baseDir);
 				violations.push(...matches);
 			}
 		} catch (error) {
@@ -311,55 +317,121 @@ function isRipgrepAvailable(): boolean {
 			},
 		);
 		return result.status === 0;
-	} catch {
+	} catch (error) {
 		return false;
 	}
 }
 
 /**
- * Build grep command arguments for codebase-wide search
+ * Build ripgrep command arguments for codebase-wide search
  *
- * @param grepCommand - The grep command to use ("rg" or "grep")
  * @param rule - The grep rule to apply
  * @param baseDir - Base directory to search
  * @returns Array of command arguments
  */
-function buildGrepArgs(
-	grepCommand: string,
+function buildRipgrepArgs(
 	rule: GrepRule,
 	baseDir: string,
 ): string[] {
-	const args: string[] = [];
+	return [
+		"--line-number", // Show line numbers
+		"--no-heading", // Don't show filename headers
+		"--color=never", // No color output
+		"--glob",
+		rule.filePattern, // File pattern matching
+		rule.forbiddenPattern, // Search pattern
+		".", // Search current directory
+	];
+}
 
-	if (grepCommand === "rg") {
-		// Ripgrep arguments
-		args.push(
-			"--line-number", // Show line numbers
-			"--no-heading", // Don't show filename headers
-			"--color=never", // No color output
-			"--glob",
-			rule.filePattern, // File pattern matching
-			rule.forbiddenPattern, // Search pattern
-			".", // Search current directory
-		);
-	} else {
-		// Traditional grep arguments
-		args.push(
-			"-r", // Recursive
-			"-n", // Show line numbers
-			"--include=" + rule.filePattern.replace("**", "*"), // File pattern (simplified)
-			rule.forbiddenPattern, // Search pattern
-			baseDir, // Search directory
-		);
+/**
+ * Execute a grep rule using traditional grep with find for complex patterns
+ *
+ * @param rule - The grep rule to apply
+ * @param baseDir - Base directory to search
+ * @returns Array of violations found
+ */
+function executeTraditionalGrepRule(
+	rule: GrepRule,
+	baseDir: string,
+): GrepRuleViolation[] {
+	const violations: GrepRuleViolation[] = [];
+
+	try {
+		// First, find all files matching the pattern using glob matching
+		const matchingFiles = findMatchingFiles(rule.filePattern, baseDir);
+
+		// Then grep each matching file
+		for (const file of matchingFiles) {
+			const result = spawnSync("grep", [
+				"-H", // Always show filename
+				"-n", // Show line numbers
+				rule.forbiddenPattern,
+				file,
+			], {
+				encoding: "utf8",
+				shell: false,
+			});
+
+			if (result.status === 0 && result.stdout) {
+				const matches = parseGrepOutput(result.stdout, rule);
+				violations.push(...matches);
+			}
+		}
+	} catch (error) {
+		console.error(`Failed to execute traditional grep rule: ${error}`);
 	}
 
-	return args;
+	return violations;
+}
+
+/**
+ * Find files matching a glob pattern
+ *
+ * @param pattern - Glob pattern to match
+ * @param baseDir - Base directory to search
+ * @returns Array of matching file paths
+ */
+function findMatchingFiles(pattern: string, baseDir: string): string[] {
+	const matchingFiles: string[] = [];
+
+	function scanDirectory(dir: string): void {
+		try {
+			const items = fs.readdirSync(dir);
+			
+			for (const item of items) {
+				const itemPath = path.join(dir, item);
+				const relativePath = path.relative(baseDir, itemPath);
+				
+				try {
+					const stat = fs.statSync(itemPath);
+					
+					if (stat.isDirectory()) {
+						// Recursively scan subdirectories
+						scanDirectory(itemPath);
+					} else if (stat.isFile()) {
+						// Check if file matches the pattern
+						if (minimatch(relativePath, pattern) || minimatch(item, pattern)) {
+							matchingFiles.push(itemPath);
+						}
+					}
+				} catch {
+					// Skip files/directories we can't read
+				}
+			}
+		} catch {
+			// Skip directories we can't read
+		}
+	}
+
+	scanDirectory(baseDir);
+	return matchingFiles;
 }
 
 /**
  * Build grep command arguments for single file search
  *
- * @param grepCommand - The grep command to use ("rg" or "grep")
+ * @param grepCommand - The grep command to use ("rg" or "grep")  
  * @param rule - The grep rule to apply
  * @param filePath - Path to the specific file to check
  * @returns Array of command arguments
@@ -369,27 +441,42 @@ function buildGrepArgsForFile(
 	rule: GrepRule,
 	filePath: string,
 ): string[] {
-	const args: string[] = [];
-
 	if (grepCommand === "rg") {
-		// Ripgrep arguments for single file
-		args.push(
+		return [
 			"--line-number", // Show line numbers
 			"--no-heading", // Don't show filename headers
 			"--color=never", // No color output
 			rule.forbiddenPattern, // Search pattern
 			filePath, // Specific file
-		);
+		];
 	} else {
-		// Traditional grep arguments for single file
-		args.push(
+		return [
+			"-H", // Always show filename
 			"-n", // Show line numbers
 			rule.forbiddenPattern, // Search pattern
 			filePath, // Specific file
-		);
+		];
 	}
+}
 
-	return args;
+/**
+ * Build ripgrep command arguments for single file search
+ *
+ * @param rule - The grep rule to apply
+ * @param filePath - Path to the specific file to check
+ * @returns Array of command arguments
+ */
+function buildRipgrepArgsForFile(
+	rule: GrepRule,
+	filePath: string,
+): string[] {
+	return [
+		"--line-number", // Show line numbers
+		"--no-heading", // Don't show filename headers
+		"--color=never", // No color output
+		rule.forbiddenPattern, // Search pattern
+		filePath, // Specific file
+	];
 }
 
 /**
