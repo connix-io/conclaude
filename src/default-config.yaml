@@ -1,32 +1,31 @@
-# Conclaude YAML Configuration for Rust Implementation
+# Conclaude YAML Configuration
 # This configuration defines how conclaude handles Claude Code hook events
 
 # Commands to run during Stop hook
 # Each line is executed as a separate bash command
 stop:
   run: |
-    cargo test --lib
-    cargo build
-
+    nix develop -c "lint"
+    bun test
+  
   # infinite mode - allows Claude to continue automatically
-  # When enabled, Claude receives the infinite_message to continue working
+  # When enabled, Claude receives the infiniteMessage to continue working
   # instead of ending the session after stop hook commands succeed
   infinite: false
-  infinite_message: "continue working on the task"
+  infiniteMessage: "continue working on the task"
 
 # Validation rules for hook processing
 rules:
   # Prevent Claude from creating or modifying files at the repository root
   # Helps maintain clean project structure
-  prevent_root_additions: true
-
+  preventRootAdditions: true
+  
   # Files that Claude cannot edit, using glob patterns
   # Examples:
   # - "./package.json" - specific files
-  # - "*.md" - file extensions
+  # - "*.md" - file extensions  
   # - "src/**/*.ts" - nested patterns
   # - ".env*" - environment files
   # - "docs/**" - entire directories
-  uneditable_files:
-    - ".conclaude.yaml"
-    - ".envrc"
+  # - "{package,tsconfig}.json" - multiple specific files
+  uneditableFiles: []

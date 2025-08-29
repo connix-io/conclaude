@@ -1,12 +1,9 @@
 .direnv
 result
-*.test
-logs
-*.log
-.DS_Store
-conclaude.ts
-node_modules
-.crush
-bin
-dist
-.output
+target
+
+
+# Added by cargo
+
+/target
+conclaude

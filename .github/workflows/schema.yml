@@ -1,0 +1,170 @@
+name: Auto-update JSON Schema
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/config.rs'
+      - 'src/schema.rs'
+      - 'src/types.rs'
+      - 'Cargo.toml'
+      - 'flake.nix'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Force schema update regardless of changes'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate-and-publish-schema:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Install Nix
+      uses: DeterminateSystems/nix-installer-action@v14
+      with:
+        logger: pretty
+
+    - name: Setup Nix Magic Cache
+      uses: DeterminateSystems/magic-nix-cache-action@v8
+
+    - name: Check Nix flake
+      uses: DeterminateSystems/flake-checker-action@v8
+
+    - name: Build conclaude with Nix
+      run: |
+        nix build .#default
+        ./result/bin/conclaude --version
+
+    - name: Generate JSON Schema
+      run: |
+        ./result/bin/conclaude generate-schema --output conclaude-schema.json --validate
+        echo "Schema generated successfully"
+
+    - name: Validate Schema Structure
+      run: |
+        # Basic validation that the schema is valid JSON and contains expected fields
+        jq -e '.["$schema"]' conclaude-schema.json > /dev/null
+        jq -e '.title' conclaude-schema.json > /dev/null
+        jq -e '.description' conclaude-schema.json > /dev/null
+        jq -e '.properties' conclaude-schema.json > /dev/null
+        jq -e '.properties.stop' conclaude-schema.json > /dev/null
+        jq -e '.properties.rules' conclaude-schema.json > /dev/null
+        echo "Schema structure validation passed"
+
+    - name: Upload schema as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: conclaude-schema
+        path: conclaude-schema.json
+        retention-days: 90
+
+    # Only run the release steps on main branch or release events
+    - name: Check if this is a release or main branch
+      id: check_release
+      run: |
+        if [[ "${{ github.event_name }}" == "release" ]] || [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ inputs.force_update }}" == "true" ]]; then
+          echo "should_release=true" >> $GITHUB_OUTPUT
+        else
+          echo "should_release=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Get latest release
+      if: steps.check_release.outputs.should_release == 'true'
+      id: get_release
+      run: |
+        # Get the latest release tag, or use v0.1.0 as fallback
+        LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "")
+        if [[ -z "$LATEST_TAG" ]]; then
+          LATEST_TAG="v0.1.0"
+        fi
+        echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+        
+        # Check if this tag exists as a release
+        if gh release view "$LATEST_TAG" >/dev/null 2>&1; then
+          echo "release_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "release_exists=false" >> $GITHUB_OUTPUT
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create or update release with schema
+      if: steps.check_release.outputs.should_release == 'true'
+      run: |
+        TAG="${{ steps.get_release.outputs.latest_tag }}"
+        
+        if [[ "${{ steps.get_release.outputs.release_exists }}" == "true" ]]; then
+          echo "Updating existing release $TAG with new schema"
+          # Delete existing schema asset if it exists
+          gh release delete-asset "$TAG" "conclaude-schema.json" 2>/dev/null || true
+          # Upload new schema
+          gh release upload "$TAG" conclaude-schema.json
+        else
+          echo "Creating new release $TAG"
+          gh release create "$TAG" \
+            --title "Conclaude $TAG" \
+            --notes "Automated release with updated JSON schema" \
+            conclaude-schema.json
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Verify schema URL accessibility
+      if: steps.check_release.outputs.should_release == 'true'
+      run: |
+        # Wait a moment for the release to be fully processed
+        sleep 10
+        
+        # Test that the schema URL is accessible
+        SCHEMA_URL="https://github.com/${{ github.repository }}/releases/latest/download/conclaude-schema.json"
+        echo "Testing schema URL: $SCHEMA_URL"
+        
+        # Try to fetch the schema (with retries)
+        for i in {1..5}; do
+          if curl -f -s "$SCHEMA_URL" > /dev/null; then
+            echo "✅ Schema URL is accessible"
+            break
+          else
+            echo "⏳ Waiting for schema to be available (attempt $i/5)..."
+            sleep 10
+          fi
+        done
+
+    - name: Create summary
+      run: |
+        echo "## 🔧 Schema Generation Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Schema file**: \`conclaude-schema.json\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Validation**: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+        echo "- **Structure check**: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ steps.check_release.outputs.should_release }}" == "true" ]]; then
+          echo "- **Release**: ✅ Updated with schema" >> $GITHUB_STEP_SUMMARY
+          echo "- **Schema URL**: https://github.com/${{ github.repository }}/releases/latest/download/conclaude-schema.json" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Release**: ⏭️ Skipped (not main branch or release)" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Usage in YAML files:" >> $GITHUB_STEP_SUMMARY
+        echo '```yaml' >> $GITHUB_STEP_SUMMARY
+        echo '# yaml-language-server: $schema=https://github.com/${{ github.repository }}/releases/latest/download/conclaude-schema.json' >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "stop:" >> $GITHUB_STEP_SUMMARY
+        echo "  run: |" >> $GITHUB_STEP_SUMMARY
+        echo "    echo 'Your commands here'" >> $GITHUB_STEP_SUMMARY
+        echo "```" >> $GITHUB_STEP_SUMMARY
