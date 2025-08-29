@@ -33,8 +33,8 @@ where
         .read_to_string(&mut buffer)
         .context("Failed to read from stdin")?;
 
-    let payload: T = serde_json::from_str(&buffer)
-        .context("Failed to parse JSON payload from stdin")?;
+    let payload: T =
+        serde_json::from_str(&buffer).context("Failed to parse JSON payload from stdin")?;
 
     Ok(payload)
 }
@@ -63,9 +63,8 @@ where
 /// Handles PreToolUse hook events fired before Claude executes any tool.
 pub async fn handle_pre_tool_use() -> Result<HookResult> {
     let payload: PreToolUsePayload = read_payload_from_stdin().await?;
-    
-    validate_base_payload(&payload.base)
-        .map_err(|e| anyhow::anyhow!(e))?;
+
+    validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
     if payload.tool_name.is_empty() {
         return Err(anyhow::anyhow!("Missing required field: tool_name"));
@@ -96,7 +95,7 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
 /// Check file validation rules for file-modifying tools
 async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
     let config = get_config().await?;
-    
+
     // Extract file path from tool input
     let file_path = extract_file_path(&payload.tool_input);
     let Some(file_path) = file_path else {
@@ -105,7 +104,8 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
 
     let cwd = std::env::current_dir().context("Failed to get current working directory")?;
     let resolved_path = cwd.join(&file_path);
-    let relative_path = resolved_path.strip_prefix(&cwd)
+    let relative_path = resolved_path
+        .strip_prefix(&cwd)
         .unwrap_or(resolved_path.as_path())
         .to_string_lossy()
         .to_string();
@@ -130,7 +130,12 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
 
     // Check uneditableFiles rule
     for pattern in &config.rules.uneditable_files {
-        if matches_uneditable_pattern(&file_path, &relative_path, &resolved_path.to_string_lossy(), pattern)? {
+        if matches_uneditable_pattern(
+            &file_path,
+            &relative_path,
+            &resolved_path.to_string_lossy(),
+            pattern,
+        )? {
             let error_message = format!(
                 "Blocked {} operation: file matches uneditable pattern '{}'. File: {}",
                 payload.tool_name, pattern, file_path
@@ -163,14 +168,15 @@ pub fn extract_file_path(tool_input: &std::collections::HashMap<String, Value>) 
 pub fn is_root_addition(_file_path: &str, relative_path: &str) -> bool {
     let path = Path::new(relative_path);
     let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    
+
     // Check if the file is directly in the root directory (no subdirectories)
-    let is_in_root = !relative_path.contains(std::path::MAIN_SEPARATOR) 
-        && !relative_path.is_empty() 
+    let is_in_root = !relative_path.contains(std::path::MAIN_SEPARATOR)
+        && !relative_path.is_empty()
         && relative_path != "..";
 
     // Allow dotfiles and configuration files
-    let is_config_file = file_name.contains("config") 
+    // TODO: REMOVE THIS HACK
+    let is_config_file = file_name.contains("config")
         || file_name.contains("settings")
         || file_name == "package.json"
         || file_name == "tsconfig.json"
@@ -189,8 +195,8 @@ pub fn matches_uneditable_pattern(
     resolved_path: &str,
     pattern: &str,
 ) -> Result<bool> {
-    let glob_pattern = Pattern::new(pattern)
-        .with_context(|| format!("Invalid glob pattern: {}", pattern))?;
+    let glob_pattern =
+        Pattern::new(pattern).with_context(|| format!("Invalid glob pattern: {}", pattern))?;
 
     Ok(glob_pattern.matches(file_path)
         || glob_pattern.matches(relative_path)
@@ -200,9 +206,8 @@ pub fn matches_uneditable_pattern(
 /// Handles PostToolUse hook events fired after Claude executes a tool.
 pub async fn handle_post_tool_use() -> Result<HookResult> {
     let payload: PostToolUsePayload = read_payload_from_stdin().await?;
-    
-    validate_base_payload(&payload.base)
-        .map_err(|e| anyhow::anyhow!(e))?;
+
+    validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
     if payload.tool_name.is_empty() {
         return Err(anyhow::anyhow!("Missing required field: tool_name"));
@@ -225,9 +230,8 @@ pub async fn handle_post_tool_use() -> Result<HookResult> {
 /// Handles Notification hook events when Claude sends system notifications.
 pub async fn handle_notification() -> Result<HookResult> {
     let payload: NotificationPayload = read_payload_from_stdin().await?;
-    
-    validate_base_payload(&payload.base)
-        .map_err(|e| anyhow::anyhow!(e))?;
+
+    validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
     if payload.message.is_empty() {
         return Err(anyhow::anyhow!("Missing required field: message"));
@@ -250,9 +254,8 @@ pub async fn handle_notification() -> Result<HookResult> {
 /// Handles UserPromptSubmit hook events when users submit input to Claude.
 pub async fn handle_user_prompt_submit() -> Result<HookResult> {
     let payload: UserPromptSubmitPayload = read_payload_from_stdin().await?;
-    
-    validate_base_payload(&payload.base)
-        .map_err(|e| anyhow::anyhow!(e))?;
+
+    validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
     if payload.prompt.is_empty() {
         return Err(anyhow::anyhow!("Missing required field: prompt"));
@@ -274,9 +277,8 @@ pub async fn handle_user_prompt_submit() -> Result<HookResult> {
 /// Handles SessionStart hook events when a new Claude session begins.
 pub async fn handle_session_start() -> Result<HookResult> {
     let payload: SessionStartPayload = read_payload_from_stdin().await?;
-    
-    validate_base_payload(&payload.base)
-        .map_err(|e| anyhow::anyhow!(e))?;
+
+    validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
     if payload.source.is_empty() {
         return Err(anyhow::anyhow!("Missing required field: source"));
@@ -299,9 +301,8 @@ pub async fn handle_session_start() -> Result<HookResult> {
 /// Handles Stop hook events when a Claude session is terminating.
 pub async fn handle_stop() -> Result<HookResult> {
     let payload: StopPayload = read_payload_from_stdin().await?;
-    
-    validate_base_payload(&payload.base)
-        .map_err(|e| anyhow::anyhow!(e))?;
+
+    validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
     // Initialize logger
     let logging_config = LoggingConfig::default();
@@ -320,7 +321,12 @@ pub async fn handle_stop() -> Result<HookResult> {
     log::info!("Executing {} stop hook commands", commands.len());
 
     for (index, command) in commands.iter().enumerate() {
-        log::info!("Executing command {}/{}: {}", index + 1, commands.len(), command);
+        log::info!(
+            "Executing command {}/{}: {}",
+            index + 1,
+            commands.len(),
+            command
+        );
 
         let child = TokioCommand::new("bash")
             .arg("-c")
@@ -331,26 +337,28 @@ pub async fn handle_stop() -> Result<HookResult> {
             .spawn()
             .with_context(|| format!("Failed to spawn command: {}", command))?;
 
-        let output = child.wait_with_output().await
+        let output = child
+            .wait_with_output()
+            .await
             .with_context(|| format!("Failed to wait for command: {}", command))?;
 
         if !output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
             let exit_code = output.status.code().unwrap_or(1);
-            
+
             let stdout_section = if !stdout.is_empty() {
                 format!("\nStdout: {}", stdout)
             } else {
                 String::new()
             };
-            
+
             let stderr_section = if !stderr.is_empty() {
                 format!("\nStderr: {}", stderr)
             } else {
                 String::new()
             };
-            
+
             let error_message = format!(
                 "Command failed with exit code {}: {}{}{}",
                 exit_code, command, stdout_section, stderr_section
@@ -371,11 +379,16 @@ pub async fn handle_stop() -> Result<HookResult> {
 
     // Check if infinite mode is enabled
     if config.stop.infinite {
-        let infinite_message = config.stop.infinite_message
+        let infinite_message = config
+            .stop
+            .infinite_message
             .as_deref()
             .unwrap_or("continue working on the task");
-        
-        log::info!("Infinite mode enabled, sending continuation message: {}", infinite_message);
+
+        log::info!(
+            "Infinite mode enabled, sending continuation message: {}",
+            infinite_message
+        );
         return Ok(HookResult::blocked(infinite_message.to_string()));
     }
 
@@ -385,9 +398,8 @@ pub async fn handle_stop() -> Result<HookResult> {
 /// Handles SubagentStop hook events when Claude subagents complete their tasks.
 pub async fn handle_subagent_stop() -> Result<HookResult> {
     let payload: SubagentStopPayload = read_payload_from_stdin().await?;
-    
-    validate_base_payload(&payload.base)
-        .map_err(|e| anyhow::anyhow!(e))?;
+
+    validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
     // Initialize logger
     let logging_config = LoggingConfig::default();
@@ -405,9 +417,8 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
 /// Handles PreCompact hook events before transcript compaction occurs.
 pub async fn handle_pre_compact() -> Result<HookResult> {
     let payload: PreCompactPayload = read_payload_from_stdin().await?;
-    
-    validate_base_payload(&payload.base)
-        .map_err(|e| anyhow::anyhow!(e))?;
+
+    validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
     // Initialize logger
     let logging_config = LoggingConfig::default();
@@ -438,23 +449,48 @@ mod tests {
 
     #[test]
     fn test_matches_uneditable_pattern() {
-        assert!(matches_uneditable_pattern("package.json", "package.json", "/path/package.json", "package.json").unwrap());
+        assert!(matches_uneditable_pattern(
+            "package.json",
+            "package.json",
+            "/path/package.json",
+            "package.json"
+        )
+        .unwrap());
         assert!(matches_uneditable_pattern("test.md", "test.md", "/path/test.md", "*.md").unwrap());
-        assert!(matches_uneditable_pattern("src/index.ts", "src/index.ts", "/path/src/index.ts", "src/**/*.ts").unwrap());
-        assert!(!matches_uneditable_pattern("other.txt", "other.txt", "/path/other.txt", "*.md").unwrap());
+        assert!(matches_uneditable_pattern(
+            "src/index.ts",
+            "src/index.ts",
+            "/path/src/index.ts",
+            "src/**/*.ts"
+        )
+        .unwrap());
+        assert!(
+            !matches_uneditable_pattern("other.txt", "other.txt", "/path/other.txt", "*.md")
+                .unwrap()
+        );
     }
 
     #[test]
     fn test_extract_file_path() {
         let mut tool_input = std::collections::HashMap::new();
-        tool_input.insert("file_path".to_string(), Value::String("test.txt".to_string()));
+        tool_input.insert(
+            "file_path".to_string(),
+            Value::String("test.txt".to_string()),
+        );
         assert_eq!(extract_file_path(&tool_input), Some("test.txt".to_string()));
 
         tool_input.clear();
-        tool_input.insert("notebook_path".to_string(), Value::String("notebook.ipynb".to_string()));
-        assert_eq!(extract_file_path(&tool_input), Some("notebook.ipynb".to_string()));
+        tool_input.insert(
+            "notebook_path".to_string(),
+            Value::String("notebook.ipynb".to_string()),
+        );
+        assert_eq!(
+            extract_file_path(&tool_input),
+            Some("notebook.ipynb".to_string())
+        );
 
         tool_input.clear();
         assert_eq!(extract_file_path(&tool_input), None);
     }
 }
+

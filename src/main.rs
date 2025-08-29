@@ -97,16 +97,19 @@ async fn main() -> Result<()> {
     if cli.verbose {
         std::env::set_var("CONCLAUDE_LOG_LEVEL", "debug");
     }
-    
+
     // Set file logging environment variable based on CLI flag
     if cli.disable_file_logging {
         std::env::set_var("CONCLAUDE_DISABLE_FILE_LOGGING", "true");
     }
 
     match cli.command {
-        Commands::Init { config_path, claude_path, force, schema_url } => {
-            handle_init(config_path, claude_path, force, schema_url).await
-        }
+        Commands::Init {
+            config_path,
+            claude_path,
+            force,
+            schema_url,
+        } => handle_init(config_path, claude_path, force, schema_url).await,
         Commands::GenerateSchema { output, validate } => {
             handle_generate_schema(output, validate).await
         }
@@ -143,6 +146,8 @@ struct ClaudePermissions {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ClaudeSettings {
+    #[serde(rename = "includeCoAuthoredBy")]
+    include_co_authored_by: bool,
     permissions: ClaudePermissions,
     hooks: std::collections::HashMap<String, Vec<ClaudeHookMatcher>>,
 }
@@ -155,9 +160,11 @@ async fn handle_init(
     schema_url: Option<String>,
 ) -> Result<()> {
     let cwd = std::env::current_dir().context("Failed to get current directory")?;
-    let config_path = config_path.map(PathBuf::from)
+    let config_path = config_path
+        .map(PathBuf::from)
         .unwrap_or_else(|| cwd.join(".conclaude.yaml"));
-    let claude_path = claude_path.map(PathBuf::from)
+    let claude_path = claude_path
+        .map(PathBuf::from)
         .unwrap_or_else(|| cwd.join(".claude"));
     let settings_path = claude_path.join("settings.json");
 
@@ -176,7 +183,7 @@ async fn handle_init(
     let config_content = format!("{}{}", yaml_header, config::generate_default_config());
     fs::write(&config_path, config_content)
         .with_context(|| format!("Failed to write config file: {}", config_path.display()))?;
-    
+
     println!("✅ Created configuration file with YAML language server support:");
     println!("   {}", config_path.display());
     let default_schema_url = schema::get_schema_url();
@@ -184,20 +191,28 @@ async fn handle_init(
     println!("   Schema URL: {}", used_schema_url);
 
     // Create .claude directory if it doesn't exist
-    fs::create_dir_all(&claude_path)
-        .with_context(|| format!("Failed to create .claude directory: {}", claude_path.display()))?;
+    fs::create_dir_all(&claude_path).with_context(|| {
+        format!(
+            "Failed to create .claude directory: {}",
+            claude_path.display()
+        )
+    })?;
 
     // Handle settings.json
     let mut settings = if settings_path.exists() {
-        let settings_content = fs::read_to_string(&settings_path)
-            .with_context(|| format!("Failed to read settings file: {}", settings_path.display()))?;
-        let settings: ClaudeSettings = serde_json::from_str(&settings_content)
-            .with_context(|| format!("Failed to parse settings file: {}", settings_path.display()))?;
+        let settings_content = fs::read_to_string(&settings_path).with_context(|| {
+            format!("Failed to read settings file: {}", settings_path.display())
+        })?;
+        let settings: ClaudeSettings =
+            serde_json::from_str(&settings_content).with_context(|| {
+                format!("Failed to parse settings file: {}", settings_path.display())
+            })?;
         println!("\n📝 Found existing Claude settings, updating hooks...");
         settings
     } else {
         println!("\n📝 Creating Claude Code settings...");
         ClaudeSettings {
+            include_co_authored_by: false,
             permissions: ClaudePermissions {
                 allow: Vec::new(),
                 deny: Vec::new(),
@@ -209,7 +224,7 @@ async fn handle_init(
     // Define all hook types and their commands
     let hook_types = [
         "UserPromptSubmit",
-        "PreToolUse", 
+        "PreToolUse",
         "PostToolUse",
         "Notification",
         "Stop",
@@ -233,11 +248,11 @@ async fn handle_init(
     }
 
     // Write updated settings
-    let settings_json = serde_json::to_string_pretty(&settings)
-        .context("Failed to serialize settings to JSON")?;
+    let settings_json =
+        serde_json::to_string_pretty(&settings).context("Failed to serialize settings to JSON")?;
     fs::write(&settings_path, settings_json)
         .with_context(|| format!("Failed to write settings file: {}", settings_path.display()))?;
-    
+
     println!("✅ Updated Claude Code settings:");
     println!("   {}", settings_path.display());
 
@@ -254,40 +269,42 @@ async fn handle_init(
 /// Handles GenerateSchema command to generate JSON Schema for conclaude configuration.
 async fn handle_generate_schema(output: String, validate: bool) -> Result<()> {
     let output_path = PathBuf::from(output);
-    
+
     println!("🔧 Generating JSON Schema for conclaude configuration...");
-    
+
     // Generate the schema
-    let schema = schema::generate_config_schema()
-        .context("Failed to generate JSON schema")?;
-    
+    let schema = schema::generate_config_schema().context("Failed to generate JSON schema")?;
+
     // Write schema to file
     schema::write_schema_to_file(&schema, &output_path)
         .context("Failed to write schema to file")?;
-    
+
     println!("✅ Schema generated successfully:");
     println!("   {}", output_path.display());
-    
+
     // Optionally validate the schema
     if validate {
         println!("\n🔍 Validating generated schema...");
-        
+
         // Test with the default configuration
         let default_config = config::generate_default_config();
         schema::validate_config_against_schema(&default_config)
             .context("Default configuration failed schema validation")?;
-        
+
         println!("✅ Schema validation passed!");
         println!("   Default configuration is valid against the generated schema.");
     }
-    
+
     // Display schema URL info
     let schema_url = schema::get_schema_url();
     println!("\n📋 Schema URL for YAML language server:");
     println!("   {}", schema_url);
-    
+
     println!("\n💡 Add this header to your .conclaude.yaml files for IDE support:");
-    println!("   {}", schema::generate_yaml_language_server_header(None).trim());
-    
+    println!(
+        "   {}",
+        schema::generate_yaml_language_server_header(None).trim()
+    );
+
     Ok(())
 }
