@@ -77,9 +77,9 @@ rules:
   uneditableFiles:
     - "*.lock"
 "#;
-    
+
     println!("YAML content:\n{}", config_content);
-    
+
     let result = serde_yaml::from_str::<conclaude::config::ConclaudeConfig>(config_content);
     match result {
         Ok(config) => {
@@ -99,16 +99,16 @@ rules:
 #[tokio::test]
 async fn test_load_config_not_found() {
     let temp_dir = tempdir().unwrap();
-    
+
     // Change to temp directory where no config exists
     let original_dir = std::env::current_dir().unwrap();
     std::env::set_current_dir(&temp_dir).unwrap();
-    
+
     let result = load_conclaude_config().await;
-    
+
     // Restore original directory
     std::env::set_current_dir(original_dir).unwrap();
-    
+
     assert!(result.is_err());
     let error_message = result.unwrap_err().to_string();
     assert!(error_message.contains("Configuration file not found"));

@@ -92,7 +92,10 @@ fn test_compact_trigger_deserialization() {
 #[test]
 fn test_pre_tool_use_payload_serialization() {
     let mut tool_input = HashMap::new();
-    tool_input.insert("file_path".to_string(), serde_json::Value::String("test.txt".to_string()));
+    tool_input.insert(
+        "file_path".to_string(),
+        serde_json::Value::String("test.txt".to_string()),
+    );
 
     let payload = PreToolUsePayload {
         base: BasePayload {

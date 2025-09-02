@@ -1,19 +1,18 @@
 use crate::types::LoggingConfig;
 use log::LevelFilter;
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
 /// Initialize the logger based on configuration
 pub fn init_logger(session_id: Option<&str>, config: Option<&LoggingConfig>) -> anyhow::Result<()> {
     let logging_config = resolve_logging_config(config);
-    
+
     let mut builder = env_logger::Builder::from_default_env();
-    
+
     // Set default log level
-    let log_level = std::env::var("CONCLAUDE_LOG_LEVEL")
-        .unwrap_or_else(|_| "info".to_string());
-    
+    let log_level = std::env::var("CONCLAUDE_LOG_LEVEL").unwrap_or_else(|_| "info".to_string());
+
     let level_filter = match log_level.to_lowercase().as_str() {
         "error" => LevelFilter::Error,
         "warn" => LevelFilter::Warn,
@@ -22,9 +21,9 @@ pub fn init_logger(session_id: Option<&str>, config: Option<&LoggingConfig>) -> 
         "trace" => LevelFilter::Trace,
         _ => LevelFilter::Info,
     };
-    
+
     builder.filter_level(level_filter);
-    
+
     // Configure format
     builder.format(|buf, record| {
         let timestamp = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ");
@@ -44,9 +43,9 @@ pub fn init_logger(session_id: Option<&str>, config: Option<&LoggingConfig>) -> 
             setup_file_logging(&mut builder, &log_file_path)?;
         }
     }
-    
+
     builder.try_init()?;
-    
+
     Ok(())
 }
 
@@ -58,19 +57,24 @@ pub fn resolve_logging_config(config: Option<&LoggingConfig>) -> LoggingConfig {
 
 /// Internal function that resolves logging configuration with explicit environment variable value.
 /// This allows for deterministic testing without global environment variable manipulation.
-pub fn resolve_logging_config_with_env(config: Option<&LoggingConfig>, env_var: Option<&str>) -> LoggingConfig {
+pub fn resolve_logging_config_with_env(
+    config: Option<&LoggingConfig>,
+    env_var: Option<&str>,
+) -> LoggingConfig {
     // Check environment variable CONCLAUDE_DISABLE_FILE_LOGGING
-    // - If "true", disable file logging  
+    // - If "true", disable file logging
     // - If "false", enable file logging
     // - If unset, default to disabled
     let default_file_logging = match env_var {
-        Some("false") => true,  // Enable if explicitly set to "false"
-        Some("true") => false,  // Disable if explicitly set to "true"
-        _ => false,             // Default to disabled if unset or invalid value
+        Some("false") => true, // Enable if explicitly set to "false"
+        Some("true") => false, // Disable if explicitly set to "true"
+        _ => false,            // Default to disabled if unset or invalid value
     };
 
     LoggingConfig {
-        file_logging: config.map(|c| c.file_logging).unwrap_or(default_file_logging),
+        file_logging: config
+            .map(|c| c.file_logging)
+            .unwrap_or(default_file_logging),
     }
 }
 
@@ -79,7 +83,7 @@ pub fn get_log_file_path(session_id: &str) -> anyhow::Result<PathBuf> {
     let project_name = get_project_name();
     let sanitized_project = sanitize_project_name(&project_name);
     let filename = format!("conclaude-{}-sess-{}.jsonl", sanitized_project, session_id);
-    
+
     let temp_dir = std::env::temp_dir();
     Ok(temp_dir.join(filename))
 }
@@ -87,12 +91,11 @@ pub fn get_log_file_path(session_id: &str) -> anyhow::Result<PathBuf> {
 /// Get the current project name from the working directory
 fn get_project_name() -> String {
     match std::env::current_dir() {
-        Ok(cwd) => {
-            cwd.file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("unknown")
-                .to_string()
-        }
+        Ok(cwd) => cwd
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("unknown")
+            .to_string(),
         Err(_) => "unknown".to_string(),
     }
 }
@@ -101,7 +104,13 @@ fn get_project_name() -> String {
 pub fn sanitize_project_name(name: &str) -> String {
     name.to_lowercase()
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .split('-')
         .filter(|s| !s.is_empty())
@@ -120,17 +129,20 @@ fn setup_file_logging(
     // Note: env_logger doesn't support file output directly
     // In a production implementation, you might want to use tracing + tracing-appender
     // or implement a custom logger that writes to both console and file
-    
+
     // For now, we'll just ensure the log directory exists
     if let Some(parent) = _log_file_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    
+
     Ok(())
 }
 
 /// Create a session-specific logger instance
-pub fn create_session_logger(session_id: &str, config: Option<&LoggingConfig>) -> anyhow::Result<()> {
+pub fn create_session_logger(
+    session_id: &str,
+    config: Option<&LoggingConfig>,
+) -> anyhow::Result<()> {
     init_logger(Some(session_id), config)
 }
 
@@ -142,7 +154,10 @@ mod tests {
     fn test_sanitize_project_name() {
         assert_eq!(sanitize_project_name("my-project"), "my-project");
         assert_eq!(sanitize_project_name("My Project!"), "my-project");
-        assert_eq!(sanitize_project_name("test_project_123"), "test-project-123");
+        assert_eq!(
+            sanitize_project_name("test_project_123"),
+            "test-project-123"
+        );
         assert_eq!(sanitize_project_name("---test---"), "test");
         assert_eq!(sanitize_project_name(""), "");
     }

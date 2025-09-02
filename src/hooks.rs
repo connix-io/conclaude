@@ -1,4 +1,4 @@
-use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig, GrepRule};
+use crate::config::{ConclaudeConfig, GrepRule, extract_bash_commands, load_conclaude_config};
 use crate::logger::create_session_logger;
 use crate::types::*;
 use anyhow::{Context, Result};
@@ -95,7 +95,7 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
         if let Some(result) = check_file_validation_rules(&payload).await? {
             return Ok(result);
         }
-        
+
         // Check PreToolUse grep rules for the file being modified
         if let Some(result) = check_pre_tool_use_grep_rules(&payload).await? {
             return Ok(result);
@@ -328,22 +328,22 @@ pub async fn handle_stop() -> Result<HookResult> {
     );
 
     let config = get_config().await?;
-    
+
     // Check stop hook grep rules first
     if let Some(result) = execute_grep_rules(&config.stop.grep_rules).await? {
         return Ok(result);
     }
-    
+
     // Snapshot root directory if preventRootAdditions is enabled
     let root_snapshot = if config.rules.prevent_root_additions {
         Some(snapshot_root_directory()?)
     } else {
         None
     };
-    
+
     // Extract and execute commands from config.stop.run and config.stop.commands
     let mut commands_with_messages = Vec::new();
-    
+
     // Add legacy run commands
     if !config.stop.run.is_empty() {
         let commands = extract_bash_commands(&config.stop.run)?;
@@ -351,7 +351,7 @@ pub async fn handle_stop() -> Result<HookResult> {
             commands_with_messages.push((cmd, None));
         }
     }
-    
+
     // Add new structured commands with messages
     for cmd_config in &config.stop.commands {
         let commands = extract_bash_commands(&cmd_config.run)?;
@@ -360,8 +360,11 @@ pub async fn handle_stop() -> Result<HookResult> {
         }
     }
 
-    log::info!("Executing {} stop hook commands", commands_with_messages.len());
-    
+    log::info!(
+        "Executing {} stop hook commands",
+        commands_with_messages.len()
+    );
+
     // Track rounds for infinite alternative using atomic counter
     static ROUND_COUNT: AtomicU32 = AtomicU32::new(0);
 
@@ -425,7 +428,7 @@ pub async fn handle_stop() -> Result<HookResult> {
     }
 
     log::info!("All stop hook commands completed successfully");
-    
+
     // Check root additions if enabled
     if let Some(snapshot) = root_snapshot {
         if let Some(result) = check_root_additions(&snapshot)? {
@@ -437,7 +440,10 @@ pub async fn handle_stop() -> Result<HookResult> {
     if let Some(max_rounds) = config.stop.rounds {
         let current_round = ROUND_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
         if current_round < max_rounds {
-            let message = format!("Round {}/{} completed, continuing...", current_round, max_rounds);
+            let message = format!(
+                "Round {}/{} completed, continuing...",
+                current_round, max_rounds
+            );
             log::info!("{}", message);
             return Ok(HookResult::blocked(message));
         }
@@ -504,13 +510,13 @@ pub async fn handle_pre_compact() -> Result<HookResult> {
 /// Check tool usage validation rules
 async fn check_tool_usage_rules(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
     let config = get_config().await?;
-    
+
     for rule in &config.rules.tool_usage_validation {
         if rule.tool == payload.tool_name || rule.tool == "*" {
             // Extract file path if available
             if let Some(file_path) = extract_file_path(&payload.tool_input) {
                 let matches = Pattern::new(&rule.pattern)?.matches(&file_path);
-                
+
                 if (rule.action == "block" && matches) || (rule.action == "allow" && !matches) {
                     let message = rule.message.clone().unwrap_or_else(|| {
                         format!("Tool usage blocked by validation rule: {}", rule.pattern)
@@ -520,14 +526,14 @@ async fn check_tool_usage_rules(payload: &PreToolUsePayload) -> Result<Option<Ho
             }
         }
     }
-    
+
     Ok(None)
 }
 
 /// Check PreToolUse grep rules for the file being modified
 async fn check_pre_tool_use_grep_rules(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
     let config = get_config().await?;
-    
+
     if let Some(file_path) = extract_file_path(&payload.tool_input) {
         for rule in &config.pre_tool_use.grep_rules {
             if Pattern::new(&rule.file_pattern)?.matches(&file_path) {
@@ -545,18 +551,18 @@ async fn check_pre_tool_use_grep_rules(payload: &PreToolUsePayload) -> Result<Op
             }
         }
     }
-    
+
     Ok(None)
 }
 
 /// Execute grep rules on the entire codebase
 async fn execute_grep_rules(rules: &[GrepRule]) -> Result<Option<HookResult>> {
     use walkdir::WalkDir;
-    
+
     for rule in rules {
         let pattern = Pattern::new(&rule.file_pattern)?;
         let regex = regex::Regex::new(&rule.forbidden_pattern)?;
-        
+
         for entry in WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
             if entry.file_type().is_file() {
                 let path = entry.path();
@@ -566,8 +572,9 @@ async fn execute_grep_rules(rules: &[GrepRule]) -> Result<Option<HookResult>> {
                             let line_num = content[..match_found.start()]
                                 .chars()
                                 .filter(|&c| c == '\n')
-                                .count() + 1;
-                            
+                                .count()
+                                + 1;
+
                             let message = format!(
                                 "Grep rule violation: {} at {}:{} - {}",
                                 rule.forbidden_pattern,
@@ -582,14 +589,14 @@ async fn execute_grep_rules(rules: &[GrepRule]) -> Result<Option<HookResult>> {
             }
         }
     }
-    
+
     Ok(None)
 }
 
 /// Snapshot the root directory
 fn snapshot_root_directory() -> Result<HashSet<String>> {
     let mut snapshot = HashSet::new();
-    
+
     for entry in fs::read_dir(".")? {
         if let Ok(entry) = entry {
             if let Ok(file_name) = entry.file_name().into_string() {
@@ -597,14 +604,14 @@ fn snapshot_root_directory() -> Result<HashSet<String>> {
             }
         }
     }
-    
+
     Ok(snapshot)
 }
 
 /// Check for new additions to the root directory
 fn check_root_additions(snapshot: &HashSet<String>) -> Result<Option<HookResult>> {
     let mut new_files = Vec::new();
-    
+
     for entry in fs::read_dir(".")? {
         if let Ok(entry) = entry {
             if let Ok(file_name) = entry.file_name().into_string() {
@@ -614,7 +621,7 @@ fn check_root_additions(snapshot: &HashSet<String>) -> Result<Option<HookResult>
             }
         }
     }
-    
+
     if !new_files.is_empty() {
         let message = format!(
             "Unauthorized root additions detected: {}",
@@ -622,7 +629,7 @@ fn check_root_additions(snapshot: &HashSet<String>) -> Result<Option<HookResult>
         );
         return Ok(Some(HookResult::blocked(message)));
     }
-    
+
     Ok(None)
 }
 
@@ -641,21 +648,25 @@ mod tests {
 
     #[test]
     fn test_matches_uneditable_pattern() {
-        assert!(matches_uneditable_pattern(
-            "package.json",
-            "package.json",
-            "/path/package.json",
-            "package.json"
-        )
-        .unwrap());
+        assert!(
+            matches_uneditable_pattern(
+                "package.json",
+                "package.json",
+                "/path/package.json",
+                "package.json"
+            )
+            .unwrap()
+        );
         assert!(matches_uneditable_pattern("test.md", "test.md", "/path/test.md", "*.md").unwrap());
-        assert!(matches_uneditable_pattern(
-            "src/index.ts",
-            "src/index.ts",
-            "/path/src/index.ts",
-            "src/**/*.ts"
-        )
-        .unwrap());
+        assert!(
+            matches_uneditable_pattern(
+                "src/index.ts",
+                "src/index.ts",
+                "/path/src/index.ts",
+                "src/**/*.ts"
+            )
+            .unwrap()
+        );
         assert!(
             !matches_uneditable_pattern("other.txt", "other.txt", "/path/other.txt", "*.md")
                 .unwrap()
@@ -685,4 +696,3 @@ mod tests {
         assert_eq!(extract_file_path(&tool_input), None);
     }
 }
-

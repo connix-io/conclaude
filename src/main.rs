@@ -92,7 +92,7 @@ enum Commands {
         /// The specific rule to visualize (e.g., "uneditableFiles", "preventRootAdditions")
         #[arg(short, long)]
         rule: Option<String>,
-        
+
         /// Show files that match the rule
         #[arg(long)]
         show_matches: bool,
@@ -324,12 +324,13 @@ async fn handle_generate_schema(output: String, validate: bool) -> Result<()> {
 async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()> {
     use glob::Pattern;
     use walkdir::WalkDir;
-    
+
     println!("🔍 Visualizing configuration rules...\n");
-    
-    let config = config::load_conclaude_config().await
+
+    let config = config::load_conclaude_config()
+        .await
         .context("Failed to load configuration")?;
-    
+
     if let Some(rule_name) = rule {
         match rule_name.as_str() {
             "uneditableFiles" => {
@@ -339,12 +340,12 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                 } else {
                     for pattern_str in &config.rules.uneditable_files {
                         println!("   Pattern: {}", pattern_str);
-                        
+
                         if show_matches {
                             let pattern = Pattern::new(pattern_str)?;
                             println!("   Matching files:");
                             let mut found = false;
-                            
+
                             for entry in WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
                                 if entry.file_type().is_file() {
                                     let path = entry.path();
@@ -354,7 +355,7 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                                     }
                                 }
                             }
-                            
+
                             if !found {
                                 println!("      (no matching files found)");
                             }
@@ -363,7 +364,10 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                 }
             }
             "preventRootAdditions" => {
-                println!("🚫 Prevent Root Additions: {}", config.rules.prevent_root_additions);
+                println!(
+                    "🚫 Prevent Root Additions: {}",
+                    config.rules.prevent_root_additions
+                );
                 if config.rules.prevent_root_additions && show_matches {
                     println!("\n   Root directory contents:");
                     for entry in fs::read_dir(".")? {
@@ -379,8 +383,10 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                     println!("   No tool usage validation rules configured");
                 } else {
                     for rule in &config.rules.tool_usage_validation {
-                        println!("   Tool: {} | Pattern: {} | Action: {}", 
-                                 rule.tool, rule.pattern, rule.action);
+                        println!(
+                            "   Tool: {} | Pattern: {} | Action: {}",
+                            rule.tool, rule.pattern, rule.action
+                        );
                         if let Some(msg) = &rule.message {
                             println!("      Message: {}", msg);
                         }
@@ -398,7 +404,7 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                         println!("   Description: {}", rule.description);
                     }
                 }
-                
+
                 println!("\n🔍 Grep Rules (PreToolUse Hook):");
                 if config.pre_tool_use.grep_rules.is_empty() {
                     println!("   No grep rules configured for pre-tool-use hook");
@@ -422,19 +428,34 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
     } else {
         // Show all rules overview
         println!("📋 Configuration Overview:\n");
-        println!("🚫 Prevent Root Additions: {}", config.rules.prevent_root_additions);
-        println!("📁 Uneditable Files: {} patterns", config.rules.uneditable_files.len());
-        println!("🔧 Tool Usage Validation: {} rules", config.rules.tool_usage_validation.len());
-        println!("🔍 Stop Hook Grep Rules: {} rules", config.stop.grep_rules.len());
-        println!("🔍 PreToolUse Grep Rules: {} rules", config.pre_tool_use.grep_rules.len());
+        println!(
+            "🚫 Prevent Root Additions: {}",
+            config.rules.prevent_root_additions
+        );
+        println!(
+            "📁 Uneditable Files: {} patterns",
+            config.rules.uneditable_files.len()
+        );
+        println!(
+            "🔧 Tool Usage Validation: {} rules",
+            config.rules.tool_usage_validation.len()
+        );
+        println!(
+            "🔍 Stop Hook Grep Rules: {} rules",
+            config.stop.grep_rules.len()
+        );
+        println!(
+            "🔍 PreToolUse Grep Rules: {} rules",
+            config.pre_tool_use.grep_rules.len()
+        );
         println!("♾️  Infinite Mode: {}", config.stop.infinite);
         if let Some(rounds) = config.stop.rounds {
             println!("🔄 Rounds Mode: {} rounds", rounds);
         }
-        
+
         println!("\nUse --rule <rule-name> to see details for a specific rule");
         println!("Use --show-matches to see which files match the patterns");
     }
-    
+
     Ok(())
 }

@@ -6,7 +6,10 @@ fn test_sanitize_project_name() {
     // Test basic functionality
     assert_eq!(sanitize_project_name("my-project"), "my-project");
     assert_eq!(sanitize_project_name("My Project!"), "my-project");
-    assert_eq!(sanitize_project_name("test_project_123"), "test-project-123");
+    assert_eq!(
+        sanitize_project_name("test_project_123"),
+        "test-project-123"
+    );
     assert_eq!(sanitize_project_name("---test---"), "test");
     assert_eq!(sanitize_project_name(""), "");
 }
@@ -15,7 +18,10 @@ fn test_sanitize_project_name() {
 fn test_sanitize_project_name_special_chars() {
     assert_eq!(sanitize_project_name("hello@world"), "hello-world");
     assert_eq!(sanitize_project_name("test.project"), "test-project");
-    assert_eq!(sanitize_project_name("my project with spaces"), "my-project-with-spaces");
+    assert_eq!(
+        sanitize_project_name("my project with spaces"),
+        "my-project-with-spaces"
+    );
     assert_eq!(sanitize_project_name("project#$%^&*()"), "project");
 }
 
@@ -75,7 +81,9 @@ fn test_init_logger_basic() {
 
 #[test]
 fn test_create_session_logger() {
-    let config = LoggingConfig { file_logging: false };
+    let config = LoggingConfig {
+        file_logging: false,
+    };
     let result = create_session_logger("test-session", Some(&config));
     // Logger might already be initialized by previous tests, so we accept either Ok or the specific "already initialized" error
     assert!(result.is_ok() || result.unwrap_err().to_string().contains("already"));

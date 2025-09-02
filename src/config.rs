@@ -69,7 +69,7 @@ pub struct RulesConfig {
 pub struct ToolUsageRule {
     pub tool: String,
     pub pattern: String,
-    pub action: String,  // "block" or "allow"
+    pub action: String, // "block" or "allow"
     pub message: Option<String>,
 }
 
@@ -145,21 +145,22 @@ impl Default for ConclaudeConfig {
 /// Search strategy: searches up directory tree until a config file is found
 pub async fn load_conclaude_config() -> Result<ConclaudeConfig> {
     let search_paths = get_config_search_paths()?;
-    
+
     for path in &search_paths {
         if path.exists() {
             let content = fs::read_to_string(path)
                 .with_context(|| format!("Failed to read config file: {}", path.display()))?;
-            
+
             let config: ConclaudeConfig = serde_yaml::from_str(&content)
                 .with_context(|| format!("Failed to parse config file: {}", path.display()))?;
-            
+
             return Ok(config);
         }
     }
 
     // If no config file is found, show search locations
-    let search_locations: Vec<String> = search_paths.iter()
+    let search_locations: Vec<String> = search_paths
+        .iter()
         .map(|p| format!("  • {}", p.display()))
         .collect();
 
@@ -174,24 +175,24 @@ pub async fn load_conclaude_config() -> Result<ConclaudeConfig> {
 fn get_config_search_paths() -> Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
     let mut current_dir = std::env::current_dir()?;
-    
+
     loop {
         // Add .conclaude.yaml and .conclaude.yml to search paths
         paths.push(current_dir.join(".conclaude.yaml"));
         paths.push(current_dir.join(".conclaude.yml"));
-        
+
         // Check if we've reached the project root (directory containing package.json)
         if current_dir.join("package.json").exists() {
             break;
         }
-        
+
         // Move to parent directory
         match current_dir.parent() {
             Some(parent) => current_dir = parent.to_path_buf(),
             None => break, // Reached filesystem root
         }
     }
-    
+
     Ok(paths)
 }
 
@@ -230,7 +231,7 @@ EOF"#,
     if !output.stdout.is_empty() {
         let stdout = String::from_utf8(output.stdout)
             .context("Failed to parse bash analyzer stdout as UTF-8")?;
-        
+
         for line in stdout.lines() {
             if let Some(command) = line.strip_prefix("CMD:") {
                 if !command.is_empty() {
@@ -302,5 +303,4 @@ cd /tmp && echo "test""#;
             ]
         );
     }
-
 }

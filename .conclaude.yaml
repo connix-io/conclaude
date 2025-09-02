@@ -5,6 +5,8 @@
 # Each line is executed as a separate bash command
 stop:
   run: |
+    nix fmt
+    cargo clippy -- -D warnings -D clippy::pedantic
     cargo test --lib
     cargo build
   # infinite mode - allows Claude to continue automatically
@@ -27,5 +29,5 @@ rules:
   # - ".env*" - environment files
   # - "docs/**" - entire directories
   uneditable_files:
-    - ".conclaude.yaml"
+    # - ".conclaude.yaml"
     - ".envrc"

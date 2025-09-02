@@ -58,8 +58,8 @@ fn test_cli_init_command() {
     assert!(temp_path.join(".claude/settings.json").exists());
 
     // Verify config file content
-    let config_content = fs::read_to_string(temp_path.join(".conclaude.yaml"))
-        .expect("Failed to read config file");
+    let config_content =
+        fs::read_to_string(temp_path.join(".conclaude.yaml")).expect("Failed to read config file");
     assert!(config_content.contains("# yaml-language-server:"));
     assert!(config_content.contains("stop:"));
     assert!(config_content.contains("rules:"));
@@ -81,7 +81,8 @@ fn test_cli_init_command_force_overwrite() {
 
     // Create existing config file
     let mut file = File::create(&config_path).expect("Failed to create config file");
-    file.write_all(b"existing content").expect("Failed to write existing content");
+    file.write_all(b"existing content")
+        .expect("Failed to write existing content");
 
     // First init without force should fail
     let output = Command::new("cargo")
