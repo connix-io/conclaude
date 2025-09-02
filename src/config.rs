@@ -90,6 +90,7 @@ pub struct GitWorktreeConfig {
 
 /// Main configuration interface matching the TypeScript version
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ConclaudeConfig {
     #[serde(default)]
     pub stop: StopConfig,
