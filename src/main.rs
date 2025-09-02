@@ -87,6 +87,16 @@ enum Commands {
     /// Process PreCompact hook - fired before transcript compaction
     #[clap(name = "PreCompact")]
     PreCompact,
+    /// Visualize file/directory settings from configuration
+    Visualize {
+        /// The specific rule to visualize (e.g., "uneditableFiles", "preventRootAdditions")
+        #[arg(short, long)]
+        rule: Option<String>,
+        
+        /// Show files that match the rule
+        #[arg(long)]
+        show_matches: bool,
+    },
 }
 
 #[tokio::main]
@@ -121,6 +131,7 @@ async fn main() -> Result<()> {
         Commands::Stop => handle_hook_result(handle_stop).await,
         Commands::SubagentStop => handle_hook_result(handle_subagent_stop).await,
         Commands::PreCompact => handle_hook_result(handle_pre_compact).await,
+        Commands::Visualize { rule, show_matches } => handle_visualize(rule, show_matches).await,
     }
 }
 
@@ -306,5 +317,124 @@ async fn handle_generate_schema(output: String, validate: bool) -> Result<()> {
         schema::generate_yaml_language_server_header(None).trim()
     );
 
+    Ok(())
+}
+
+/// Handles Visualize command to display file/directory settings from configuration.
+async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()> {
+    use glob::Pattern;
+    use walkdir::WalkDir;
+    
+    println!("🔍 Visualizing configuration rules...\n");
+    
+    let config = config::load_conclaude_config().await
+        .context("Failed to load configuration")?;
+    
+    if let Some(rule_name) = rule {
+        match rule_name.as_str() {
+            "uneditableFiles" => {
+                println!("📁 Uneditable Files:");
+                if config.rules.uneditable_files.is_empty() {
+                    println!("   No uneditable files configured");
+                } else {
+                    for pattern_str in &config.rules.uneditable_files {
+                        println!("   Pattern: {}", pattern_str);
+                        
+                        if show_matches {
+                            let pattern = Pattern::new(pattern_str)?;
+                            println!("   Matching files:");
+                            let mut found = false;
+                            
+                            for entry in WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
+                                if entry.file_type().is_file() {
+                                    let path = entry.path();
+                                    if pattern.matches(&path.to_string_lossy()) {
+                                        println!("      - {}", path.display());
+                                        found = true;
+                                    }
+                                }
+                            }
+                            
+                            if !found {
+                                println!("      (no matching files found)");
+                            }
+                        }
+                    }
+                }
+            }
+            "preventRootAdditions" => {
+                println!("🚫 Prevent Root Additions: {}", config.rules.prevent_root_additions);
+                if config.rules.prevent_root_additions && show_matches {
+                    println!("\n   Root directory contents:");
+                    for entry in fs::read_dir(".")? {
+                        if let Ok(entry) = entry {
+                            println!("      - {}", entry.file_name().to_string_lossy());
+                        }
+                    }
+                }
+            }
+            "toolUsageValidation" => {
+                println!("🔧 Tool Usage Validation Rules:");
+                if config.rules.tool_usage_validation.is_empty() {
+                    println!("   No tool usage validation rules configured");
+                } else {
+                    for rule in &config.rules.tool_usage_validation {
+                        println!("   Tool: {} | Pattern: {} | Action: {}", 
+                                 rule.tool, rule.pattern, rule.action);
+                        if let Some(msg) = &rule.message {
+                            println!("      Message: {}", msg);
+                        }
+                    }
+                }
+            }
+            "grepRules" => {
+                println!("🔍 Grep Rules (Stop Hook):");
+                if config.stop.grep_rules.is_empty() {
+                    println!("   No grep rules configured for stop hook");
+                } else {
+                    for rule in &config.stop.grep_rules {
+                        println!("   File Pattern: {}", rule.file_pattern);
+                        println!("   Forbidden Pattern: {}", rule.forbidden_pattern);
+                        println!("   Description: {}", rule.description);
+                    }
+                }
+                
+                println!("\n🔍 Grep Rules (PreToolUse Hook):");
+                if config.pre_tool_use.grep_rules.is_empty() {
+                    println!("   No grep rules configured for pre-tool-use hook");
+                } else {
+                    for rule in &config.pre_tool_use.grep_rules {
+                        println!("   File Pattern: {}", rule.file_pattern);
+                        println!("   Forbidden Pattern: {}", rule.forbidden_pattern);
+                        println!("   Description: {}", rule.description);
+                    }
+                }
+            }
+            _ => {
+                println!("❌ Unknown rule: {}", rule_name);
+                println!("\nAvailable rules:");
+                println!("   - uneditableFiles");
+                println!("   - preventRootAdditions");
+                println!("   - toolUsageValidation");
+                println!("   - grepRules");
+            }
+        }
+    } else {
+        // Show all rules overview
+        println!("📋 Configuration Overview:\n");
+        println!("🚫 Prevent Root Additions: {}", config.rules.prevent_root_additions);
+        println!("📁 Uneditable Files: {} patterns", config.rules.uneditable_files.len());
+        println!("🔧 Tool Usage Validation: {} rules", config.rules.tool_usage_validation.len());
+        println!("🔍 Stop Hook Grep Rules: {} rules", config.stop.grep_rules.len());
+        println!("🔍 PreToolUse Grep Rules: {} rules", config.pre_tool_use.grep_rules.len());
+        println!("♾️  Infinite Mode: {}", config.stop.infinite);
+        if let Some(rounds) = config.stop.rounds {
+            println!("🔄 Rounds Mode: {} rounds", rounds);
+        }
+        
+        println!("\nUse --rule <rule-name> to see details for a specific rule");
+        println!("Use --show-matches to see which files match the patterns");
+    }
+    
     Ok(())
 }

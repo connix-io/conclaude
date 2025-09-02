@@ -28,6 +28,8 @@ thiserror = "1.0"
 dirs = "5.0"
 chrono = { version = "0.4", features = ["serde"] }
 schemars = { version = "0.8", features = ["derive"] }
+regex = "1.10"
+walkdir = "2.4"
 
 [dev-dependencies]
 tempfile = "3.8"

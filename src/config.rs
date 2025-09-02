@@ -5,22 +5,50 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
+/// Configuration interface for grep rules
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct GrepRule {
+    #[serde(rename = "filePattern")]
+    pub file_pattern: String,
+    #[serde(rename = "forbiddenPattern")]
+    pub forbidden_pattern: String,
+    pub description: String,
+}
+
+/// Configuration for individual stop commands with optional messages
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct StopCommand {
+    pub run: String,
+    #[serde(default)]
+    pub message: Option<String>,
+}
+
 /// Configuration interface for stop hook commands
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct StopConfig {
+    #[serde(default)]
     pub run: String,
+    #[serde(default)]
+    pub commands: Vec<StopCommand>,
     #[serde(default)]
     pub infinite: bool,
     #[serde(default, rename = "infiniteMessage")]
     pub infinite_message: Option<String>,
+    #[serde(default)]
+    pub rounds: Option<u32>,
+    #[serde(default, rename = "grepRules")]
+    pub grep_rules: Vec<GrepRule>,
 }
 
 impl Default for StopConfig {
     fn default() -> Self {
         Self {
             run: String::new(),
+            commands: Vec::new(),
             infinite: false,
             infinite_message: None,
+            rounds: None,
+            grep_rules: Vec::new(),
         }
     }
 }
@@ -32,6 +60,17 @@ pub struct RulesConfig {
     pub prevent_root_additions: bool,
     #[serde(default, rename = "uneditableFiles")]
     pub uneditable_files: Vec<String>,
+    #[serde(default, rename = "toolUsageValidation")]
+    pub tool_usage_validation: Vec<ToolUsageRule>,
+}
+
+/// Tool usage validation rule
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ToolUsageRule {
+    pub tool: String,
+    pub pattern: String,
+    pub action: String,  // "block" or "allow"
+    pub message: Option<String>,
 }
 
 impl Default for RulesConfig {
@@ -39,6 +78,43 @@ impl Default for RulesConfig {
         Self {
             prevent_root_additions: true,
             uneditable_files: Vec::new(),
+            tool_usage_validation: Vec::new(),
+        }
+    }
+}
+
+/// Configuration for pre tool use hooks
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct PreToolUseConfig {
+    #[serde(default, rename = "grepRules")]
+    pub grep_rules: Vec<GrepRule>,
+    #[serde(default, rename = "preventAdditions")]
+    pub prevent_additions: Vec<String>,
+}
+
+impl Default for PreToolUseConfig {
+    fn default() -> Self {
+        Self {
+            grep_rules: Vec::new(),
+            prevent_additions: Vec::new(),
+        }
+    }
+}
+
+/// Configuration for git worktree auto finish
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct GitWorktreeConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default, rename = "autoCreatePR")]
+    pub auto_create_pr: bool,
+}
+
+impl Default for GitWorktreeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            auto_create_pr: false,
         }
     }
 }
@@ -48,6 +124,10 @@ impl Default for RulesConfig {
 pub struct ConclaudeConfig {
     pub stop: StopConfig,
     pub rules: RulesConfig,
+    #[serde(default, rename = "preToolUse")]
+    pub pre_tool_use: PreToolUseConfig,
+    #[serde(default, rename = "gitWorktree")]
+    pub git_worktree: GitWorktreeConfig,
 }
 
 impl Default for ConclaudeConfig {
@@ -55,6 +135,8 @@ impl Default for ConclaudeConfig {
         Self {
             stop: StopConfig::default(),
             rules: RulesConfig::default(),
+            pre_tool_use: PreToolUseConfig::default(),
+            git_worktree: GitWorktreeConfig::default(),
         }
     }
 }

@@ -1,14 +1,18 @@
-use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig};
+use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig, GrepRule, ToolUsageRule};
 use crate::logger::create_session_logger;
 use crate::types::*;
 use anyhow::{Context, Result};
 use glob::Pattern;
+use regex::Regex;
 use serde_json::Value;
+use std::collections::HashSet;
+use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::OnceLock;
 use tokio::process::Command as TokioCommand;
+use walkdir::WalkDir;
 
 /// Cached configuration instance to avoid repeated loads
 static CACHED_CONFIG: OnceLock<ConclaudeConfig> = OnceLock::new();
@@ -314,17 +318,49 @@ pub async fn handle_stop() -> Result<HookResult> {
         payload.base.session_id
     );
 
-    // Extract and execute commands from config.stop.run
     let config = get_config().await?;
-    let commands = extract_bash_commands(&config.stop.run)?;
+    
+    // Check stop hook grep rules first
+    if let Some(result) = execute_grep_rules(&config.stop.grep_rules).await? {
+        return Ok(result);
+    }
+    
+    // Snapshot root directory if preventRootAdditions is enabled
+    let root_snapshot = if config.rules.prevent_root_additions {
+        Some(snapshot_root_directory()?)
+    } else {
+        None
+    };
+    
+    // Extract and execute commands from config.stop.run and config.stop.commands
+    let mut commands_with_messages = Vec::new();
+    
+    // Add legacy run commands
+    if !config.stop.run.is_empty() {
+        let commands = extract_bash_commands(&config.stop.run)?;
+        for cmd in commands {
+            commands_with_messages.push((cmd, None));
+        }
+    }
+    
+    // Add new structured commands with messages
+    for cmd_config in &config.stop.commands {
+        let commands = extract_bash_commands(&cmd_config.run)?;
+        for cmd in commands {
+            commands_with_messages.push((cmd, cmd_config.message.clone()));
+        }
+    }
 
-    log::info!("Executing {} stop hook commands", commands.len());
+    log::info!("Executing {} stop hook commands", commands_with_messages.len());
+    
+    // Track rounds for infinite alternative
+    static mut ROUND_COUNT: u32 = 0;
 
-    for (index, command) in commands.iter().enumerate() {
+    for (index, (command, custom_message)) in commands_with_messages.iter().enumerate() {
         log::info!(
             "Executing command {}/{}: {}",
             index + 1,
-            commands.len(),
+            commands_with_messages.len(),
             command
         );
 
@@ -359,10 +395,14 @@ pub async fn handle_stop() -> Result<HookResult> {
                 String::new()
             };
 
-            let error_message = format!(
-                "Command failed with exit code {}: {}{}{}",
-                exit_code, command, stdout_section, stderr_section
-            );
+            let error_message = if let Some(custom_msg) = custom_message {
+                custom_msg.clone()
+            } else {
+                format!(
+                    "Command failed with exit code {}: {}{}{}",
+                    exit_code, command, stdout_section, stderr_section
+                )
+            };
 
             log::error!("Stop hook command failed: {}", error_message);
             return Ok(HookResult::blocked(error_message));
@@ -376,6 +416,26 @@ pub async fn handle_stop() -> Result<HookResult> {
     }
 
     log::info!("All stop hook commands completed successfully");
+    
+    // Check root additions if enabled
+    if let Some(snapshot) = root_snapshot {
+        if let Some(result) = check_root_additions(&snapshot)? {
+            return Ok(result);
+        }
+    }
+
+    // Check rounds mode (alternative to infinite)
+    if let Some(max_rounds) = config.stop.rounds {
+        unsafe {
+            ROUND_COUNT += 1;
+            if ROUND_COUNT < max_rounds {
+                let message = format!("Round {}/{} completed, continuing...", ROUND_COUNT, max_rounds);
+                log::info!("{}", message);
+                return Ok(HookResult::blocked(message));
+            }
+            ROUND_COUNT = 0; // Reset for next session
+        }
+    }
 
     // Check if infinite mode is enabled
     if config.stop.infinite {
@@ -432,6 +492,131 @@ pub async fn handle_pre_compact() -> Result<HookResult> {
     );
 
     Ok(HookResult::success())
+}
+
+/// Check tool usage validation rules
+async fn check_tool_usage_rules(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
+    let config = get_config().await?;
+    
+    for rule in &config.rules.tool_usage_validation {
+        if rule.tool == payload.tool_name || rule.tool == "*" {
+            // Extract file path if available
+            if let Some(file_path) = extract_file_path(&payload.tool_input) {
+                let matches = Pattern::new(&rule.pattern)?.matches(&file_path);
+                
+                if (rule.action == "block" && matches) || (rule.action == "allow" && !matches) {
+                    let message = rule.message.clone().unwrap_or_else(|| {
+                        format!("Tool usage blocked by validation rule: {}", rule.pattern)
+                    });
+                    return Ok(Some(HookResult::blocked(message)));
+                }
+            }
+        }
+    }
+    
+    Ok(None)
+}
+
+/// Check PreToolUse grep rules for the file being modified
+async fn check_pre_tool_use_grep_rules(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
+    let config = get_config().await?;
+    
+    if let Some(file_path) = extract_file_path(&payload.tool_input) {
+        for rule in &config.pre_tool_use.grep_rules {
+            if Pattern::new(&rule.file_pattern)?.matches(&file_path) {
+                // Read the file and check for forbidden pattern
+                if let Ok(content) = fs::read_to_string(&file_path) {
+                    let regex = regex::Regex::new(&rule.forbidden_pattern)?;
+                    if regex.is_match(&content) {
+                        let message = format!(
+                            "File {} contains forbidden pattern: {}",
+                            file_path, rule.description
+                        );
+                        return Ok(Some(HookResult::blocked(message)));
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(None)
+}
+
+/// Execute grep rules on the entire codebase
+async fn execute_grep_rules(rules: &[GrepRule]) -> Result<Option<HookResult>> {
+    use walkdir::WalkDir;
+    
+    for rule in rules {
+        let pattern = Pattern::new(&rule.file_pattern)?;
+        let regex = regex::Regex::new(&rule.forbidden_pattern)?;
+        
+        for entry in WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
+            if entry.file_type().is_file() {
+                let path = entry.path();
+                if pattern.matches(&path.to_string_lossy()) {
+                    if let Ok(content) = fs::read_to_string(path) {
+                        if let Some(match_found) = regex.find(&content) {
+                            let line_num = content[..match_found.start()]
+                                .chars()
+                                .filter(|&c| c == '\n')
+                                .count() + 1;
+                            
+                            let message = format!(
+                                "Grep rule violation: {} at {}:{} - {}",
+                                rule.forbidden_pattern,
+                                path.display(),
+                                line_num,
+                                rule.description
+                            );
+                            return Ok(Some(HookResult::blocked(message)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(None)
+}
+
+/// Snapshot the root directory
+fn snapshot_root_directory() -> Result<HashSet<String>> {
+    let mut snapshot = HashSet::new();
+    
+    for entry in fs::read_dir(".")? {
+        if let Ok(entry) = entry {
+            if let Ok(file_name) = entry.file_name().into_string() {
+                snapshot.insert(file_name);
+            }
+        }
+    }
+    
+    Ok(snapshot)
+}
+
+/// Check for new additions to the root directory
+fn check_root_additions(snapshot: &HashSet<String>) -> Result<Option<HookResult>> {
+    let mut new_files = Vec::new();
+    
+    for entry in fs::read_dir(".")? {
+        if let Ok(entry) = entry {
+            if let Ok(file_name) = entry.file_name().into_string() {
+                if !snapshot.contains(&file_name) && !file_name.starts_with('.') {
+                    new_files.push(file_name);
+                }
+            }
+        }
+    }
+    
+    if !new_files.is_empty() {
+        let message = format!(
+            "Unauthorized root additions detected: {}",
+            new_files.join(", ")
+        );
+        return Ok(Some(HookResult::blocked(message)));
+    }
+    
+    Ok(None)
 }
 
 #[cfg(test)]
