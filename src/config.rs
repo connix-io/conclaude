@@ -103,6 +103,10 @@ pub struct ConclaudeConfig {
 
 /// Load YAML configuration using native search strategies
 /// Search strategy: searches up directory tree until a config file is found
+///
+/// # Errors
+///
+/// Returns an error if no configuration file is found, file reading fails, or YAML parsing fails.
 pub async fn load_conclaude_config() -> Result<ConclaudeConfig> {
     let search_paths = get_config_search_paths()?;
 
@@ -157,6 +161,10 @@ fn get_config_search_paths() -> Result<Vec<PathBuf>> {
 }
 
 /// Extracts individual commands from a bash script string
+///
+/// # Errors
+///
+/// Returns an error if the bash command execution fails or UTF-8 parsing fails.
 pub fn extract_bash_commands(bash_script: &str) -> Result<Vec<String>> {
     let analyzer_script = format!(
         r#"#!/bin/bash
@@ -211,7 +219,8 @@ EOF"#
 
 /// Generate a default configuration file content
 /// The configuration is embedded at compile time from default-config.yaml
-#[must_use] pub fn generate_default_config() -> String {
+#[must_use]
+pub fn generate_default_config() -> String {
     include_str!("default-config.yaml").to_string()
 }
 

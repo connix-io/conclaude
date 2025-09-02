@@ -27,32 +27,34 @@ fn test_sanitize_project_name_special_chars() {
 
 #[test]
 fn test_get_log_file_path() {
-    let path = get_log_file_path("test-session-123").unwrap();
+    let path = get_log_file_path("test-session-123");
     let filename = path.file_name().unwrap().to_str().unwrap();
     assert!(filename.starts_with("conclaude-"));
     assert!(filename.contains("sess-test-session-123"));
-    assert!(filename.ends_with(".jsonl"));
+    assert!(std::path::Path::new(filename)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("jsonl")));
 }
 
 #[test]
 fn test_resolve_logging_config_default() {
     // Test with no environment variable set (None)
     let config = resolve_logging_config_with_env(None, None);
-    assert_eq!(config.file_logging, false);
+    assert!(!config.file_logging);
 }
 
 #[test]
 fn test_resolve_logging_config_with_env_var_true() {
     // Test with environment variable explicitly set to "true" (disable file logging)
     let config = resolve_logging_config_with_env(None, Some("true"));
-    assert_eq!(config.file_logging, false);
+    assert!(!config.file_logging);
 }
 
 #[test]
 fn test_resolve_logging_config_with_env_var_false() {
     // Test with environment variable explicitly set to "false" (enable file logging)
     let config = resolve_logging_config_with_env(None, Some("false"));
-    assert_eq!(config.file_logging, true);
+    assert!(config.file_logging);
 }
 
 #[test]
@@ -60,7 +62,7 @@ fn test_resolve_logging_config_with_override() {
     // Test that config override takes precedence (no env var)
     let override_config = LoggingConfig { file_logging: true };
     let config = resolve_logging_config_with_env(Some(&override_config), None);
-    assert_eq!(config.file_logging, true);
+    assert!(config.file_logging);
 }
 
 #[test]
@@ -68,7 +70,7 @@ fn test_resolve_logging_config_override_takes_precedence() {
     // Test that config override takes precedence over environment variable
     let override_config = LoggingConfig { file_logging: true };
     let config = resolve_logging_config_with_env(Some(&override_config), Some("true"));
-    assert_eq!(config.file_logging, true);
+    assert!(config.file_logging);
 }
 
 #[test]

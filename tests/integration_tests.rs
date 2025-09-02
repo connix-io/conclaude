@@ -6,7 +6,7 @@ use tempfile::tempdir;
 #[test]
 fn test_cli_help_command() {
     let output = Command::new("cargo")
-        .args(&["run", "--", "--help"])
+        .args(["run", "--", "--help"])
         .output()
         .expect("Failed to run CLI help command");
 
@@ -20,7 +20,7 @@ fn test_cli_help_command() {
 #[test]
 fn test_cli_version_command() {
     let output = Command::new("cargo")
-        .args(&["run", "--", "--version"])
+        .args(["run", "--", "--version"])
         .output()
         .expect("Failed to run CLI version command");
 
@@ -35,7 +35,7 @@ fn test_cli_init_command() {
     let temp_path = temp_dir.path();
 
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "init",
@@ -86,7 +86,7 @@ fn test_cli_init_command_force_overwrite() {
 
     // First init without force should fail
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "init",
@@ -104,7 +104,7 @@ fn test_cli_init_command_force_overwrite() {
 
     // Second init with force should succeed
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "init",
@@ -130,7 +130,7 @@ fn test_cli_init_command_force_overwrite() {
 #[test]
 fn test_cli_verbose_flag() {
     let output = Command::new("cargo")
-        .args(&["run", "--", "--verbose", "--help"])
+        .args(["run", "--", "--verbose", "--help"])
         .output()
         .expect("Failed to run CLI with verbose flag");
 
@@ -141,7 +141,7 @@ fn test_cli_verbose_flag() {
 #[test]
 fn test_cli_disable_file_logging_flag() {
     let output = Command::new("cargo")
-        .args(&["run", "--", "--disable-file-logging", "--help"])
+        .args(["run", "--", "--disable-file-logging", "--help"])
         .output()
         .expect("Failed to run CLI with disable-file-logging flag");
 
@@ -152,7 +152,7 @@ fn test_cli_disable_file_logging_flag() {
 #[test]
 fn test_cli_invalid_command() {
     let output = Command::new("cargo")
-        .args(&["run", "--", "invalid-command"])
+        .args(["run", "--", "invalid-command"])
         .output()
         .expect("Failed to run CLI with invalid command");
 

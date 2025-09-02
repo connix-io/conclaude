@@ -6,7 +6,11 @@ use std::path::PathBuf;
 
 use crate::config::ConclaudeConfig;
 
-/// Generates a JSON Schema for the ConclaudeConfig structure
+/// Generates a JSON Schema for the `ConclaudeConfig` structure
+///
+/// # Errors
+///
+/// Returns an error if JSON schema generation or value serialization fails.
 pub fn generate_config_schema() -> Result<Value> {
     let schema = schema_for!(ConclaudeConfig);
 
@@ -31,6 +35,10 @@ pub fn generate_config_schema() -> Result<Value> {
 }
 
 /// Writes the generated schema to a file
+///
+/// # Errors
+///
+/// Returns an error if JSON serialization fails, directory creation fails, or file writing fails.
 pub fn write_schema_to_file(schema: &Value, output_path: &PathBuf) -> Result<()> {
     let schema_json =
         serde_json::to_string_pretty(schema).context("Failed to serialize schema to JSON")?;
@@ -48,6 +56,10 @@ pub fn write_schema_to_file(schema: &Value, output_path: &PathBuf) -> Result<()>
 }
 
 /// Validates that a given YAML content matches the schema
+///
+/// # Errors
+///
+/// Returns an error if the YAML content is invalid or does not match the expected structure.
 pub fn validate_config_against_schema(config_content: &str) -> Result<()> {
     // Parse the YAML to ensure it's valid
     let _: ConclaudeConfig = serde_yaml::from_str(config_content)
@@ -57,13 +69,15 @@ pub fn validate_config_against_schema(config_content: &str) -> Result<()> {
 }
 
 /// Gets the default schema URL for YAML language server headers
-#[must_use] pub fn get_schema_url() -> String {
+#[must_use]
+pub fn get_schema_url() -> String {
     "https://github.com/conneroisu/conclaude/releases/latest/download/conclaude-schema.json"
         .to_string()
 }
 
 /// Generates a YAML language server header comment with schema URL
-#[must_use] pub fn generate_yaml_language_server_header(custom_schema_url: Option<&str>) -> String {
+#[must_use]
+pub fn generate_yaml_language_server_header(custom_schema_url: Option<&str>) -> String {
     let default_url = get_schema_url();
     let schema_url = custom_schema_url.unwrap_or(&default_url);
     format!("# yaml-language-server: $schema={schema_url}\n")
@@ -141,6 +155,6 @@ invalid_field: "should fail"
         let url = get_schema_url();
         assert!(url.starts_with("https://"));
         assert!(url.contains("github.com"));
-        assert!(url.ends_with(".json"));
+        assert!(url.to_lowercase().ends_with(".json"));
     }
 }

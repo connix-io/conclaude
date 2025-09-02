@@ -6,7 +6,7 @@ mod types;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use hooks::*;
+use hooks::{handle_hook_result, handle_pre_tool_use, handle_post_tool_use, handle_notification, handle_user_prompt_submit, handle_session_start, handle_stop, handle_subagent_stop, handle_pre_compact};
 use std::fs;
 use std::path::PathBuf;
 
@@ -28,7 +28,7 @@ struct Cli {
     #[arg(short, long, global = true)]
     verbose: bool,
 
-    /// Disable logging to temporary files (overrides CONCLAUDE_DISABLE_FILE_LOGGING)
+    /// Disable logging to temporary files (overrides `CONCLAUDE_DISABLE_FILE_LOGGING`)
     #[arg(long, global = true)]
     disable_file_logging: bool,
 }
@@ -63,28 +63,28 @@ enum Commands {
         #[arg(long)]
         validate: bool,
     },
-    /// Process PreToolUse hook - fired before tool execution
+    /// Process `PreToolUse` hook - fired before tool execution
     #[clap(name = "PreToolUse")]
     PreToolUse,
-    /// Process PostToolUse hook - fired after tool execution
+    /// Process `PostToolUse` hook - fired after tool execution
     #[clap(name = "PostToolUse")]
     PostToolUse,
     /// Process Notification hook - fired for system notifications
     #[clap(name = "Notification")]
     Notification,
-    /// Process UserPromptSubmit hook - fired when user submits input
+    /// Process `UserPromptSubmit` hook - fired when user submits input
     #[clap(name = "UserPromptSubmit")]
     UserPromptSubmit,
-    /// Process SessionStart hook - fired when session begins
+    /// Process `SessionStart` hook - fired when session begins
     #[clap(name = "SessionStart")]
     SessionStart,
     /// Process Stop hook - fired when session terminates
     #[clap(name = "Stop")]
     Stop,
-    /// Process SubagentStop hook - fired when subagent completes
+    /// Process `SubagentStop` hook - fired when subagent completes
     #[clap(name = "SubagentStop")]
     SubagentStop,
-    /// Process PreCompact hook - fired before transcript compaction
+    /// Process `PreCompact` hook - fired before transcript compaction
     #[clap(name = "PreCompact")]
     PreCompact,
     /// Visualize file/directory settings from configuration
@@ -164,6 +164,11 @@ struct ClaudeSettings {
 }
 
 /// Handles Init command to set up conclaude configuration and Claude Code hooks.
+///
+/// # Errors
+///
+/// Returns an error if directory access fails, file operations fail, or JSON serialization fails.
+#[allow(clippy::unused_async)]
 async fn handle_init(
     config_path: Option<String>,
     claude_path: Option<String>,
@@ -171,12 +176,8 @@ async fn handle_init(
     schema_url: Option<String>,
 ) -> Result<()> {
     let cwd = std::env::current_dir().context("Failed to get current directory")?;
-    let config_path = config_path
-        .map(PathBuf::from)
-        .unwrap_or_else(|| cwd.join(".conclaude.yaml"));
-    let claude_path = claude_path
-        .map(PathBuf::from)
-        .unwrap_or_else(|| cwd.join(".claude"));
+    let config_path = config_path.map_or_else(|| cwd.join(".conclaude.yaml"), PathBuf::from);
+    let claude_path = claude_path.map_or_else(|| cwd.join(".claude"), PathBuf::from);
     let settings_path = claude_path.join("settings.json");
 
     println!("🚀 Initializing conclaude configuration...\n");
@@ -199,7 +200,7 @@ async fn handle_init(
     println!("   {}", config_path.display());
     let default_schema_url = schema::get_schema_url();
     let used_schema_url = schema_url.as_deref().unwrap_or(&default_schema_url);
-    println!("   Schema URL: {}", used_schema_url);
+    println!("   Schema URL: {used_schema_url}");
 
     // Create .claude directory if it doesn't exist
     fs::create_dir_all(&claude_path).with_context(|| {
@@ -247,12 +248,12 @@ async fn handle_init(
     // Add hook configurations
     for hook_type in &hook_types {
         settings.hooks.insert(
-            hook_type.to_string(),
+            (*hook_type).to_string(),
             vec![ClaudeHookMatcher {
                 matcher: String::new(),
                 hooks: vec![ClaudeHookConfig {
                     config_type: "command".to_string(),
-                    command: format!("conclaude {}", hook_type),
+                    command: format!("conclaude {hook_type}"),
                 }],
             }],
         );
@@ -270,14 +271,19 @@ async fn handle_init(
     println!("\n🎉 Conclaude initialization complete!");
     println!("\nConfigured hooks:");
     for hook_type in &hook_types {
-        println!("   • {}", hook_type);
+        println!("   • {hook_type}");
     }
     println!("\nYou can now use Claude Code with conclaude hook handling.");
 
     Ok(())
 }
 
-/// Handles GenerateSchema command to generate JSON Schema for conclaude configuration.
+/// Handles `GenerateSchema` command to generate JSON Schema for conclaude configuration.
+///
+/// # Errors
+///
+/// Returns an error if schema generation fails, file writing fails, or validation fails.
+#[allow(clippy::unused_async)]
 async fn handle_generate_schema(output: String, validate: bool) -> Result<()> {
     let output_path = PathBuf::from(output);
 
@@ -309,7 +315,7 @@ async fn handle_generate_schema(output: String, validate: bool) -> Result<()> {
     // Display schema URL info
     let schema_url = schema::get_schema_url();
     println!("\n📋 Schema URL for YAML language server:");
-    println!("   {}", schema_url);
+    println!("   {schema_url}");
 
     println!("\n💡 Add this header to your .conclaude.yaml files for IDE support:");
     println!(
@@ -321,6 +327,12 @@ async fn handle_generate_schema(output: String, validate: bool) -> Result<()> {
 }
 
 /// Handles Visualize command to display file/directory settings from configuration.
+///
+/// # Errors
+///
+/// Returns an error if configuration loading fails, directory access fails, or glob pattern creation fails.
+#[allow(clippy::too_many_lines)]
+#[allow(clippy::unused_async)]
 async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()> {
     use glob::Pattern;
     use walkdir::WalkDir;
@@ -339,14 +351,14 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                     println!("   No uneditable files configured");
                 } else {
                     for pattern_str in &config.rules.uneditable_files {
-                        println!("   Pattern: {}", pattern_str);
+                        println!("   Pattern: {pattern_str}");
 
                         if show_matches {
                             let pattern = Pattern::new(pattern_str)?;
                             println!("   Matching files:");
                             let mut found = false;
 
-                            for entry in WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
+                            for entry in WalkDir::new(".").into_iter().filter_map(std::result::Result::ok) {
                                 if entry.file_type().is_file() {
                                     let path = entry.path();
                                     if pattern.matches(&path.to_string_lossy()) {
@@ -370,10 +382,8 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                 );
                 if config.rules.prevent_root_additions && show_matches {
                     println!("\n   Root directory contents:");
-                    for entry in fs::read_dir(".")? {
-                        if let Ok(entry) = entry {
-                            println!("      - {}", entry.file_name().to_string_lossy());
-                        }
+                    for entry in (fs::read_dir(".")?).flatten() {
+                        println!("      - {}", entry.file_name().to_string_lossy());
                     }
                 }
             }
@@ -388,7 +398,7 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                             rule.tool, rule.pattern, rule.action
                         );
                         if let Some(msg) = &rule.message {
-                            println!("      Message: {}", msg);
+                            println!("      Message: {msg}");
                         }
                     }
                 }
@@ -417,7 +427,7 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                 }
             }
             _ => {
-                println!("❌ Unknown rule: {}", rule_name);
+                println!("❌ Unknown rule: {rule_name}");
                 println!("\nAvailable rules:");
                 println!("   - uneditableFiles");
                 println!("   - preventRootAdditions");
@@ -450,7 +460,7 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
         );
         println!("♾️  Infinite Mode: {}", config.stop.infinite);
         if let Some(rounds) = config.stop.rounds {
-            println!("🔄 Rounds Mode: {} rounds", rounds);
+            println!("🔄 Rounds Mode: {rounds} rounds");
         }
 
         println!("\nUse --rule <rule-name> to see details for a specific rule");

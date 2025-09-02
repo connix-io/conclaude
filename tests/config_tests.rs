@@ -78,16 +78,16 @@ rules:
     - "*.lock"
 "#;
 
-    println!("YAML content:\n{}", config_content);
+    println!("YAML content:\n{config_content}");
 
     let result = serde_yaml::from_str::<conclaude::config::ConclaudeConfig>(config_content);
     match result {
         Ok(config) => {
-            println!("Successfully parsed config: {:?}", config);
+            println!("Successfully parsed config: {config:?}");
             println!("stop.infinite_message: {:?}", config.stop.infinite_message);
         }
         Err(e) => {
-            println!("YAML parsing error: {:?}", e);
+            println!("YAML parsing error: {e:?}");
         }
     }
 }

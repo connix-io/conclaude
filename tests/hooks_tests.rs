@@ -262,8 +262,8 @@ fn test_file_path_normalization_scenarios() {
 
     for (path, pattern, expected) in test_cases {
         // Normalize path similar to how the real code would
-        let normalized = if path.starts_with("./") {
-            &path[2..]
+        let normalized = if let Some(stripped) = path.strip_prefix("./") {
+            stripped
         } else if path.contains("..") {
             "package.json" // Simplified normalization for test
         } else {
@@ -276,8 +276,7 @@ fn test_file_path_normalization_scenarios() {
         let result = matches_uneditable_pattern(normalized, normalized, path, pattern).unwrap();
         assert_eq!(
             result, expected,
-            "Failed for path: {}, pattern: {}",
-            path, pattern
+            "Failed for path: {path}, pattern: {pattern}"
         );
     }
 }
@@ -289,7 +288,7 @@ fn test_validate_base_payload_integration() {
     assert!(validate_base_payload(&valid_base).is_ok());
 
     let invalid_base = BasePayload {
-        session_id: "".to_string(),
+        session_id: String::new(),
         transcript_path: "/path/to/transcript".to_string(),
         hook_event_name: "PreToolUse".to_string(),
     };

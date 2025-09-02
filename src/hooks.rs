@@ -1,6 +1,10 @@
 use crate::config::{ConclaudeConfig, GrepRule, extract_bash_commands, load_conclaude_config};
 use crate::logger::create_session_logger;
-use crate::types::{HookResult, PreToolUsePayload, validate_base_payload, LoggingConfig, PostToolUsePayload, NotificationPayload, UserPromptSubmitPayload, SessionStartPayload, StopPayload, SubagentStopPayload, PreCompactPayload};
+use crate::types::{
+    HookResult, LoggingConfig, NotificationPayload, PostToolUsePayload, PreCompactPayload,
+    PreToolUsePayload, SessionStartPayload, StopPayload, SubagentStopPayload,
+    UserPromptSubmitPayload, validate_base_payload,
+};
 use anyhow::{Context, Result};
 use glob::Pattern;
 use serde_json::Value;
@@ -17,6 +21,10 @@ use tokio::process::Command as TokioCommand;
 static CACHED_CONFIG: OnceLock<ConclaudeConfig> = OnceLock::new();
 
 /// Load configuration with caching to avoid repeated file system operations
+///
+/// # Errors
+///
+/// Returns an error if the configuration file cannot be loaded or parsed.
 async fn get_config() -> Result<&'static ConclaudeConfig> {
     if let Some(config) = CACHED_CONFIG.get() {
         Ok(config)
@@ -27,7 +35,11 @@ async fn get_config() -> Result<&'static ConclaudeConfig> {
 }
 
 /// Reads and validates hook payload from stdin, creating a session-specific logger.
-pub async fn read_payload_from_stdin<T>() -> Result<T>
+///
+/// # Errors
+///
+/// Returns an error if reading from stdin fails or if the JSON payload cannot be parsed.
+pub fn read_payload_from_stdin<T>() -> Result<T>
 where
     T: serde::de::DeserializeOwned,
 {
@@ -43,6 +55,14 @@ where
 }
 
 /// Wrapper function that standardizes hook result processing and process exit codes.
+///
+/// # Errors
+///
+/// Returns an error if the hook handler fails to execute.
+///
+/// # Panics
+///
+/// This function does not panic - the `unwrap()` call is guarded by `is_some()` check.
 pub async fn handle_hook_result<F, Fut>(handler: F) -> Result<()>
 where
     F: FnOnce() -> Fut,
@@ -63,9 +83,13 @@ where
     }
 }
 
-/// Handles PreToolUse hook events fired before Claude executes any tool.
+/// Handles `PreToolUse` hook events fired before Claude executes any tool.
+///
+/// # Errors
+///
+/// Returns an error if payload validation fails, logger creation fails, or configuration loading fails.
 pub async fn handle_pre_tool_use() -> Result<HookResult> {
-    let payload: PreToolUsePayload = read_payload_from_stdin().await?;
+    let payload: PreToolUsePayload = read_payload_from_stdin()?;
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
@@ -106,6 +130,10 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
 }
 
 /// Check file validation rules for file-modifying tools
+///
+/// # Errors
+///
+/// Returns an error if configuration loading fails, directory access fails, or glob pattern processing fails.
 async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
     let config = get_config().await?;
 
@@ -124,21 +152,23 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
         .to_string();
 
     // Check preventRootAdditions rule - only applies to Write tool
-    if config.rules.prevent_root_additions && payload.tool_name == "Write"
-        && is_root_addition(&file_path, &relative_path) {
-            let error_message = format!(
-                "Blocked {} operation: preventRootAdditions rule prevents creating files at repository root. File: {}",
-                payload.tool_name, file_path
-            );
+    if config.rules.prevent_root_additions
+        && payload.tool_name == "Write"
+        && is_root_addition(&file_path, &relative_path)
+    {
+        let error_message = format!(
+            "Blocked {} operation: preventRootAdditions rule prevents creating files at repository root. File: {}",
+            payload.tool_name, file_path
+        );
 
-            log::warn!(
-                "PreToolUse blocked by preventRootAdditions rule: tool_name={}, file_path={}",
-                payload.tool_name,
-                file_path
-            );
+        log::warn!(
+            "PreToolUse blocked by preventRootAdditions rule: tool_name={}, file_path={}",
+            payload.tool_name,
+            file_path
+        );
 
-            return Ok(Some(HookResult::blocked(error_message)));
-        }
+        return Ok(Some(HookResult::blocked(error_message)));
+    }
 
     // Check uneditableFiles rule
     for pattern in &config.rules.uneditable_files {
@@ -168,7 +198,7 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
 }
 
 /// Extract file path from tool input
-pub fn extract_file_path(tool_input: &std::collections::HashMap<String, Value>) -> Option<String> {
+pub fn extract_file_path<S: std::hash::BuildHasher>(tool_input: &std::collections::HashMap<String, Value, S>) -> Option<String> {
     tool_input
         .get("file_path")
         .or_else(|| tool_input.get("notebook_path"))
@@ -177,7 +207,8 @@ pub fn extract_file_path(tool_input: &std::collections::HashMap<String, Value>) 
 }
 
 /// Check if a file path represents a root addition
-#[must_use] pub fn is_root_addition(_file_path: &str, relative_path: &str) -> bool {
+#[must_use]
+pub fn is_root_addition(_file_path: &str, relative_path: &str) -> bool {
     let path = Path::new(relative_path);
     let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
@@ -201,6 +232,10 @@ pub fn extract_file_path(tool_input: &std::collections::HashMap<String, Value>) 
 }
 
 /// Check if a file matches an uneditable pattern
+///
+/// # Errors
+///
+/// Returns an error if the glob pattern is invalid.
 pub fn matches_uneditable_pattern(
     file_path: &str,
     relative_path: &str,
@@ -215,9 +250,14 @@ pub fn matches_uneditable_pattern(
         || glob_pattern.matches(resolved_path))
 }
 
-/// Handles PostToolUse hook events fired after Claude executes a tool.
+/// Handles `PostToolUse` hook events fired after Claude executes a tool.
+///
+/// # Errors
+///
+/// Returns an error if payload validation fails or logger creation fails.
+#[allow(clippy::unused_async)]
 pub async fn handle_post_tool_use() -> Result<HookResult> {
-    let payload: PostToolUsePayload = read_payload_from_stdin().await?;
+    let payload: PostToolUsePayload = read_payload_from_stdin()?;
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
@@ -239,9 +279,14 @@ pub async fn handle_post_tool_use() -> Result<HookResult> {
     Ok(HookResult::success())
 }
 
-/// Handles Notification hook events when Claude sends system notifications.
+/// Handles `Notification` hook events when Claude sends system notifications.
+///
+/// # Errors
+///
+/// Returns an error if payload validation fails or logger creation fails.
+#[allow(clippy::unused_async)]
 pub async fn handle_notification() -> Result<HookResult> {
-    let payload: NotificationPayload = read_payload_from_stdin().await?;
+    let payload: NotificationPayload = read_payload_from_stdin()?;
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
@@ -263,9 +308,14 @@ pub async fn handle_notification() -> Result<HookResult> {
     Ok(HookResult::success())
 }
 
-/// Handles UserPromptSubmit hook events when users submit input to Claude.
+/// Handles `UserPromptSubmit` hook events when users submit input to Claude.
+///
+/// # Errors
+///
+/// Returns an error if payload validation fails or logger creation fails.
+#[allow(clippy::unused_async)]
 pub async fn handle_user_prompt_submit() -> Result<HookResult> {
-    let payload: UserPromptSubmitPayload = read_payload_from_stdin().await?;
+    let payload: UserPromptSubmitPayload = read_payload_from_stdin()?;
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
@@ -286,9 +336,14 @@ pub async fn handle_user_prompt_submit() -> Result<HookResult> {
     Ok(HookResult::success())
 }
 
-/// Handles SessionStart hook events when a new Claude session begins.
+/// Handles `SessionStart` hook events when a new Claude session begins.
+///
+/// # Errors
+///
+/// Returns an error if payload validation fails or logger creation fails.
+#[allow(clippy::unused_async)]
 pub async fn handle_session_start() -> Result<HookResult> {
-    let payload: SessionStartPayload = read_payload_from_stdin().await?;
+    let payload: SessionStartPayload = read_payload_from_stdin()?;
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
@@ -310,37 +365,12 @@ pub async fn handle_session_start() -> Result<HookResult> {
     Ok(HookResult::success())
 }
 
-/// Handles Stop hook events when a Claude session is terminating.
-pub async fn handle_stop() -> Result<HookResult> {
-    let payload: StopPayload = read_payload_from_stdin().await?;
-
-    validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
-
-    // Initialize logger
-    let logging_config = LoggingConfig::default();
-    create_session_logger(&payload.base.session_id, Some(&logging_config))
-        .context("Failed to create session logger")?;
-
-    log::info!(
-        "Processing Stop hook: session_id={}",
-        payload.base.session_id
-    );
-
-    let config = get_config().await?;
-
-    // Check stop hook grep rules first
-    if let Some(result) = execute_grep_rules(&config.stop.grep_rules).await? {
-        return Ok(result);
-    }
-
-    // Snapshot root directory if preventRootAdditions is enabled
-    let root_snapshot = if config.rules.prevent_root_additions {
-        Some(snapshot_root_directory()?)
-    } else {
-        None
-    };
-
-    // Extract and execute commands from config.stop.run and config.stop.commands
+/// Collect stop commands from configuration
+///
+/// # Errors
+///
+/// Returns an error if bash command extraction fails.
+fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<(String, Option<String>)>> {
     let mut commands_with_messages = Vec::new();
 
     // Add legacy run commands
@@ -359,13 +389,19 @@ pub async fn handle_stop() -> Result<HookResult> {
         }
     }
 
+    Ok(commands_with_messages)
+}
+
+/// Execute stop hook commands
+///
+/// # Errors
+///
+/// Returns an error if command execution fails or process spawning fails.
+async fn execute_stop_commands(commands_with_messages: &[(String, Option<String>)]) -> Result<Option<HookResult>> {
     log::info!(
         "Executing {} stop hook commands",
         commands_with_messages.len()
     );
-
-    // Track rounds for infinite alternative using atomic counter
-    static ROUND_COUNT: AtomicU32 = AtomicU32::new(0);
 
     for (index, (command, custom_message)) in commands_with_messages.iter().enumerate() {
         log::info!(
@@ -415,7 +451,7 @@ pub async fn handle_stop() -> Result<HookResult> {
             };
 
             log::error!("Stop hook command failed: {error_message}");
-            return Ok(HookResult::blocked(error_message));
+            return Ok(Some(HookResult::blocked(error_message)));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -426,6 +462,54 @@ pub async fn handle_stop() -> Result<HookResult> {
     }
 
     log::info!("All stop hook commands completed successfully");
+    Ok(None)
+}
+
+/// Handles `Stop` hook events when a Claude session is terminating.
+///
+/// # Errors
+///
+/// Returns an error if payload validation fails, logger creation fails, configuration loading fails,
+/// command execution fails, or directory operations fail.
+pub async fn handle_stop() -> Result<HookResult> {
+    // Track rounds for infinite alternative using atomic counter
+    static ROUND_COUNT: AtomicU32 = AtomicU32::new(0);
+
+    let payload: StopPayload = read_payload_from_stdin()?;
+
+    validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
+
+    // Initialize logger
+    let logging_config = LoggingConfig::default();
+    create_session_logger(&payload.base.session_id, Some(&logging_config))
+        .context("Failed to create session logger")?;
+
+    log::info!(
+        "Processing Stop hook: session_id={}",
+        payload.base.session_id
+    );
+
+    let config = get_config().await?;
+
+    // Check stop hook grep rules first
+    if let Some(result) = execute_grep_rules(&config.stop.grep_rules)? {
+        return Ok(result);
+    }
+
+    // Snapshot root directory if preventRootAdditions is enabled
+    let root_snapshot = if config.rules.prevent_root_additions {
+        Some(snapshot_root_directory()?)
+    } else {
+        None
+    };
+
+    // Extract and execute commands from config.stop.run and config.stop.commands
+    let commands_with_messages = collect_stop_commands(config)?;
+
+    // Execute commands
+    if let Some(result) = execute_stop_commands(&commands_with_messages).await? {
+        return Ok(result);
+    }
 
     // Check root additions if enabled
     if let Some(snapshot) = root_snapshot {
@@ -438,9 +522,7 @@ pub async fn handle_stop() -> Result<HookResult> {
     if let Some(max_rounds) = config.stop.rounds {
         let current_round = ROUND_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
         if current_round < max_rounds {
-            let message = format!(
-                "Round {current_round}/{max_rounds} completed, continuing..."
-            );
+            let message = format!("Round {current_round}/{max_rounds} completed, continuing...");
             log::info!("{message}");
             return Ok(HookResult::blocked(message));
         }
@@ -455,18 +537,21 @@ pub async fn handle_stop() -> Result<HookResult> {
             .as_deref()
             .unwrap_or("continue working on the task");
 
-        log::info!(
-            "Infinite mode enabled, sending continuation message: {infinite_message}"
-        );
+        log::info!("Infinite mode enabled, sending continuation message: {infinite_message}");
         return Ok(HookResult::blocked(infinite_message.to_string()));
     }
 
     Ok(HookResult::success())
 }
 
-/// Handles SubagentStop hook events when Claude subagents complete their tasks.
+/// Handles `SubagentStop` hook events when Claude subagents complete their tasks.
+///
+/// # Errors
+///
+/// Returns an error if payload validation fails or logger creation fails.
+#[allow(clippy::unused_async)]
 pub async fn handle_subagent_stop() -> Result<HookResult> {
-    let payload: SubagentStopPayload = read_payload_from_stdin().await?;
+    let payload: SubagentStopPayload = read_payload_from_stdin()?;
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
@@ -483,9 +568,14 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
     Ok(HookResult::success())
 }
 
-/// Handles PreCompact hook events before transcript compaction occurs.
+/// Handles `PreCompact` hook events before transcript compaction occurs.
+///
+/// # Errors
+///
+/// Returns an error if payload validation fails or logger creation fails.
+#[allow(clippy::unused_async)]
 pub async fn handle_pre_compact() -> Result<HookResult> {
-    let payload: PreCompactPayload = read_payload_from_stdin().await?;
+    let payload: PreCompactPayload = read_payload_from_stdin()?;
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
@@ -504,6 +594,10 @@ pub async fn handle_pre_compact() -> Result<HookResult> {
 }
 
 /// Check tool usage validation rules
+///
+/// # Errors
+///
+/// Returns an error if configuration loading fails or glob pattern creation fails.
 async fn check_tool_usage_rules(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
     let config = get_config().await?;
 
@@ -526,7 +620,11 @@ async fn check_tool_usage_rules(payload: &PreToolUsePayload) -> Result<Option<Ho
     Ok(None)
 }
 
-/// Check PreToolUse grep rules for the file being modified
+/// Check `PreToolUse` grep rules for the file being modified
+///
+/// # Errors
+///
+/// Returns an error if configuration loading fails, glob pattern creation fails, or regex compilation fails.
 async fn check_pre_tool_use_grep_rules(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
     let config = get_config().await?;
 
@@ -552,14 +650,21 @@ async fn check_pre_tool_use_grep_rules(payload: &PreToolUsePayload) -> Result<Op
 }
 
 /// Execute grep rules on the entire codebase
-async fn execute_grep_rules(rules: &[GrepRule]) -> Result<Option<HookResult>> {
+///
+/// # Errors
+///
+/// Returns an error if glob pattern creation fails or regex compilation fails.
+fn execute_grep_rules(rules: &[GrepRule]) -> Result<Option<HookResult>> {
     use walkdir::WalkDir;
 
     for rule in rules {
         let pattern = Pattern::new(&rule.file_pattern)?;
         let regex = regex::Regex::new(&rule.forbidden_pattern)?;
 
-        for entry in WalkDir::new(".").into_iter().filter_map(std::result::Result::ok) {
+        for entry in WalkDir::new(".")
+            .into_iter()
+            .filter_map(std::result::Result::ok)
+        {
             if entry.file_type().is_file() {
                 let path = entry.path();
                 if pattern.matches(&path.to_string_lossy()) {
@@ -590,6 +695,10 @@ async fn execute_grep_rules(rules: &[GrepRule]) -> Result<Option<HookResult>> {
 }
 
 /// Snapshot the root directory
+///
+/// # Errors
+///
+/// Returns an error if the current directory cannot be read.
 fn snapshot_root_directory() -> Result<HashSet<String>> {
     let mut snapshot = HashSet::new();
 
@@ -603,6 +712,10 @@ fn snapshot_root_directory() -> Result<HashSet<String>> {
 }
 
 /// Check for new additions to the root directory
+///
+/// # Errors
+///
+/// Returns an error if the current directory cannot be read.
 fn check_root_additions(snapshot: &HashSet<String>) -> Result<Option<HookResult>> {
     let mut new_files = Vec::new();
 

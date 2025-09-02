@@ -18,7 +18,8 @@ pub struct HookResult {
 }
 
 impl HookResult {
-    #[must_use] pub fn success() -> Self {
+    #[must_use]
+    pub fn success() -> Self {
         Self {
             message: None,
             blocked: Some(false),
@@ -44,7 +45,7 @@ pub struct BasePayload {
     pub hook_event_name: String,
 }
 
-/// Payload for PreToolUse hook - fired before Claude executes a tool.
+/// Payload for `PreToolUse` hook - fired before Claude executes a tool.
 /// Allows blocking or modifying tool execution before it occurs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PreToolUsePayload {
@@ -56,7 +57,7 @@ pub struct PreToolUsePayload {
     pub tool_input: HashMap<String, serde_json::Value>,
 }
 
-/// Payload for PostToolUse hook - fired after Claude executes a tool.
+/// Payload for `PostToolUse` hook - fired after Claude executes a tool.
 /// Contains both the input and response data for analysis or logging.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostToolUsePayload {
@@ -100,7 +101,7 @@ pub struct StopPayload {
     pub stop_hook_active: bool,
 }
 
-/// Payload for SubagentStop hook - fired when a Claude subagent terminates.
+/// Payload for `SubagentStop` hook - fired when a Claude subagent terminates.
 /// Subagents are spawned for complex tasks and this fires when they complete.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubagentStopPayload {
@@ -110,7 +111,7 @@ pub struct SubagentStopPayload {
     pub stop_hook_active: bool,
 }
 
-/// Payload for UserPromptSubmit hook - fired when user submits input to Claude.
+/// Payload for `UserPromptSubmit` hook - fired when user submits input to Claude.
 /// Allows processing or validation of user input before Claude processes it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserPromptSubmitPayload {
@@ -120,7 +121,7 @@ pub struct UserPromptSubmitPayload {
     pub prompt: String,
 }
 
-/// Payload for PreCompact hook - fired before transcript compaction occurs.
+/// Payload for `PreCompact` hook - fired before transcript compaction occurs.
 /// Transcript compaction reduces conversation history size to manage context limits.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PreCompactPayload {
@@ -137,7 +138,7 @@ pub enum CompactTrigger {
     Auto,
 }
 
-/// Payload for SessionStart hook - fired when a new Claude session begins.
+/// Payload for `SessionStart` hook - fired when a new Claude session begins.
 /// Allows initialization or setup operations at the start of a conversation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionStartPayload {
@@ -170,7 +171,8 @@ pub enum HookPayload {
 }
 
 impl HookPayload {
-    #[must_use] pub fn session_id(&self) -> &str {
+    #[must_use]
+    pub fn session_id(&self) -> &str {
         match self {
             HookPayload::PreToolUse(p) => &p.base.session_id,
             HookPayload::PostToolUse(p) => &p.base.session_id,
@@ -183,7 +185,8 @@ impl HookPayload {
         }
     }
 
-    #[must_use] pub fn transcript_path(&self) -> &str {
+    #[must_use]
+    pub fn transcript_path(&self) -> &str {
         match self {
             HookPayload::PreToolUse(p) => &p.base.transcript_path,
             HookPayload::PostToolUse(p) => &p.base.transcript_path,
@@ -196,7 +199,8 @@ impl HookPayload {
         }
     }
 
-    #[must_use] pub fn hook_event_name(&self) -> &str {
+    #[must_use]
+    pub fn hook_event_name(&self) -> &str {
         match self {
             HookPayload::PreToolUse(p) => &p.base.hook_event_name,
             HookPayload::PostToolUse(p) => &p.base.hook_event_name,
@@ -211,6 +215,10 @@ impl HookPayload {
 }
 
 /// Validates that a payload contains all required base fields.
+///
+/// # Errors
+///
+/// Returns an error if any required base field is missing or empty.
 pub fn validate_base_payload(base: &BasePayload) -> Result<(), String> {
     if base.session_id.is_empty() {
         return Err("Missing required field: session_id".to_string());
@@ -252,7 +260,7 @@ mod tests {
         assert!(validate_base_payload(&valid_base).is_ok());
 
         let invalid_base = BasePayload {
-            session_id: "".to_string(),
+            session_id: String::new(),
             transcript_path: "/path/to/transcript".to_string(),
             hook_event_name: "PreToolUse".to_string(),
         };

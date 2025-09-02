@@ -5,6 +5,10 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// Initialize the logger based on configuration
+///
+/// # Errors
+///
+/// Returns an error if logger initialization fails or file logging setup fails.
 pub fn init_logger(session_id: Option<&str>, config: Option<&LoggingConfig>) -> anyhow::Result<()> {
     let logging_config = resolve_logging_config(config);
 
@@ -16,10 +20,9 @@ pub fn init_logger(session_id: Option<&str>, config: Option<&LoggingConfig>) -> 
     let level_filter = match log_level.to_lowercase().as_str() {
         "error" => LevelFilter::Error,
         "warn" => LevelFilter::Warn,
-        "info" => LevelFilter::Info,
         "debug" => LevelFilter::Debug,
         "trace" => LevelFilter::Trace,
-        _ => LevelFilter::Info,
+        _ => LevelFilter::Info, // Default includes "info" and any unrecognized values
     };
 
     builder.filter_level(level_filter);
@@ -39,7 +42,7 @@ pub fn init_logger(session_id: Option<&str>, config: Option<&LoggingConfig>) -> 
     // If file logging is enabled, set up file output
     if logging_config.file_logging {
         if let Some(session_id) = session_id {
-            let log_file_path = get_log_file_path(session_id)?;
+            let log_file_path = get_log_file_path(session_id);
             setup_file_logging(&mut builder, &log_file_path)?;
         }
     }
@@ -50,14 +53,16 @@ pub fn init_logger(session_id: Option<&str>, config: Option<&LoggingConfig>) -> 
 }
 
 /// Resolves logging configuration from environment variables and optional overrides.
-#[must_use] pub fn resolve_logging_config(config: Option<&LoggingConfig>) -> LoggingConfig {
+#[must_use]
+pub fn resolve_logging_config(config: Option<&LoggingConfig>) -> LoggingConfig {
     let env_var = std::env::var("CONCLAUDE_DISABLE_FILE_LOGGING").ok();
     resolve_logging_config_with_env(config, env_var.as_deref())
 }
 
 /// Internal function that resolves logging configuration with explicit environment variable value.
 /// This allows for deterministic testing without global environment variable manipulation.
-#[must_use] pub fn resolve_logging_config_with_env(
+#[must_use]
+pub fn resolve_logging_config_with_env(
     config: Option<&LoggingConfig>,
     env_var: Option<&str>,
 ) -> LoggingConfig {
@@ -67,24 +72,23 @@ pub fn init_logger(session_id: Option<&str>, config: Option<&LoggingConfig>) -> 
     // - If unset, default to disabled
     let default_file_logging = match env_var {
         Some("false") => true, // Enable if explicitly set to "false"
-        Some("true") => false, // Disable if explicitly set to "true"
-        _ => false,            // Default to disabled if unset or invalid value
+        _ => false,            // Default to disabled if unset, "true", or invalid values
     };
 
     LoggingConfig {
-        file_logging: config
-            .map_or(default_file_logging, |c| c.file_logging),
+        file_logging: config.map_or(default_file_logging, |c| c.file_logging),
     }
 }
 
 /// Generate a log file path for the given session ID
-pub fn get_log_file_path(session_id: &str) -> anyhow::Result<PathBuf> {
+#[must_use]
+pub fn get_log_file_path(session_id: &str) -> PathBuf {
     let project_name = get_project_name();
     let sanitized_project = sanitize_project_name(&project_name);
     let filename = format!("conclaude-{sanitized_project}-sess-{session_id}.jsonl");
 
     let temp_dir = std::env::temp_dir();
-    Ok(temp_dir.join(filename))
+    temp_dir.join(filename)
 }
 
 /// Get the current project name from the working directory
@@ -100,7 +104,8 @@ fn get_project_name() -> String {
 }
 
 /// Sanitize project name for use in filenames
-#[must_use] pub fn sanitize_project_name(name: &str) -> String {
+#[must_use]
+pub fn sanitize_project_name(name: &str) -> String {
     name.to_lowercase()
         .chars()
         .map(|c| {
@@ -123,14 +128,14 @@ fn get_project_name() -> String {
 /// you might use a more sophisticated logging framework like tracing)
 fn setup_file_logging(
     _builder: &mut env_logger::Builder,
-    _log_file_path: &Path,
+    log_file_path: &Path,
 ) -> anyhow::Result<()> {
     // Note: env_logger doesn't support file output directly
     // In a production implementation, you might want to use tracing + tracing-appender
     // or implement a custom logger that writes to both console and file
 
     // For now, we'll just ensure the log directory exists
-    if let Some(parent) = _log_file_path.parent() {
+    if let Some(parent) = log_file_path.parent() {
         fs::create_dir_all(parent)?;
     }
 
@@ -138,6 +143,10 @@ fn setup_file_logging(
 }
 
 /// Create a session-specific logger instance
+///
+/// # Errors
+///
+/// Returns an error if logger initialization fails.
 pub fn create_session_logger(
     session_id: &str,
     config: Option<&LoggingConfig>,
@@ -164,22 +173,22 @@ mod tests {
     #[test]
     fn test_resolve_logging_config_default() {
         let config = resolve_logging_config(None);
-        assert_eq!(config.file_logging, false);
+        assert!(!config.file_logging);
     }
 
     #[test]
     fn test_resolve_logging_config_with_override() {
         let override_config = LoggingConfig { file_logging: true };
         let config = resolve_logging_config(Some(&override_config));
-        assert_eq!(config.file_logging, true);
+        assert!(config.file_logging);
     }
 
     #[test]
     fn test_get_log_file_path() {
-        let path = get_log_file_path("test-session-123").unwrap();
+        let path = get_log_file_path("test-session-123");
         let filename = path.file_name().unwrap().to_str().unwrap();
         assert!(filename.starts_with("conclaude-"));
         assert!(filename.contains("sess-test-session-123"));
-        assert!(filename.ends_with(".jsonl"));
+        assert!(filename.to_lowercase().ends_with(".jsonl"));
     }
 }

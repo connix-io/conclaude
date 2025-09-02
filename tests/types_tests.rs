@@ -28,7 +28,7 @@ fn test_validate_base_payload_valid() {
 #[test]
 fn test_validate_base_payload_missing_session_id() {
     let invalid_base = BasePayload {
-        session_id: "".to_string(),
+        session_id: String::new(),
         transcript_path: "/path/to/transcript".to_string(),
         hook_event_name: "PreToolUse".to_string(),
     };
@@ -41,7 +41,7 @@ fn test_validate_base_payload_missing_session_id() {
 fn test_validate_base_payload_missing_transcript_path() {
     let invalid_base = BasePayload {
         session_id: "test_session".to_string(),
-        transcript_path: "".to_string(),
+        transcript_path: String::new(),
         hook_event_name: "PreToolUse".to_string(),
     };
     let result = validate_base_payload(&invalid_base);
@@ -54,7 +54,7 @@ fn test_validate_base_payload_missing_hook_event_name() {
     let invalid_base = BasePayload {
         session_id: "test_session".to_string(),
         transcript_path: "/path/to/transcript".to_string(),
-        hook_event_name: "".to_string(),
+        hook_event_name: String::new(),
     };
     let result = validate_base_payload(&invalid_base);
     assert!(result.is_err());
@@ -64,7 +64,7 @@ fn test_validate_base_payload_missing_hook_event_name() {
 #[test]
 fn test_logging_config_default() {
     let config = LoggingConfig::default();
-    assert_eq!(config.file_logging, false);
+    assert!(!config.file_logging);
 }
 
 #[test]
@@ -140,7 +140,7 @@ fn test_stop_payload_deserialization() {
 
     let payload: StopPayload = serde_json::from_str(json).unwrap();
     assert_eq!(payload.base.session_id, "test_session");
-    assert_eq!(payload.stop_hook_active, true);
+    assert!(payload.stop_hook_active);
 }
 
 #[test]
