@@ -198,7 +198,9 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
 }
 
 /// Extract file path from tool input
-pub fn extract_file_path<S: std::hash::BuildHasher>(tool_input: &std::collections::HashMap<String, Value, S>) -> Option<String> {
+pub fn extract_file_path<S: std::hash::BuildHasher>(
+    tool_input: &std::collections::HashMap<String, Value, S>,
+) -> Option<String> {
     tool_input
         .get("file_path")
         .or_else(|| tool_input.get("notebook_path"))
@@ -397,7 +399,9 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<(String, Option
 /// # Errors
 ///
 /// Returns an error if command execution fails or process spawning fails.
-async fn execute_stop_commands(commands_with_messages: &[(String, Option<String>)]) -> Result<Option<HookResult>> {
+async fn execute_stop_commands(
+    commands_with_messages: &[(String, Option<String>)],
+) -> Result<Option<HookResult>> {
     log::info!(
         "Executing {} stop hook commands",
         commands_with_messages.len()

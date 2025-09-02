@@ -9,17 +9,34 @@ stop:
     cargo clippy -- -D warnings -D clippy::pedantic
     cargo test --lib
     cargo build
+  
+  # Alternative structured command format with optional custom error messages
+  # commands:
+  #   - run: "cargo test"
+  #     message: "Tests failed - please fix failing tests before continuing"
+  #   - run: "cargo build"
+  #     message: "Build failed - please fix compilation errors"
+  
   # infinite mode - allows Claude to continue automatically
-  # When enabled, Claude receives the infinite_message to continue working
+  # When enabled, Claude receives the infiniteMessage to continue working
   # instead of ending the session after stop hook commands succeed
   infinite: false
-  infinite_message: "continue working on the task"
+  infiniteMessage: "continue working on the task"
+  
+  # Alternative to infinite mode - run for a specific number of rounds
+  # rounds: 3
+  
+  # Grep rules for stop hook - scan files for forbidden patterns
+  # grepRules:
+  #   - filePattern: "**/*.rs"
+  #     forbiddenPattern: "todo|fixme"
+  #     description: "No TODO or FIXME comments allowed"
 
 # Validation rules for hook processing
 rules:
   # Prevent Claude from creating or modifying files at the repository root
   # Helps maintain clean project structure
-  prevent_root_additions: true
+  preventRootAdditions: true
 
   # Files that Claude cannot edit, using glob patterns
   # Examples:
@@ -28,6 +45,36 @@ rules:
   # - "src/**/*.ts" - nested patterns
   # - ".env*" - environment files
   # - "docs/**" - entire directories
-  uneditable_files:
+  uneditableFiles:
     # - ".conclaude.yaml"
     - ".envrc"
+  
+  # Tool usage validation rules - control which tools can be used on which files
+  # toolUsageValidation:
+  #   - tool: "Write"
+  #     pattern: "**/*.rs"
+  #     action: "allow"
+  #     message: "Writing to Rust files is allowed"
+  #   - tool: "*"
+  #     pattern: ".env*"
+  #     action: "block"
+  #     message: "Environment files cannot be modified"
+
+# Pre-tool-use hook configuration
+preToolUse:
+  # Grep rules that run before tools execute on files
+  # grepRules:
+  #   - filePattern: "**/*.rs"
+  #     forbiddenPattern: "unsafe"
+  #     description: "Unsafe code blocks not allowed"
+  
+  # Directories where file additions are prevented (in addition to root)
+  # preventAdditions: []
+
+# Git worktree integration configuration
+gitWorktree:
+  # Enable automatic git worktree management
+  enabled: false
+  
+  # Automatically create pull requests when work is complete
+  autoCreatePR: false
