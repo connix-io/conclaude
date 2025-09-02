@@ -7,7 +7,6 @@ stop:
   run: |
     cargo test --lib
     cargo build
-
   # infinite mode - allows Claude to continue automatically
   # When enabled, Claude receives the infinite_message to continue working
   # instead of ending the session after stop hook commands succeed

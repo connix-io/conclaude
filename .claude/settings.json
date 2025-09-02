@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx conclaude@latest Notification"
+            "command": "./target/release/conclaude Notification"
           }
         ]
       }
@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx conclaude@latest SubagentStop"
+            "command": "./target/release/conclaude SubagentStop"
           }
         ]
       }
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx conclaude@latest PreToolUse"
+            "command": "./target/release/conclaude PreToolUse"
           }
         ]
       }
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx conclaude@latest PreCompact"
+            "command": "./target/release/conclaude PreCompact"
           }
         ]
       }
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx conclaude@latest PostToolUse"
+            "command": "./target/release/conclaude PostToolUse"
           }
         ]
       }
@@ -65,7 +65,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx conclaude@latest Stop"
+            "command": "./target/release/conclaude Stop"
           }
         ]
       }
@@ -76,7 +76,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx conclaude@latest UserPromptSubmit"
+            "command": "./target/release/conclaude UserPromptSubmit"
           }
         ]
       }
@@ -87,7 +87,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx conclaude@latest SessionStart"
+            "command": "./target/release/conclaude SessionStart"
           }
         ]
       }

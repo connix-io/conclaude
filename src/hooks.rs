@@ -1,9 +1,8 @@
-use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig, GrepRule, ToolUsageRule};
+use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig, GrepRule};
 use crate::logger::create_session_logger;
 use crate::types::*;
 use anyhow::{Context, Result};
 use glob::Pattern;
-use regex::Regex;
 use serde_json::Value;
 use std::collections::HashSet;
 use std::fs;
@@ -11,8 +10,8 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::process::Command as TokioCommand;
-use walkdir::WalkDir;
 
 /// Cached configuration instance to avoid repeated loads
 static CACHED_CONFIG: OnceLock<ConclaudeConfig> = OnceLock::new();
@@ -85,10 +84,20 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
         payload.tool_name
     );
 
+    // Check tool usage validation rules
+    if let Some(result) = check_tool_usage_rules(&payload).await? {
+        return Ok(result);
+    }
+
     let file_modifying_tools = vec!["Write", "Edit", "MultiEdit", "NotebookEdit"];
 
     if file_modifying_tools.contains(&payload.tool_name.as_str()) {
         if let Some(result) = check_file_validation_rules(&payload).await? {
+            return Ok(result);
+        }
+        
+        // Check PreToolUse grep rules for the file being modified
+        if let Some(result) = check_pre_tool_use_grep_rules(&payload).await? {
             return Ok(result);
         }
     }
@@ -353,8 +362,8 @@ pub async fn handle_stop() -> Result<HookResult> {
 
     log::info!("Executing {} stop hook commands", commands_with_messages.len());
     
-    // Track rounds for infinite alternative
-    static mut ROUND_COUNT: u32 = 0;
+    // Track rounds for infinite alternative using atomic counter
+    static ROUND_COUNT: AtomicU32 = AtomicU32::new(0);
 
     for (index, (command, custom_message)) in commands_with_messages.iter().enumerate() {
         log::info!(
@@ -426,15 +435,13 @@ pub async fn handle_stop() -> Result<HookResult> {
 
     // Check rounds mode (alternative to infinite)
     if let Some(max_rounds) = config.stop.rounds {
-        unsafe {
-            ROUND_COUNT += 1;
-            if ROUND_COUNT < max_rounds {
-                let message = format!("Round {}/{} completed, continuing...", ROUND_COUNT, max_rounds);
-                log::info!("{}", message);
-                return Ok(HookResult::blocked(message));
-            }
-            ROUND_COUNT = 0; // Reset for next session
+        let current_round = ROUND_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
+        if current_round < max_rounds {
+            let message = format!("Round {}/{} completed, continuing...", current_round, max_rounds);
+            log::info!("{}", message);
+            return Ok(HookResult::blocked(message));
         }
+        ROUND_COUNT.store(0, Ordering::SeqCst); // Reset for next session
     }
 
     // Check if infinite mode is enabled
