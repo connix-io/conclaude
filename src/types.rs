@@ -149,6 +149,7 @@ pub struct SessionStartPayload {
 }
 
 /// Union type of all possible hook event payloads.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "hook_event_name")]
 pub enum HookPayload {
@@ -171,6 +172,7 @@ pub enum HookPayload {
 }
 
 impl HookPayload {
+    #[allow(dead_code)]
     #[must_use]
     pub fn session_id(&self) -> &str {
         match self {
@@ -185,6 +187,7 @@ impl HookPayload {
         }
     }
 
+    #[allow(dead_code)]
     #[must_use]
     pub fn transcript_path(&self) -> &str {
         match self {
@@ -199,6 +202,7 @@ impl HookPayload {
         }
     }
 
+    #[allow(dead_code)]
     #[must_use]
     pub fn hook_event_name(&self) -> &str {
         match self {
