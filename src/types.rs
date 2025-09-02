@@ -2,18 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Configuration options for controlling logger behavior.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LoggingConfig {
     /// Whether to enable file logging to temporary directory
     pub file_logging: bool,
-}
-
-impl Default for LoggingConfig {
-    fn default() -> Self {
-        Self {
-            file_logging: false,
-        }
-    }
 }
 
 /// Response structure returned by hook handlers to control execution flow.
@@ -26,7 +18,7 @@ pub struct HookResult {
 }
 
 impl HookResult {
-    pub fn success() -> Self {
+    #[must_use] pub fn success() -> Self {
         Self {
             message: None,
             blocked: Some(false),
@@ -178,7 +170,7 @@ pub enum HookPayload {
 }
 
 impl HookPayload {
-    pub fn session_id(&self) -> &str {
+    #[must_use] pub fn session_id(&self) -> &str {
         match self {
             HookPayload::PreToolUse(p) => &p.base.session_id,
             HookPayload::PostToolUse(p) => &p.base.session_id,
@@ -191,7 +183,7 @@ impl HookPayload {
         }
     }
 
-    pub fn transcript_path(&self) -> &str {
+    #[must_use] pub fn transcript_path(&self) -> &str {
         match self {
             HookPayload::PreToolUse(p) => &p.base.transcript_path,
             HookPayload::PostToolUse(p) => &p.base.transcript_path,
@@ -204,7 +196,7 @@ impl HookPayload {
         }
     }
 
-    pub fn hook_event_name(&self) -> &str {
+    #[must_use] pub fn hook_event_name(&self) -> &str {
         match self {
             HookPayload::PreToolUse(p) => &p.base.hook_event_name,
             HookPayload::PostToolUse(p) => &p.base.hook_event_name,

@@ -1,6 +1,6 @@
 use crate::config::{ConclaudeConfig, GrepRule, extract_bash_commands, load_conclaude_config};
 use crate::logger::create_session_logger;
-use crate::types::*;
+use crate::types::{HookResult, PreToolUsePayload, validate_base_payload, LoggingConfig, PostToolUsePayload, NotificationPayload, UserPromptSubmitPayload, SessionStartPayload, StopPayload, SubagentStopPayload, PreCompactPayload};
 use anyhow::{Context, Result};
 use glob::Pattern;
 use serde_json::Value;
@@ -57,7 +57,7 @@ where
             std::process::exit(0);
         }
         Err(error) => {
-            eprintln!("❌ Hook failed: {}", error);
+            eprintln!("❌ Hook failed: {error}");
             std::process::exit(1);
         }
     }
@@ -89,7 +89,7 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
         return Ok(result);
     }
 
-    let file_modifying_tools = vec!["Write", "Edit", "MultiEdit", "NotebookEdit"];
+    let file_modifying_tools = ["Write", "Edit", "MultiEdit", "NotebookEdit"];
 
     if file_modifying_tools.contains(&payload.tool_name.as_str()) {
         if let Some(result) = check_file_validation_rules(&payload).await? {
@@ -124,8 +124,8 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
         .to_string();
 
     // Check preventRootAdditions rule - only applies to Write tool
-    if config.rules.prevent_root_additions && payload.tool_name == "Write" {
-        if is_root_addition(&file_path, &relative_path) {
+    if config.rules.prevent_root_additions && payload.tool_name == "Write"
+        && is_root_addition(&file_path, &relative_path) {
             let error_message = format!(
                 "Blocked {} operation: preventRootAdditions rule prevents creating files at repository root. File: {}",
                 payload.tool_name, file_path
@@ -139,7 +139,6 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
 
             return Ok(Some(HookResult::blocked(error_message)));
         }
-    }
 
     // Check uneditableFiles rule
     for pattern in &config.rules.uneditable_files {
@@ -174,11 +173,11 @@ pub fn extract_file_path(tool_input: &std::collections::HashMap<String, Value>) 
         .get("file_path")
         .or_else(|| tool_input.get("notebook_path"))
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
 }
 
 /// Check if a file path represents a root addition
-pub fn is_root_addition(_file_path: &str, relative_path: &str) -> bool {
+#[must_use] pub fn is_root_addition(_file_path: &str, relative_path: &str) -> bool {
     let path = Path::new(relative_path);
     let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
@@ -209,7 +208,7 @@ pub fn matches_uneditable_pattern(
     pattern: &str,
 ) -> Result<bool> {
     let glob_pattern =
-        Pattern::new(pattern).with_context(|| format!("Invalid glob pattern: {}", pattern))?;
+        Pattern::new(pattern).with_context(|| format!("Invalid glob pattern: {pattern}"))?;
 
     Ok(glob_pattern.matches(file_path)
         || glob_pattern.matches(relative_path)
@@ -383,45 +382,44 @@ pub async fn handle_stop() -> Result<HookResult> {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .with_context(|| format!("Failed to spawn command: {}", command))?;
+            .with_context(|| format!("Failed to spawn command: {command}"))?;
 
         let output = child
             .wait_with_output()
             .await
-            .with_context(|| format!("Failed to wait for command: {}", command))?;
+            .with_context(|| format!("Failed to wait for command: {command}"))?;
 
         if !output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
             let exit_code = output.status.code().unwrap_or(1);
 
-            let stdout_section = if !stdout.is_empty() {
-                format!("\nStdout: {}", stdout)
-            } else {
+            let stdout_section = if stdout.is_empty() {
                 String::new()
+            } else {
+                format!("\nStdout: {stdout}")
             };
 
-            let stderr_section = if !stderr.is_empty() {
-                format!("\nStderr: {}", stderr)
-            } else {
+            let stderr_section = if stderr.is_empty() {
                 String::new()
+            } else {
+                format!("\nStderr: {stderr}")
             };
 
             let error_message = if let Some(custom_msg) = custom_message {
                 custom_msg.clone()
             } else {
                 format!(
-                    "Command failed with exit code {}: {}{}{}",
-                    exit_code, command, stdout_section, stderr_section
+                    "Command failed with exit code {exit_code}: {command}{stdout_section}{stderr_section}"
                 )
             };
 
-            log::error!("Stop hook command failed: {}", error_message);
+            log::error!("Stop hook command failed: {error_message}");
             return Ok(HookResult::blocked(error_message));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        log::info!("Command completed successfully: {}", command);
+        log::info!("Command completed successfully: {command}");
         if !stdout.trim().is_empty() {
             log::info!("Command output: {}", stdout.trim());
         }
@@ -441,10 +439,9 @@ pub async fn handle_stop() -> Result<HookResult> {
         let current_round = ROUND_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
         if current_round < max_rounds {
             let message = format!(
-                "Round {}/{} completed, continuing...",
-                current_round, max_rounds
+                "Round {current_round}/{max_rounds} completed, continuing..."
             );
-            log::info!("{}", message);
+            log::info!("{message}");
             return Ok(HookResult::blocked(message));
         }
         ROUND_COUNT.store(0, Ordering::SeqCst); // Reset for next session
@@ -459,8 +456,7 @@ pub async fn handle_stop() -> Result<HookResult> {
             .unwrap_or("continue working on the task");
 
         log::info!(
-            "Infinite mode enabled, sending continuation message: {}",
-            infinite_message
+            "Infinite mode enabled, sending continuation message: {infinite_message}"
         );
         return Ok(HookResult::blocked(infinite_message.to_string()));
     }
@@ -563,7 +559,7 @@ async fn execute_grep_rules(rules: &[GrepRule]) -> Result<Option<HookResult>> {
         let pattern = Pattern::new(&rule.file_pattern)?;
         let regex = regex::Regex::new(&rule.forbidden_pattern)?;
 
-        for entry in WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(".").into_iter().filter_map(std::result::Result::ok) {
             if entry.file_type().is_file() {
                 let path = entry.path();
                 if pattern.matches(&path.to_string_lossy()) {
@@ -597,11 +593,9 @@ async fn execute_grep_rules(rules: &[GrepRule]) -> Result<Option<HookResult>> {
 fn snapshot_root_directory() -> Result<HashSet<String>> {
     let mut snapshot = HashSet::new();
 
-    for entry in fs::read_dir(".")? {
-        if let Ok(entry) = entry {
-            if let Ok(file_name) = entry.file_name().into_string() {
-                snapshot.insert(file_name);
-            }
+    for entry in (fs::read_dir(".")?).flatten() {
+        if let Ok(file_name) = entry.file_name().into_string() {
+            snapshot.insert(file_name);
         }
     }
 
@@ -612,12 +606,10 @@ fn snapshot_root_directory() -> Result<HashSet<String>> {
 fn check_root_additions(snapshot: &HashSet<String>) -> Result<Option<HookResult>> {
     let mut new_files = Vec::new();
 
-    for entry in fs::read_dir(".")? {
-        if let Ok(entry) = entry {
-            if let Ok(file_name) = entry.file_name().into_string() {
-                if !snapshot.contains(&file_name) && !file_name.starts_with('.') {
-                    new_files.push(file_name);
-                }
+    for entry in (fs::read_dir(".")?).flatten() {
+        if let Ok(file_name) = entry.file_name().into_string() {
+            if !snapshot.contains(&file_name) && !file_name.starts_with('.') {
+                new_files.push(file_name);
             }
         }
     }

@@ -50,14 +50,14 @@ pub fn init_logger(session_id: Option<&str>, config: Option<&LoggingConfig>) -> 
 }
 
 /// Resolves logging configuration from environment variables and optional overrides.
-pub fn resolve_logging_config(config: Option<&LoggingConfig>) -> LoggingConfig {
+#[must_use] pub fn resolve_logging_config(config: Option<&LoggingConfig>) -> LoggingConfig {
     let env_var = std::env::var("CONCLAUDE_DISABLE_FILE_LOGGING").ok();
     resolve_logging_config_with_env(config, env_var.as_deref())
 }
 
 /// Internal function that resolves logging configuration with explicit environment variable value.
 /// This allows for deterministic testing without global environment variable manipulation.
-pub fn resolve_logging_config_with_env(
+#[must_use] pub fn resolve_logging_config_with_env(
     config: Option<&LoggingConfig>,
     env_var: Option<&str>,
 ) -> LoggingConfig {
@@ -73,8 +73,7 @@ pub fn resolve_logging_config_with_env(
 
     LoggingConfig {
         file_logging: config
-            .map(|c| c.file_logging)
-            .unwrap_or(default_file_logging),
+            .map_or(default_file_logging, |c| c.file_logging),
     }
 }
 
@@ -82,7 +81,7 @@ pub fn resolve_logging_config_with_env(
 pub fn get_log_file_path(session_id: &str) -> anyhow::Result<PathBuf> {
     let project_name = get_project_name();
     let sanitized_project = sanitize_project_name(&project_name);
-    let filename = format!("conclaude-{}-sess-{}.jsonl", sanitized_project, session_id);
+    let filename = format!("conclaude-{sanitized_project}-sess-{session_id}.jsonl");
 
     let temp_dir = std::env::temp_dir();
     Ok(temp_dir.join(filename))
@@ -101,7 +100,7 @@ fn get_project_name() -> String {
 }
 
 /// Sanitize project name for use in filenames
-pub fn sanitize_project_name(name: &str) -> String {
+#[must_use] pub fn sanitize_project_name(name: &str) -> String {
     name.to_lowercase()
         .chars()
         .map(|c| {

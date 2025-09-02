@@ -57,16 +57,16 @@ pub fn validate_config_against_schema(config_content: &str) -> Result<()> {
 }
 
 /// Gets the default schema URL for YAML language server headers
-pub fn get_schema_url() -> String {
+#[must_use] pub fn get_schema_url() -> String {
     "https://github.com/conneroisu/conclaude/releases/latest/download/conclaude-schema.json"
         .to_string()
 }
 
 /// Generates a YAML language server header comment with schema URL
-pub fn generate_yaml_language_server_header(custom_schema_url: Option<&str>) -> String {
+#[must_use] pub fn generate_yaml_language_server_header(custom_schema_url: Option<&str>) -> String {
     let default_url = get_schema_url();
     let schema_url = custom_schema_url.unwrap_or(&default_url);
-    format!("# yaml-language-server: $schema={}\n", schema_url)
+    format!("# yaml-language-server: $schema={schema_url}\n")
 }
 
 #[cfg(test)]

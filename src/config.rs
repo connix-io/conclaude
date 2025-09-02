@@ -24,7 +24,7 @@ pub struct StopCommand {
 }
 
 /// Configuration interface for stop hook commands
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 pub struct StopConfig {
     #[serde(default)]
     pub run: String,
@@ -38,19 +38,6 @@ pub struct StopConfig {
     pub rounds: Option<u32>,
     #[serde(default, rename = "grepRules")]
     pub grep_rules: Vec<GrepRule>,
-}
-
-impl Default for StopConfig {
-    fn default() -> Self {
-        Self {
-            run: String::new(),
-            commands: Vec::new(),
-            infinite: false,
-            infinite_message: None,
-            rounds: None,
-            grep_rules: Vec::new(),
-        }
-    }
 }
 
 /// Configuration interface for validation rules
@@ -84,7 +71,7 @@ impl Default for RulesConfig {
 }
 
 /// Configuration for pre tool use hooks
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 pub struct PreToolUseConfig {
     #[serde(default, rename = "grepRules")]
     pub grep_rules: Vec<GrepRule>,
@@ -92,17 +79,8 @@ pub struct PreToolUseConfig {
     pub prevent_additions: Vec<String>,
 }
 
-impl Default for PreToolUseConfig {
-    fn default() -> Self {
-        Self {
-            grep_rules: Vec::new(),
-            prevent_additions: Vec::new(),
-        }
-    }
-}
-
 /// Configuration for git worktree auto finish
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 pub struct GitWorktreeConfig {
     #[serde(default)]
     pub enabled: bool,
@@ -110,35 +88,17 @@ pub struct GitWorktreeConfig {
     pub auto_create_pr: bool,
 }
 
-impl Default for GitWorktreeConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            auto_create_pr: false,
-        }
-    }
-}
-
 /// Main configuration interface matching the TypeScript version
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 pub struct ConclaudeConfig {
+    #[serde(default)]
     pub stop: StopConfig,
+    #[serde(default)]
     pub rules: RulesConfig,
     #[serde(default, rename = "preToolUse")]
     pub pre_tool_use: PreToolUseConfig,
     #[serde(default, rename = "gitWorktree")]
     pub git_worktree: GitWorktreeConfig,
-}
-
-impl Default for ConclaudeConfig {
-    fn default() -> Self {
-        Self {
-            stop: StopConfig::default(),
-            rules: RulesConfig::default(),
-            pre_tool_use: PreToolUseConfig::default(),
-            git_worktree: GitWorktreeConfig::default(),
-        }
-    }
 }
 
 /// Load YAML configuration using native search strategies
@@ -212,9 +172,8 @@ while IFS= read -r line; do
   # Output in a simple delimited format (NOT JSON)
   echo "CMD:$line"
 done << 'EOF'
-{}
-EOF"#,
-        bash_script
+{bash_script}
+EOF"#
     );
 
     let output = Command::new("bash")
@@ -244,7 +203,7 @@ EOF"#,
     // Check for errors
     if !output.stderr.is_empty() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        log::warn!("Bash reported errors: {}", stderr);
+        log::warn!("Bash reported errors: {stderr}");
     }
 
     Ok(commands)
@@ -252,7 +211,7 @@ EOF"#,
 
 /// Generate a default configuration file content
 /// The configuration is embedded at compile time from default-config.yaml
-pub fn generate_default_config() -> String {
+#[must_use] pub fn generate_default_config() -> String {
     include_str!("default-config.yaml").to_string()
 }
 
