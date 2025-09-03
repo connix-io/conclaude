@@ -9,23 +9,23 @@ stop:
     cargo clippy -- -D warnings -D clippy::pedantic
     cargo test --lib
     cargo build
-  
+
   # Alternative structured command format with optional custom error messages
   # commands:
   #   - run: "cargo test"
   #     message: "Tests failed - please fix failing tests before continuing"
   #   - run: "cargo build"
   #     message: "Build failed - please fix compilation errors"
-  
+
   # infinite mode - allows Claude to continue automatically
   # When enabled, Claude receives the infiniteMessage to continue working
   # instead of ending the session after stop hook commands succeed
   infinite: false
   infiniteMessage: "continue working on the task"
-  
+
   # Alternative to infinite mode - run for a specific number of rounds
   # rounds: 3
-  
+
   # Grep rules for stop hook - scan files for forbidden patterns
   # grepRules:
   #   - filePattern: "**/*.rs"
@@ -46,9 +46,9 @@ rules:
   # - ".env*" - environment files
   # - "docs/**" - entire directories
   uneditableFiles:
-    # - ".conclaude.yaml"
+    - ".conclaude.yaml"
     - ".envrc"
-  
+
   # Tool usage validation rules - control which tools can be used on which files
   # toolUsageValidation:
   #   - tool: "Write"
@@ -67,7 +67,7 @@ preToolUse:
   #   - filePattern: "**/*.rs"
   #     forbiddenPattern: "unsafe"
   #     description: "Unsafe code blocks not allowed"
-  
+
   # Directories where file additions are prevented (in addition to root)
   # preventAdditions: []
 
@@ -75,6 +75,6 @@ preToolUse:
 gitWorktree:
   # Enable automatic git worktree management
   enabled: false
-  
+
   # Automatically create pull requests when work is complete
   autoCreatePR: false
