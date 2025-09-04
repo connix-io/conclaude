@@ -24,8 +24,15 @@
       };
       craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.rust-bin.stable.latest.default);
 
+      src = pkgs.lib.cleanSourceWith {
+        src = ./.;
+        filter = path: type:
+          (craneLib.filterCargoSources path type)
+          || (builtins.match ".*default-config\\.yaml$" path != null);
+      };
+
       conclaude = craneLib.buildPackage {
-        src = craneLib.cleanCargoSource ./.;
+        inherit src;
         strictDeps = true;
         pname = "conclaude";
         version = "0.1.1";

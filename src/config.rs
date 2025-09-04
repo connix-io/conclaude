@@ -70,6 +70,11 @@ impl Default for RulesConfig {
     }
 }
 
+/// Default function that returns true for serde defaults
+fn default_true() -> bool {
+    true
+}
+
 /// Configuration for pre tool use hooks
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 pub struct PreToolUseConfig {
@@ -77,6 +82,10 @@ pub struct PreToolUseConfig {
     pub grep_rules: Vec<GrepRule>,
     #[serde(default, rename = "preventAdditions")]
     pub prevent_additions: Vec<String>,
+    #[serde(default = "default_true", rename = "preventGeneratedFileEdits")]
+    pub prevent_generated_file_edits: bool,
+    #[serde(default, rename = "generatedFileMessage")]
+    pub generated_file_message: Option<String>,
 }
 
 /// Configuration for git worktree auto finish

@@ -70,6 +70,12 @@ preToolUse:
 
   # Directories where file additions are prevented (in addition to root)
   # preventAdditions: []
+  # Prevent editing of auto-generated files (enabled by default)
+  preventGeneratedFileEdits: true
+
+  # Custom message when blocking auto-generated file edits
+  # Available placeholders: {file_path}, {marker}
+  # generatedFileMessage: "Cannot modify {file_path} - it contains '{marker}' indicating it's auto-generated"
 
 # Git worktree integration configuration
 gitWorktree:
