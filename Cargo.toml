@@ -5,8 +5,8 @@ edition = "2021"
 description = "Claude Code hook handler CLI tool that processes hook events and manages lifecycle hooks for tool usage, session management, and transcript processing"
 license = "MIT"
 authors = ["Conner Ohnesorge"]
-repository = "https://github.com/conneroisu/conclaude"
-keywords = ["claude", "claude-code", "hooks", "cli", "ai", "automation"]
+repository = "https://github.com/connix-io/conclaude"
+keywords = ["claude-code", "hooks", "cli", "ai", "automation"]
 
 [[bin]]
 name = "conclaude"
