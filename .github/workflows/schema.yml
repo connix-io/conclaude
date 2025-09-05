@@ -162,7 +162,7 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Usage in YAML files:" >> $GITHUB_STEP_SUMMARY
         echo '```yaml' >> $GITHUB_STEP_SUMMARY
-        echo '# yaml-language-server: $schema=https://github.com/${{ github.repository }}/releases/latest/download/conclaude-schema.json' >> $GITHUB_STEP_SUMMARY
+        echo "# yaml-language-server: \$schema=https://github.com/${{ github.repository }}/releases/latest/download/conclaude-schema.json" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "stop:" >> $GITHUB_STEP_SUMMARY
         echo "  run: |" >> $GITHUB_STEP_SUMMARY
