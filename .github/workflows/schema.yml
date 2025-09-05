@@ -146,25 +146,33 @@ jobs:
 
     - name: Create summary
       run: |
-        echo "## 🔧 Schema Generation Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- **Schema file**: \\\`conclaude-schema.json\\\`" >> $GITHUB_STEP_SUMMARY
-        echo "- **Validation**: ✅ Passed" >> $GITHUB_STEP_SUMMARY
-        echo "- **Structure check**: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+        cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+        ## 🔧 Schema Generation Summary
+        
+        - **Schema file**: conclaude-schema.json
+        - **Validation**: ✅ Passed
+        - **Structure check**: ✅ Passed
+        EOF
         
         if [[ "${{ steps.check_release.outputs.should_release }}" == "true" ]]; then
-          echo "- **Release**: ✅ Updated with schema" >> $GITHUB_STEP_SUMMARY
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+        - **Release**: ✅ Updated with schema
+        EOF
           echo "- **Schema URL**: https://github.com/${{ github.repository }}/releases/latest/download/conclaude-schema.json" >> $GITHUB_STEP_SUMMARY
         else
-          echo "- **Release**: ⏭️ Skipped (not main branch or release)" >> $GITHUB_STEP_SUMMARY
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+        - **Release**: ⏭️ Skipped (not main branch or release)
+        EOF
         fi
         
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Usage in YAML files:" >> $GITHUB_STEP_SUMMARY
-        echo '```yaml' >> $GITHUB_STEP_SUMMARY
-        echo "# yaml-language-server: \$schema=https://github.com/${{ github.repository }}/releases/latest/download/conclaude-schema.json" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "stop:" >> $GITHUB_STEP_SUMMARY
-        echo "  run: |" >> $GITHUB_STEP_SUMMARY
-        echo "    echo 'Your commands here'" >> $GITHUB_STEP_SUMMARY
-        echo "```" >> $GITHUB_STEP_SUMMARY
+        cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+        
+        ### Usage in YAML files:
+        ```yaml
+        # yaml-language-server: $schema=https://github.com/your-repo/conclaude/releases/latest/download/conclaude-schema.json
+        
+        stop:
+          run: |
+            echo 'Your commands here'
+        ```
+        EOF
