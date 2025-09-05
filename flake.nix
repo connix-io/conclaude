@@ -36,10 +36,6 @@
         strictDeps = true;
         pname = "conclaude";
         version = "0.1.1";
-
-        buildInputs = with pkgs; [
-          # Add any system dependencies here if needed
-        ];
       };
 
       rooted = exec:
