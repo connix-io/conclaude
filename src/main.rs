@@ -1,3 +1,4 @@
+// Testing GitHub Actions workflow fixes
 mod config;
 mod hooks;
 mod logger;
