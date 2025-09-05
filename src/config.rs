@@ -95,6 +95,10 @@ pub struct GitWorktreeConfig {
     pub enabled: bool,
     #[serde(default, rename = "autoCreatePR")]
     pub auto_create_pr: bool,
+    #[serde(default, rename = "autoCreatePRCommand")]
+    pub auto_create_pr_command: Option<String>,
+    #[serde(default, rename = "autoCreatePRTemplate")]
+    pub auto_create_pr_template: Option<String>,
 }
 
 /// Main configuration interface matching the TypeScript version

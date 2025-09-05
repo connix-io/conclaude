@@ -1,9 +1,9 @@
-use crate::config::{ConclaudeConfig, GrepRule, extract_bash_commands, load_conclaude_config};
+use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig, GrepRule};
 use crate::logger::create_session_logger;
 use crate::types::{
-    HookResult, LoggingConfig, NotificationPayload, PostToolUsePayload, PreCompactPayload,
-    PreToolUsePayload, SessionStartPayload, StopPayload, SubagentStopPayload,
-    UserPromptSubmitPayload, validate_base_payload,
+    validate_base_payload, HookResult, LoggingConfig, NotificationPayload, PostToolUsePayload,
+    PreCompactPayload, PreToolUsePayload, SessionStartPayload, StopPayload, SubagentStopPayload,
+    UserPromptSubmitPayload,
 };
 use anyhow::{Context, Result};
 use glob::Pattern;
@@ -13,8 +13,8 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::OnceLock;
 use tokio::process::Command as TokioCommand;
 
 /// Cached configuration instance to avoid repeated loads
@@ -434,10 +434,37 @@ async fn execute_stop_commands(
             .await
             .with_context(|| format!("Failed to wait for command: {command}"))?;
 
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
         if !output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
             let exit_code = output.status.code().unwrap_or(1);
+            let separator = "-".repeat(60);
+
+            // Log detailed failure information with command and outputs appended
+            log::error!(
+                "Stop command failed:\n{}\n  Command: {}\n  Status: Failed (exit code: {})\n  Stdout:\n{}\n  Stderr:\n{}\n{}",
+                separator,
+                command,
+                exit_code,
+                if stdout.trim().is_empty() {
+                    "    (no stdout)".to_string()
+                } else {
+                    stdout.trim().lines()
+                        .map(|line| format!("    {}", line))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                },
+                if stderr.trim().is_empty() {
+                    "    (no stderr)".to_string()
+                } else {
+                    stderr.trim().lines()
+                        .map(|line| format!("    {}", line))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                },
+                separator
+            );
 
             let stdout_section = if stdout.is_empty() {
                 String::new()
@@ -459,15 +486,27 @@ async fn execute_stop_commands(
                 )
             };
 
-            log::error!("Stop hook command failed: {error_message}");
             return Ok(Some(HookResult::blocked(error_message)));
         }
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        log::info!("Command completed successfully: {command}");
-        if !stdout.trim().is_empty() {
-            log::info!("Command output: {}", stdout.trim());
-        }
+        // Always log command execution details with stdout appended
+        let separator = "-".repeat(60);
+        log::info!(
+            "Stop command executed:\n{}\n  Command: {}\n  Status: Success\n  Output:\n{}\n{}",
+            separator,
+            command,
+            if stdout.trim().is_empty() {
+                "    (no output)".to_string()
+            } else {
+                stdout
+                    .trim()
+                    .lines()
+                    .map(|line| format!("    {}", line))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            },
+            separator
+        );
     }
 
     log::info!("All stop hook commands completed successfully");
@@ -865,25 +904,21 @@ mod tests {
 
     #[test]
     fn test_matches_uneditable_pattern() {
-        assert!(
-            matches_uneditable_pattern(
-                "package.json",
-                "package.json",
-                "/path/package.json",
-                "package.json"
-            )
-            .unwrap()
-        );
+        assert!(matches_uneditable_pattern(
+            "package.json",
+            "package.json",
+            "/path/package.json",
+            "package.json"
+        )
+        .unwrap());
         assert!(matches_uneditable_pattern("test.md", "test.md", "/path/test.md", "*.md").unwrap());
-        assert!(
-            matches_uneditable_pattern(
-                "src/index.ts",
-                "src/index.ts",
-                "/path/src/index.ts",
-                "src/**/*.ts"
-            )
-            .unwrap()
-        );
+        assert!(matches_uneditable_pattern(
+            "src/index.ts",
+            "src/index.ts",
+            "/path/src/index.ts",
+            "src/**/*.ts"
+        )
+        .unwrap());
         assert!(
             !matches_uneditable_pattern("other.txt", "other.txt", "/path/other.txt", "*.md")
                 .unwrap()
