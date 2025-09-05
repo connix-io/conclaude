@@ -1,0 +1,257 @@
+{
+  "$id": "https://github.com/conneroisu/conclaude/releases/latest/download/conclaude-schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "GitWorktreeConfig": {
+      "description": "Configuration for git worktree auto finish",
+      "properties": {
+        "autoCreatePR": {
+          "default": false,
+          "type": "boolean"
+        },
+        "autoCreatePRCommand": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "autoCreatePRTemplate": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "GrepRule": {
+      "description": "Configuration interface for grep rules",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "filePattern": {
+          "type": "string"
+        },
+        "forbiddenPattern": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "description",
+        "filePattern",
+        "forbiddenPattern"
+      ],
+      "type": "object"
+    },
+    "PreToolUseConfig": {
+      "description": "Configuration for pre tool use hooks",
+      "properties": {
+        "generatedFileMessage": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "grepRules": {
+          "default": [],
+          "items": {
+            "$ref": "#/definitions/GrepRule"
+          },
+          "type": "array"
+        },
+        "preventAdditions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "preventGeneratedFileEdits": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "RulesConfig": {
+      "description": "Configuration interface for validation rules",
+      "properties": {
+        "preventRootAdditions": {
+          "default": false,
+          "type": "boolean"
+        },
+        "toolUsageValidation": {
+          "default": [],
+          "items": {
+            "$ref": "#/definitions/ToolUsageRule"
+          },
+          "type": "array"
+        },
+        "uneditableFiles": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "StopCommand": {
+      "description": "Configuration for individual stop commands with optional messages",
+      "properties": {
+        "message": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "run": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "run"
+      ],
+      "type": "object"
+    },
+    "StopConfig": {
+      "description": "Configuration interface for stop hook commands",
+      "properties": {
+        "commands": {
+          "default": [],
+          "items": {
+            "$ref": "#/definitions/StopCommand"
+          },
+          "type": "array"
+        },
+        "grepRules": {
+          "default": [],
+          "items": {
+            "$ref": "#/definitions/GrepRule"
+          },
+          "type": "array"
+        },
+        "infinite": {
+          "default": false,
+          "type": "boolean"
+        },
+        "infiniteMessage": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rounds": {
+          "default": null,
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "run": {
+          "default": "",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ToolUsageRule": {
+      "description": "Tool usage validation rule",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "tool": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "pattern",
+        "tool"
+      ],
+      "type": "object"
+    }
+  },
+  "description": "Configuration schema for Conclaude - Claude Code hook handler",
+  "properties": {
+    "gitWorktree": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/GitWorktreeConfig"
+        }
+      ],
+      "default": {
+        "autoCreatePR": false,
+        "autoCreatePRCommand": null,
+        "autoCreatePRTemplate": null,
+        "enabled": false
+      }
+    },
+    "preToolUse": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/PreToolUseConfig"
+        }
+      ],
+      "default": {
+        "generatedFileMessage": null,
+        "grepRules": [],
+        "preventAdditions": [],
+        "preventGeneratedFileEdits": false
+      }
+    },
+    "rules": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/RulesConfig"
+        }
+      ],
+      "default": {
+        "preventRootAdditions": true,
+        "toolUsageValidation": [],
+        "uneditableFiles": []
+      }
+    },
+    "stop": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/StopConfig"
+        }
+      ],
+      "default": {
+        "commands": [],
+        "grepRules": [],
+        "infinite": false,
+        "infiniteMessage": null,
+        "rounds": null,
+        "run": ""
+      }
+    }
+  },
+  "title": "Conclaude Configuration",
+  "type": "object"
+}
