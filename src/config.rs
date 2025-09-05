@@ -1,4 +1,4 @@
-// Testing fixed Auto-update JSON Schema workflow
+// Final test - expecting both workflows to succeed
 use anyhow::{Context, Result};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
