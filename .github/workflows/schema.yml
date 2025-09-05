@@ -148,7 +148,7 @@ jobs:
       run: |
         echo "## 🔧 Schema Generation Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- **Schema file**: \`conclaude-schema.json\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Schema file**: \\\`conclaude-schema.json\\\`" >> $GITHUB_STEP_SUMMARY
         echo "- **Validation**: ✅ Passed" >> $GITHUB_STEP_SUMMARY
         echo "- **Structure check**: ✅ Passed" >> $GITHUB_STEP_SUMMARY
         
