@@ -1,88 +1,96 @@
 {
-	"permissions": {
-		"allow": [
-			"Bash(mkdir:*)",
-			"Bash(uv:*)",
-			"Bash(find:*)",
-			"Bash(mv:*)",
-			"Bash(grep:*)",
-			"Bash(npm:*)",
-			"Bash(ls:*)",
-			"Bash(cp:*)",
-			"Write",
-			"Edit",
-			"Bash(chmod:*)",
-			"Bash(touch:*)"
-		],
-		"deny": []
-	},
-	"includeCoAuthoredBy": false,
-	"hooks": {
-		"UserPromptSubmit": [
-			{
-				"matcher": "",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts UserPromptSubmit"
-					}
-				]
-			}
-		],
-		"PreToolUse": [
-			{
-				"matcher": "",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts PreToolUse"
-					}
-				]
-			}
-		],
-		"PostToolUse": [
-			{
-				"matcher": "",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts PostToolUse"
-					}
-				]
-			}
-		],
-		"Notification": [
-			{
-				"matcher": "",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts Notification"
-					}
-				]
-			}
-		],
-		"Stop": [
-			{
-				"matcher": "",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts Stop"
-					}
-				]
-			}
-		],
-		"SubagentStop": [
-			{
-				"matcher": "",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "bun $(git rev-parse --show-toplevel)/src/index.ts SubagentStop"
-					}
-				]
-			}
-		]
-	}
+  "permissions": {
+    "allow": [],
+    "deny": []
+  },
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./target/release/conclaude Notification"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./target/release/conclaude SubagentStop"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./target/release/conclaude PreToolUse"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./target/release/conclaude PreCompact"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./target/release/conclaude PostToolUse"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./target/release/conclaude Stop"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./target/release/conclaude UserPromptSubmit"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./target/release/conclaude SessionStart"
+          }
+        ]
+      }
+    ]
+  }
 }

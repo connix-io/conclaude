@@ -2,9 +2,11 @@
 
 **The guardrails your Claude Code sessions need.**
 
-Picture this: You're deep in a coding session with Claude, building something amazing. Claude is writing tests, refactoring code, fixing bugs—it's incredibly productive. But then you notice something troubling. Your carefully configured linting rules? Ignored. Your test suite that was green this morning? Now broken. Root-level files appearing where they shouldn't. The AI is powerful, but it doesn't know your project's rules.
+A high-performance Rust CLI tool that provides essential guardrails for Claude Code sessions through a comprehensive hook system. Conclaude ensures your AI coding sessions maintain code quality, follow project standards, and respect your development workflows.
 
-This is the story of why `conclaude` exists.
+[![Crates.io](https://img.shields.io/crates/v/conclaude)](https://crates.io/crates/conclaude)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org)
 
 Born from real developer frustration, conclaude transforms chaotic AI coding sessions into controlled, validated workflows. It's not just another CLI tool—it's your project's guardian, ensuring that every Claude Code session respects your standards, follows your rules, and maintains your code quality.
 
@@ -105,23 +107,31 @@ stop:
 
 Now every small change gets validated immediately. No surprises at the end of a long session.
 
-## Getting Started
+## Installation
 
-### Global Installation (Recommended)
+### From Crates.io (Recommended)
 
 ```bash
-# Install globally with bun
-bun install -g conclaude
+# Install from crates.io
+cargo install conclaude
+```
 
-# Or install from npm
-npm install -g conclaude
+### From Source
+
+```bash
+# Clone and build from source
+git clone https://github.com/conneroisu/conclaude.git
+cd conclaude
+cargo build --release
+
+# The binary will be in target/release/conclaude
 ```
 
 ### Nix Flake Installation
 
 ```bash
 # Use the flake directly
-nix run github:connix-io/conclaude -- --help
+nix run github:conneroisu/conclaude -- --help
 ```
 
 #### Adding conclaude to your development shell
@@ -133,7 +143,7 @@ Add conclaude as a flake input and include it in your development shell:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    conclaude.url = "github:connix-io/conclaude";
+    conclaude.url = "github:conneroisu/conclaude";
   };
 
   outputs = { self, nixpkgs, conclaude, ... }:
@@ -162,13 +172,21 @@ Then enter the development shell:
 nix develop
 ```
 
-### Development Installation
+### Development Setup
 
 ```bash
-# Clone and install for development
-git clone https://github.com/connix-io/conclaude.git
+# Clone the repository
+git clone https://github.com/conneroisu/conclaude.git
 cd conclaude
-bun install
+
+# Build the project
+cargo build
+
+# Run tests
+cargo test
+
+# Install for development
+cargo install --path .
 ```
 
 ## Configuration: Your Project's Rulebook
@@ -194,23 +212,25 @@ Here's what a real-world configuration looks like:
 # Commands that MUST pass before any session ends
 stop:
   run: |
-    bun x tsc --noEmit    # TypeScript check
-    bun test              # All tests must pass
-    bun run lint          # Code style enforced
+    cargo fmt --check     # Code formatting check
+    cargo clippy -- -D warnings  # Linting with warnings as errors
+    cargo test            # All tests must pass
+    cargo build           # Successful compilation required
   
 # File protection rules
 rules:
   preventRootAdditions: true    # Keep project root clean
   uneditableFiles:              # Protect critical files
-    - "./package.json"          # Don't touch dependencies
-    - "*.lock"                  # Lock files are sacred
+    - "Cargo.toml"              # Don't modify package manifest
+    - "Cargo.lock"              # Lock file is sacred
     - ".env*"                   # Secrets stay secret
+    - "target/**"               # Build artifacts
 ```
 
 **What this accomplishes:**
-- 🛡️ Claude can't break your TypeScript compilation
+- 🛡️ Claude can't break your Rust compilation
 - ✅ All tests must pass before session completion  
-- 🎨 Your linting rules are automatically enforced
+- 🎨 Your formatting and linting rules are automatically enforced
 - 📁 No surprise files cluttering your project root
 - 🔒 Critical configuration files stay untouched
 
@@ -221,9 +241,9 @@ rules:
 # Perfect for refactoring sessions or long pair-programming
 stop:
   run: |
-    bun x tsc --noEmit
-    bun test --silent
-  infinite: true  # Validate after every change
+    cargo check --quiet   # Fast compilation check
+    cargo test --quiet     # Silent test execution
+  infinite: true           # Validate after every change
   infiniteMessage: "🔍 Watching your code quality..."
 ```
 
@@ -232,43 +252,33 @@ stop:
 # Maximum security for production codebases
 stop:
   run: |
-    npm audit --audit-level moderate
-    bun x tsc --noEmit
-    bun test --coverage
-    bun run lint
-    bun run build
+    cargo audit              # Security audit
+    cargo fmt --check        # Strict formatting
+    cargo clippy -- -D warnings  # All clippy warnings as errors
+    cargo test --all         # Test all packages
+    cargo build --release    # Release build
 
 rules:
   preventRootAdditions: true
   uneditableFiles:
-    - "./package.json"
-    - "./package-lock.json"
+    - "Cargo.toml"
+    - "Cargo.lock"
     - ".env*"
-    - "dist/**"
-    - "build/**"
-    - "node_modules/**"
+    - "target/**"
     - ".github/workflows/**"
+    - "src/lib.rs"            # Protect main library entry point
 ```
 
 ### Configuration Reference
 
-<details>
-<summary>Complete Configuration Schema</summary>
+The complete configuration schema is defined as Rust structs with serde serialization. Key sections include:
 
-```typescript
-interface ConclaudeConfig {
-  stop: {
-    run: string;                    // Shell commands to execute
-    infinite?: boolean;             // Keep running infinitely (default: false)  
-    infiniteMessage?: string;       // Custom message for infinite mode
-  };
-  rules: {
-    preventRootAdditions: boolean;  // Block file creation at repo root
-    uneditableFiles: string[];      // Glob patterns for protected files
-  };
-}
-```
-</details>
+- **stop**: Commands and settings for session termination hooks
+- **rules**: File protection and validation rules
+- **preToolUse**: Pre-execution validation and controls
+- **gitWorktree**: Git integration settings
+
+Generate a complete JSON schema with: `conclaude generate-schema`
 
 ## Understanding the Hook System
 
@@ -325,9 +335,9 @@ conclaude taps into Claude Code's lifecycle through strategic intervention point
 # Commands to run during Stop hook
 stop:
   run: |
-    bun x tsc --noEmit
-    bun test
-    bun build
+    cargo check
+    cargo test
+    cargo build
 
 # Validation rules
 rules:
@@ -336,10 +346,10 @@ rules:
   
   # Files that cannot be edited (glob patterns)
   uneditableFiles:
-    - "./package.json"
-    - "./bun.lockb"
+    - "Cargo.toml"
+    - "Cargo.lock"
     - ".env*"
-    - "*.lock"
+    - "target/**"
 ```
 
 ### Development Configuration Example
@@ -349,12 +359,12 @@ rules:
 stop:
   run: |
     echo "Running development checks..."
-    bun x tsc --noEmit
+    cargo check
 
 rules:
   preventRootAdditions: false  # Allow root edits during development
   uneditableFiles:
-    - "./package.json"  # Still protect package.json
+    - "Cargo.toml"  # Still protect Cargo.toml
 ```
 
 ### Production Configuration Example
@@ -364,19 +374,18 @@ rules:
 stop:
   run: |
     echo "Running production validation..."
-    bun x tsc --noEmit
-    bun test
-    bun run lint
-    bun run build
+    cargo fmt --check
+    cargo clippy -- -D warnings
+    cargo test
+    cargo build --release
 
 rules:
   preventRootAdditions: true
   uneditableFiles:
-    - "./package.json"
-    - "./bun.lockb"
+    - "Cargo.toml"
+    - "Cargo.lock"
     - ".env*"
-    - "dist/**"
-    - "node_modules/**"
+    - "target/**"
 ```
 
 ### Infinite Mode Configuration Example
@@ -386,15 +395,15 @@ rules:
 stop:
   run: |
     echo "Starting continuous monitoring..."
-    bun x tsc --noEmit
-    bun test
+    cargo check
+    cargo test
   infinite: true
   infiniteMessage: "Monitoring active - press Ctrl+C to stop"
 
 rules:
   preventRootAdditions: false  # Allow file changes during development
   uneditableFiles:
-    - "./package.json"
+    - "Cargo.toml"
 ```
 
 ## Usage
@@ -501,13 +510,13 @@ The Stop hook executes commands from `config.stop.run` sequentially:
 # Configuration
 stop:
   run: |
-    bun x tsc --noEmit
-    bun test
+    cargo check
+    cargo test
 
 # Execution: If any command fails, the entire hook fails and blocks the session
-✓ Command 1/2: bun x tsc --noEmit
-✗ Command 2/2: bun test (exit code 1)
-❌ Hook blocked: Command failed with exit code 1: bun test
+✓ Command 1/2: cargo check
+✗ Command 2/2: cargo test (exit code 1)
+❌ Hook blocked: Command failed with exit code 1: cargo test
 ```
 
 ### PreToolUse Root Protection
@@ -521,8 +530,8 @@ Edit → /repo/config.json           ❌ Blocked
 
 # Allowed operations  
 Write → /repo/.gitignore           ✓ Allowed (dotfile)
-Write → /repo/src/component.tsx    ✓ Allowed (subdirectory)
-Read → /repo/package.json          ✓ Allowed (read-only)
+Write → /repo/src/component.rs     ✓ Allowed (subdirectory)
+Read → /repo/Cargo.toml            ✓ Allowed (read-only)
 ```
 
 ## Development
@@ -530,17 +539,20 @@ Read → /repo/package.json          ✓ Allowed (read-only)
 ### Commands
 
 ```bash
-# Type checking
-bun run lint
+# Format code
+cargo fmt
+
+# Run linting
+cargo clippy
 
 # Run tests
-bun test
+cargo test
 
 # Build for distribution
-bun run build
+cargo build --release
 
 # Run hooks directly (development)
-bun src/index.ts <hook-type>
+cargo run -- <hook-type>
 
 # Use Nix development environment
 nix develop -c lint    # Run linting
@@ -551,52 +563,245 @@ nix develop -c tests   # Run tests
 
 ```
 ├── src/
-│   ├── index.ts      # Main CLI with hook handlers
-│   ├── config.ts     # Configuration loading with cosmiconfig
-│   ├── types.ts      # TypeScript payload definitions
-│   └── logger.ts     # Winston logging configuration
-├── .conclaude.yaml        # YAML configuration file
-├── flake.nix              # Nix development environment
-├── package.json           # Package configuration
+│   ├── main.rs             # Main CLI entry point
+│   ├── config.rs           # Configuration loading and parsing
+│   ├── types.rs            # Rust type definitions for payloads
+│   ├── hooks.rs            # Hook handler implementations
+│   ├── logger.rs           # Logging configuration
+│   ├── schema.rs           # JSON Schema generation
+│   ├── lib.rs              # Library exports
+│   └── default-config.yaml # Default configuration template
+├── .conclaude.yaml         # YAML configuration file
+├── flake.nix               # Nix development environment
+├── Cargo.toml              # Rust package manifest
 └── README.md
 ```
 
 ### Configuration Loading
 
-Configuration is loaded using cosmiconfig with YAML files:
+Configuration is loaded using native Rust YAML parsing with automatic directory tree search:
 
 1. `.conclaude.yaml` - Primary configuration file
 2. `.conclaude.yml` - Alternative YAML extension
 
-If no configuration file is found, conclaude will throw an error requiring you to run `conclaude init` first.
+The search starts from the current directory and moves up the directory tree until a configuration file is found or the project root (indicated by `package.json` presence) is reached.
+
+If no configuration file is found, conclaude will display the searched locations and suggest running `conclaude init` to generate a template configuration.
 
 ### Adding New Hooks
 
-1. Define payload interface in `types.ts`
-2. Add handler function in `index.ts`
-3. Create command definition
-4. Register command with yargs CLI
+1. Define payload struct in `src/types.rs`
+2. Add handler function in `src/hooks.rs`
+3. Create command variant in `src/main.rs`
+4. Register command with clap CLI parser
 
 ## Architecture
 
 ### Hook Processing Flow
 
 ```
-stdin JSON → readPayload() → validateFields() → handler() → HookResult → exit code
+stdin JSON → read_payload_from_stdin() → validate_base_payload() → handler() → HookResult → exit code
 ```
 
 ### Configuration Resolution
 
 ```
-.conclaude.yaml → YAML parsing → ConclaudeConfig interface
+.conclaude.yaml → serde_yaml parsing → ConclaudeConfig struct
 ```
 
 ### Command Execution (Stop Hook)
 
 ```
-config.stop.run → extractBashCommands() → Bun.spawn() → sequential execution → fail fast
+config.stop.run → extract_bash_commands() → tokio::process::Command → sequential execution → fail fast
+```
+
+## Features
+
+### Hook System
+
+- **PreToolUse**: Block or validate tool usage before execution
+- **PostToolUse**: Log and analyze tool results after execution
+- **Stop**: Run validation commands before session completion
+- **SessionStart**: Initialize session-specific logging and setup
+- **UserPromptSubmit**: Process and validate user input
+- **Notification**: Handle system notifications and alerts
+- **SubagentStop**: Manage subagent completion events
+- **PreCompact**: Handle transcript compaction preparation
+
+### Configuration Features
+
+- **YAML Configuration**: Human-readable configuration with JSON Schema validation
+- **File Protection**: Prevent edits to critical files using glob patterns
+- **Root Directory Protection**: Keep project root clean from unwanted files
+- **Command Validation**: Run custom validation commands (tests, linting, builds)
+- **Infinite Mode**: Continuous monitoring for long development sessions
+- **Rounds Mode**: Run validation for a specific number of iterations
+- **Grep Rules**: Content-based validation using pattern matching
+- **Tool Usage Validation**: Control which tools can operate on which files
+- **Git Worktree Integration**: Automatic branch and PR management
+
+### Performance & Reliability
+
+- **Fast Startup**: Minimal overhead with efficient Rust implementation
+- **Configuration Caching**: Avoid repeated file system operations
+- **Session Logging**: Comprehensive logging with session-specific output
+- **Error Recovery**: Graceful handling of command failures and invalid input
+- **Cross-Platform**: Works on Linux, macOS, and Windows
+
+## Command Line Interface
+
+### Available Commands
+
+```bash
+# Initialize configuration
+conclaude init [--force] [--config-path <path>] [--claude-path <path>]
+
+# Generate JSON Schema
+conclaude generate-schema [--output <path>] [--validate]
+
+# Hook handlers (called by Claude Code)
+conclaude PreToolUse
+conclaude PostToolUse
+conclaude Stop
+conclaude SessionStart
+conclaude UserPromptSubmit
+conclaude Notification
+conclaude SubagentStop
+conclaude PreCompact
+
+# Visualize configuration
+conclaude visualize [--rule <rule-name>] [--show-matches]
+
+# Global options
+--verbose              # Enable debug logging
+--disable-file-logging # Disable logging to temporary files
+```
+
+## Configuration Reference
+
+### Complete Configuration Schema
+
+```yaml
+# Stop hook configuration
+stop:
+  # Simple command format
+  run: |
+    cargo check
+    cargo test
+    cargo build
+  
+  # Alternative: structured commands with custom messages
+  commands:
+    - run: "cargo test"
+      message: "Tests failed - fix failing tests before continuing"
+    - run: "cargo build"
+      message: "Build failed - fix compilation errors"
+  
+  # Infinite mode - continue after successful validation
+  infinite: false
+  infiniteMessage: "Continue working on the task"
+  
+  # Rounds mode - run for specific iterations
+  rounds: 3
+  
+  # Content validation rules
+  grepRules:
+    - filePattern: "**/*.rs"
+      forbiddenPattern: "todo|fixme"
+      description: "No TODO or FIXME comments allowed"
+
+# File and directory protection rules
+rules:
+  # Prevent file creation at repository root
+  preventRootAdditions: true
+  
+  # Files that cannot be edited (glob patterns)
+  uneditableFiles:
+    - "Cargo.toml"
+    - "Cargo.lock"
+    - ".env*"
+    - "target/**"
+  
+  # Tool usage validation
+  toolUsageValidation:
+    - tool: "Write"
+      pattern: "**/*.rs"
+      action: "allow"
+      message: "Writing to Rust files is allowed"
+    - tool: "*"
+      pattern: ".env*"
+      action: "block"
+      message: "Environment files cannot be modified"
+
+# Pre-tool-use hook configuration
+preToolUse:
+  # Content validation before tool execution
+  grepRules:
+    - filePattern: "**/*.rs"
+      forbiddenPattern: "unsafe"
+      description: "Unsafe code blocks not allowed"
+  
+  # Additional directories to protect from additions
+  preventAdditions:
+    - "docs/"
+    - "examples/"
+
+# Git worktree integration
+gitWorktree:
+  enabled: false
+  autoCreatePR: false
+```
+
+### Environment Variables
+
+- `CONCLAUDE_LOG_LEVEL`: Set logging level (debug, info, warn, error)
+- `CONCLAUDE_DISABLE_FILE_LOGGING`: Disable logging to temporary files
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Development Setup
+
+1. Fork the repository
+2. Clone your fork: `git clone https://github.com/yourusername/conclaude.git`
+3. Create a feature branch: `git checkout -b feature-name`
+4. Make your changes and add tests
+5. Run the test suite: `cargo test`
+6. Run linting: `cargo clippy`
+7. Format code: `cargo fmt`
+8. Commit your changes: `git commit -am 'Add feature'`
+9. Push to the branch: `git push origin feature-name`
+10. Submit a Pull Request
+
+### Testing
+
+```bash
+# Run all tests
+cargo test
+
+# Run with output
+cargo test -- --nocapture
+
+# Run specific test
+cargo test test_name
+
+# Run integration tests
+cargo test --test integration
 ```
 
 ## License
 
-This project is part of the connix ecosystem and follows the same licensing terms.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Built with [Rust](https://www.rust-lang.org/) for performance and safety
+- Uses [serde](https://serde.rs/) for JSON/YAML serialization
+- CLI powered by [clap](https://clap.rs/)
+- Async runtime provided by [tokio](https://tokio.rs/)
+- Configuration validation with [schemars](https://docs.rs/schemars/)
+
+---
+
+**Note**: This is the Rust implementation of conclaude. For maximum performance and system integration, the Rust version is recommended over alternative implementations.
