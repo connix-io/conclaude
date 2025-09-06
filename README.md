@@ -7,8 +7,26 @@ A high-performance Rust CLI tool that provides essential guardrails for Claude C
 [![Crates.io](https://img.shields.io/crates/v/conclaude)](https://crates.io/crates/conclaude)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org)
+[![CI](https://github.com/connix-io/conclaude/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/connix-io/conclaude/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/connix-io/conclaude?display_name=tag&sort=semver)](https://github.com/connix-io/conclaude/releases)
 
 Born from real developer frustration, conclaude transforms chaotic AI coding sessions into controlled, validated workflows. It's not just another CLI tool—it's your project's guardian, ensuring that every Claude Code session respects your standards, follows your rules, and maintains your code quality.
+
+## Releases
+
+Official builds are published on GitHub Releases when tags matching `v*` are pushed. The CI builds with Nix and uploads a Linux x86_64 binary.
+
+- Latest binary: https://github.com/connix-io/conclaude/releases/latest/download/conclaude-linux-amd64
+- All releases: https://github.com/connix-io/conclaude/releases
+
+Quick install of latest Linux binary:
+
+```bash
+curl -L -o conclaude \
+  https://github.com/connix-io/conclaude/releases/latest/download/conclaude-linux-amd64
+chmod +x conclaude && sudo mv conclaude /usr/local/bin/
+conclaude --version
+```
 
 ## The Problem We Solve
 

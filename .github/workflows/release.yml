@@ -1,0 +1,50 @@
+name: Release (Nix)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+
+      - name: Setup Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build with Nix
+        run: |
+          nix build .#default
+
+      - name: Verify binary
+        run: ./result/bin/conclaude --version
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          cp ./result/bin/conclaude dist/conclaude-linux-amd64
+          chmod +x dist/conclaude-linux-amd64
+          echo "ASSET=dist/conclaude-linux-amd64" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

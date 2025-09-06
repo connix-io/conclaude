@@ -1,0 +1,48 @@
+name: CI (Nix)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+
+      - name: Setup Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Flake checker
+        uses: DeterminateSystems/flake-checker-action@v8
+
+      - name: Show Nix info
+        run: |
+          nix --version
+          nix flake show
+
+      - name: Format check (rustfmt)
+        run: nix develop -c cargo fmt --all -- --check
+
+      - name: Lint (clippy, deny warnings)
+        run: nix develop -c cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Tests
+        run: nix develop -c cargo test --all-features -- --nocapture
+
+      - name: Build package
+        run: |
+          nix build .#default
+          ./result/bin/conclaude --version
+
