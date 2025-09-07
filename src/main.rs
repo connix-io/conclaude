@@ -163,7 +163,7 @@ struct ClaudePermissions {
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ClaudeSettings {
     #[serde(rename = "includeCoAuthoredBy")]
-    include_co_authored_by: bool,
+    include_co_authored_by: Option<bool>,
     permissions: ClaudePermissions,
     hooks: std::collections::HashMap<String, Vec<ClaudeHookMatcher>>,
 }
@@ -229,7 +229,7 @@ async fn handle_init(
     } else {
         println!("\n📝 Creating Claude Code settings...");
         ClaudeSettings {
-            include_co_authored_by: false,
+            include_co_authored_by: Some(false),
             permissions: ClaudePermissions {
                 allow: Vec::new(),
                 deny: Vec::new(),
