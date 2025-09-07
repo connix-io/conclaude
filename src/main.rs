@@ -251,7 +251,9 @@ async fn handle_init(
     ];
 
     // Add hook configurations
-    let hooks = settings.hooks.get_or_insert_with(std::collections::HashMap::new);
+    let hooks = settings
+        .hooks
+        .get_or_insert_with(std::collections::HashMap::new);
     for hook_type in &hook_types {
         hooks.insert(
             (*hook_type).to_string(),

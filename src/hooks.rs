@@ -1,9 +1,9 @@
-use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig, GrepRule};
+use crate::config::{ConclaudeConfig, GrepRule, extract_bash_commands, load_conclaude_config};
 use crate::logger::create_session_logger;
 use crate::types::{
-    validate_base_payload, HookResult, LoggingConfig, NotificationPayload, PostToolUsePayload,
-    PreCompactPayload, PreToolUsePayload, SessionStartPayload, StopPayload, SubagentStopPayload,
-    UserPromptSubmitPayload,
+    HookResult, LoggingConfig, NotificationPayload, PostToolUsePayload, PreCompactPayload,
+    PreToolUsePayload, SessionStartPayload, StopPayload, SubagentStopPayload,
+    UserPromptSubmitPayload, validate_base_payload,
 };
 use anyhow::{Context, Result};
 use glob::Pattern;
@@ -13,8 +13,8 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::process::Command as TokioCommand;
 
 /// Cached configuration instance to avoid repeated loads
@@ -450,7 +450,9 @@ async fn execute_stop_commands(
                 if stdout.trim().is_empty() {
                     "    (no stdout)".to_string()
                 } else {
-                    stdout.trim().lines()
+                    stdout
+                        .trim()
+                        .lines()
                         .map(|line| format!("    {}", line))
                         .collect::<Vec<_>>()
                         .join("\n")
@@ -458,7 +460,9 @@ async fn execute_stop_commands(
                 if stderr.trim().is_empty() {
                     "    (no stderr)".to_string()
                 } else {
-                    stderr.trim().lines()
+                    stderr
+                        .trim()
+                        .lines()
                         .map(|line| format!("    {}", line))
                         .collect::<Vec<_>>()
                         .join("\n")
@@ -904,21 +908,25 @@ mod tests {
 
     #[test]
     fn test_matches_uneditable_pattern() {
-        assert!(matches_uneditable_pattern(
-            "package.json",
-            "package.json",
-            "/path/package.json",
-            "package.json"
-        )
-        .unwrap());
+        assert!(
+            matches_uneditable_pattern(
+                "package.json",
+                "package.json",
+                "/path/package.json",
+                "package.json"
+            )
+            .unwrap()
+        );
         assert!(matches_uneditable_pattern("test.md", "test.md", "/path/test.md", "*.md").unwrap());
-        assert!(matches_uneditable_pattern(
-            "src/index.ts",
-            "src/index.ts",
-            "/path/src/index.ts",
-            "src/**/*.ts"
-        )
-        .unwrap());
+        assert!(
+            matches_uneditable_pattern(
+                "src/index.ts",
+                "src/index.ts",
+                "/path/src/index.ts",
+                "src/**/*.ts"
+            )
+            .unwrap()
+        );
         assert!(
             !matches_uneditable_pattern("other.txt", "other.txt", "/path/other.txt", "*.md")
                 .unwrap()

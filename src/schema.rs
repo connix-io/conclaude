@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use schemars::schema_for;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fs;
 use std::path::PathBuf;
 

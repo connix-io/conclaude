@@ -31,9 +31,11 @@ fn test_get_log_file_path() {
     let filename = path.file_name().unwrap().to_str().unwrap();
     assert!(filename.starts_with("conclaude-"));
     assert!(filename.contains("sess-test-session-123"));
-    assert!(std::path::Path::new(filename)
-        .extension()
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("jsonl")));
+    assert!(
+        std::path::Path::new(filename)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("jsonl"))
+    );
 }
 
 #[test]
