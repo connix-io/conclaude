@@ -165,7 +165,7 @@ struct ClaudeSettings {
     #[serde(rename = "includeCoAuthoredBy")]
     include_co_authored_by: Option<bool>,
     permissions: Option<ClaudePermissions>,
-    hooks: std::collections::HashMap<String, Vec<ClaudeHookMatcher>>,
+    hooks: Option<std::collections::HashMap<String, Vec<ClaudeHookMatcher>>>,
 }
 
 /// Handles Init command to set up conclaude configuration and Claude Code hooks.
@@ -234,7 +234,7 @@ async fn handle_init(
                 allow: Vec::new(),
                 deny: Vec::new(),
             }),
-            hooks: std::collections::HashMap::new(),
+            hooks: Some(std::collections::HashMap::new()),
         }
     };
 
@@ -251,8 +251,9 @@ async fn handle_init(
     ];
 
     // Add hook configurations
+    let hooks = settings.hooks.get_or_insert_with(std::collections::HashMap::new);
     for hook_type in &hook_types {
-        settings.hooks.insert(
+        hooks.insert(
             (*hook_type).to_string(),
             vec![ClaudeHookMatcher {
                 matcher: String::new(),
