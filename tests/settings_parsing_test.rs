@@ -22,9 +22,14 @@ struct ClaudePermissions {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ClaudeSettings {
-    #[serde(rename = "includeCoAuthoredBy")]
+    #[serde(
+        rename = "includeCoAuthoredBy",
+        skip_serializing_if = "Option::is_none"
+    )]
     include_co_authored_by: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     permissions: Option<ClaudePermissions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     hooks: Option<std::collections::HashMap<String, Vec<ClaudeHookMatcher>>>,
 }
 
@@ -115,4 +120,98 @@ fn test_parse_real_world_settings() {
     assert_eq!(permissions.allow.len(), 2);
     assert_eq!(permissions.deny.len(), 1);
     assert!(settings.hooks.is_none());
+}
+
+#[test]
+fn test_serialize_settings_omits_none_fields() {
+    // Test that None fields are omitted from serialization
+    let settings = ClaudeSettings {
+        include_co_authored_by: None,
+        permissions: Some(ClaudePermissions {
+            allow: vec!["Write:**.md".to_string()],
+            deny: vec![],
+        }),
+        hooks: None,
+    };
+
+    let serialized = serde_json::to_string(&settings).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+    // Verify that includeCoAuthoredBy is NOT present in the JSON
+    assert!(
+        !json
+            .as_object()
+            .unwrap()
+            .contains_key("includeCoAuthoredBy"),
+        "includeCoAuthoredBy should not be present when None"
+    );
+
+    // Verify that hooks is NOT present in the JSON
+    assert!(
+        !json.as_object().unwrap().contains_key("hooks"),
+        "hooks should not be present when None"
+    );
+
+    // Verify that permissions IS present since it has a value
+    assert!(
+        json.as_object().unwrap().contains_key("permissions"),
+        "permissions should be present when Some"
+    );
+}
+
+#[test]
+fn test_serialize_settings_includes_some_fields() {
+    // Test that Some fields are included in serialization
+    let settings = ClaudeSettings {
+        include_co_authored_by: Some(true),
+        permissions: Some(ClaudePermissions {
+            allow: vec![],
+            deny: vec![],
+        }),
+        hooks: Some(std::collections::HashMap::new()),
+    };
+
+    let serialized = serde_json::to_string(&settings).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+    // Verify that includeCoAuthoredBy IS present and has correct value
+    assert!(
+        json.as_object()
+            .unwrap()
+            .contains_key("includeCoAuthoredBy"),
+        "includeCoAuthoredBy should be present when Some"
+    );
+    assert_eq!(
+        json["includeCoAuthoredBy"],
+        serde_json::Value::Bool(true),
+        "includeCoAuthoredBy should have correct value"
+    );
+
+    // Verify that hooks IS present
+    assert!(
+        json.as_object().unwrap().contains_key("hooks"),
+        "hooks should be present when Some"
+    );
+
+    // Verify that permissions IS present
+    assert!(
+        json.as_object().unwrap().contains_key("permissions"),
+        "permissions should be present when Some"
+    );
+}
+
+#[test]
+fn test_serialize_minimal_settings() {
+    // Test that minimal settings with all None fields produces empty JSON object
+    let settings = ClaudeSettings {
+        include_co_authored_by: None,
+        permissions: None,
+        hooks: None,
+    };
+
+    let serialized = serde_json::to_string(&settings).unwrap();
+    assert_eq!(
+        serialized, "{}",
+        "Minimal settings should serialize to empty JSON object"
+    );
 }
