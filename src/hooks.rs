@@ -543,9 +543,11 @@ pub async fn handle_stop() -> Result<HookResult> {
 
     let config = get_config().await?;
 
-    // Check stop hook grep rules first
-    if let Some(result) = execute_grep_rules(&config.stop.grep_rules)? {
-        return Ok(result);
+    // Check stop hook grep rules first (only if rules exist and are not empty)
+    if !config.stop.grep_rules.is_empty() {
+        if let Some(result) = execute_grep_rules(&config.stop.grep_rules)? {
+            return Ok(result);
+        }
     }
 
     // Snapshot root directory if preventRootAdditions is enabled

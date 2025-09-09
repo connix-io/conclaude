@@ -35,7 +35,7 @@
         inherit src;
         strictDeps = true;
         pname = "conclaude";
-        version = "0.1.1";
+        version = "0.1.2";
       };
 
       rooted = exec:
