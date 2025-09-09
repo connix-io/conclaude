@@ -1,5 +1,3 @@
-use serde_json;
-
 // Replicate the structs from main.rs for testing
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ClaudeHookConfig {
