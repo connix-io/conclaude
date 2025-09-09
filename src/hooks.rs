@@ -1,4 +1,4 @@
-use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig, GrepRule};
+use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig};
 use crate::logger::create_session_logger;
 use crate::types::{
     validate_base_payload, HookResult, LoggingConfig, NotificationPayload, PostToolUsePayload,
@@ -122,11 +122,6 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
 
         // Check if file is auto-generated and should not be edited
         if let Some(result) = check_auto_generated_file(&payload).await? {
-            return Ok(result);
-        }
-
-        // Check PreToolUse grep rules for the file being modified
-        if let Some(result) = check_pre_tool_use_grep_rules(&payload).await? {
             return Ok(result);
         }
     }
@@ -543,13 +538,6 @@ pub async fn handle_stop() -> Result<HookResult> {
 
     let config = get_config().await?;
 
-    // Check stop hook grep rules first (only if rules exist and are not empty)
-    if !config.stop.grep_rules.is_empty() {
-        if let Some(result) = execute_grep_rules(&config.stop.grep_rules)? {
-            return Ok(result);
-        }
-    }
-
     // Snapshot root directory if preventRootAdditions is enabled
     let root_snapshot = if config.rules.prevent_root_additions {
         Some(snapshot_root_directory()?)
@@ -674,40 +662,6 @@ async fn check_tool_usage_rules(payload: &PreToolUsePayload) -> Result<Option<Ho
     Ok(None)
 }
 
-/// Check `PreToolUse` grep rules for the file being modified
-///
-/// # Errors
-///
-/// Returns an error if configuration loading fails, glob pattern creation fails, or regex compilation fails.
-async fn check_pre_tool_use_grep_rules(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
-    let config = get_config().await?;
-
-    // Early return if no rules are configured
-    if config.pre_tool_use.grep_rules.is_empty() {
-        return Ok(None);
-    }
-
-    if let Some(file_path) = extract_file_path(&payload.tool_input) {
-        for rule in &config.pre_tool_use.grep_rules {
-            if Pattern::new(&rule.file_pattern)?.matches(&file_path) {
-                // Read the file and check for forbidden pattern
-                if let Ok(content) = fs::read_to_string(&file_path) {
-                    let regex = regex::Regex::new(&rule.forbidden_pattern)?;
-                    if regex.is_match(&content) {
-                        let message = format!(
-                            "File {} contains forbidden pattern: {}",
-                            file_path, rule.description
-                        );
-                        return Ok(Some(HookResult::blocked(message)));
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(None)
-}
-
 /// Check if file contains auto-generated markers
 ///
 /// Returns the marker found if file contains generation markers, None otherwise
@@ -806,56 +760,6 @@ pub async fn check_auto_generated_file(payload: &PreToolUsePayload) -> Result<Op
         );
 
         return Ok(Some(HookResult::blocked(message)));
-    }
-
-    Ok(None)
-}
-
-/// Execute grep rules on the entire codebase
-///
-/// # Errors
-///
-/// Returns an error if glob pattern creation fails or regex compilation fails.
-fn execute_grep_rules(rules: &[GrepRule]) -> Result<Option<HookResult>> {
-    // Early return if no rules are configured
-    if rules.is_empty() {
-        return Ok(None);
-    }
-
-    use walkdir::WalkDir;
-
-    for rule in rules {
-        let pattern = Pattern::new(&rule.file_pattern)?;
-        let regex = regex::Regex::new(&rule.forbidden_pattern)?;
-
-        for entry in WalkDir::new(".")
-            .into_iter()
-            .filter_map(std::result::Result::ok)
-        {
-            if entry.file_type().is_file() {
-                let path = entry.path();
-                if pattern.matches(&path.to_string_lossy()) {
-                    if let Ok(content) = fs::read_to_string(path) {
-                        if let Some(match_found) = regex.find(&content) {
-                            let line_num = content[..match_found.start()]
-                                .chars()
-                                .filter(|&c| c == '\n')
-                                .count()
-                                + 1;
-
-                            let message = format!(
-                                "Grep rule violation: {} at {}:{} - {}",
-                                rule.forbidden_pattern,
-                                path.display(),
-                                line_num,
-                                rule.description
-                            );
-                            return Ok(Some(HookResult::blocked(message)));
-                        }
-                    }
-                }
-            }
-        }
     }
 
     Ok(None)
@@ -962,80 +866,5 @@ mod tests {
 
         tool_input.clear();
         assert_eq!(extract_file_path(&tool_input), None);
-    }
-
-    #[test]
-    fn test_execute_grep_rules_empty() {
-        // Test that empty grep rules should not block
-        let empty_rules: Vec<GrepRule> = vec![];
-        let result = execute_grep_rules(&empty_rules).unwrap();
-        assert!(
-            result.is_none(),
-            "Empty grep rules should not block (return None)"
-        );
-    }
-
-    #[test]
-    fn test_execute_grep_rules_with_non_matching_pattern() {
-        // Create a test file
-        let test_file = "test_grep_rule_file.txt";
-        std::fs::write(test_file, "This is a test file with safe content").unwrap();
-
-        let rules = vec![GrepRule {
-            file_pattern: "*.txt".to_string(),
-            forbidden_pattern: "FORBIDDEN_PATTERN".to_string(),
-            description: "Test rule".to_string(),
-        }];
-
-        let result = execute_grep_rules(&rules).unwrap();
-        assert!(result.is_none(), "Non-matching pattern should not block");
-
-        // Clean up
-        std::fs::remove_file(test_file).ok();
-    }
-
-    #[test]
-    fn test_execute_grep_rules_with_unknown_pattern() {
-        // Create a test file that contains "unknown"
-        let test_file = "test_api.ts";
-        std::fs::write(test_file, "const type: unknown = getData();").unwrap();
-
-        // Test with a rule that searches for "unknown" (TypeScript unknown type)
-        let rules = vec![GrepRule {
-            file_pattern: "*.ts".to_string(),
-            forbidden_pattern: "unknown".to_string(),
-            description: "Unknown types are not allowed".to_string(),
-        }];
-
-        let result = execute_grep_rules(&rules).unwrap();
-
-        // This should block since the file contains "unknown"
-        assert!(
-            result.is_some(),
-            "Should block when forbidden pattern is found"
-        );
-
-        if let Some(hook_result) = result {
-            assert!(
-                hook_result.blocked.unwrap_or(false),
-                "Result should be blocked"
-            );
-            assert!(
-                hook_result.message.is_some(),
-                "Should have an error message"
-            );
-            let message = hook_result.message.unwrap();
-            assert!(
-                message.contains("unknown"),
-                "Message should mention the forbidden pattern"
-            );
-            assert!(
-                message.contains("test_api.ts"),
-                "Message should mention the file"
-            );
-        }
-
-        // Clean up
-        std::fs::remove_file(test_file).ok();
     }
 }

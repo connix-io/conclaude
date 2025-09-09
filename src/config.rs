@@ -6,16 +6,6 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-/// Configuration interface for grep rules
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct GrepRule {
-    #[serde(rename = "filePattern")]
-    pub file_pattern: String,
-    #[serde(rename = "forbiddenPattern")]
-    pub forbidden_pattern: String,
-    pub description: String,
-}
-
 /// Configuration for individual stop commands with optional messages
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct StopCommand {
@@ -37,8 +27,6 @@ pub struct StopConfig {
     pub infinite_message: Option<String>,
     #[serde(default)]
     pub rounds: Option<u32>,
-    #[serde(default, rename = "grepRules")]
-    pub grep_rules: Vec<GrepRule>,
 }
 
 /// Configuration interface for validation rules
@@ -79,8 +67,6 @@ fn default_true() -> bool {
 /// Configuration for pre tool use hooks
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 pub struct PreToolUseConfig {
-    #[serde(default, rename = "grepRules")]
-    pub grep_rules: Vec<GrepRule>,
     #[serde(default, rename = "preventAdditions")]
     pub prevent_additions: Vec<String>,
     #[serde(default = "default_true", rename = "preventGeneratedFileEdits")]

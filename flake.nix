@@ -71,17 +71,32 @@
           '';
           description = "Run clippy";
         };
+
+        claude-researcher = {
+          type = "script";
+          exec = rooted ''
+            cd "$REPO_ROOT"
+            claude --dangerously-skip-permissions --mcp-config ./.claude/mcp/researcher.mcp.json $@
+          '';
+          description = "Run Claude Researcher.";
+        };
       };
 
       scriptPackages =
         pkgs.lib.mapAttrs
         (
-          name: script:
-            pkgs.writeShellApplication {
-              inherit name;
-              text = script.exec;
-              runtimeInputs = script.deps or [];
-            }
+          name: script: let
+            scriptType = script.type or "app";
+          in
+            if scriptType == "script"
+            then pkgs.writeShellScriptBin name script.exec
+            else
+              pkgs.writeShellApplication {
+                inherit name;
+                bashOptions = scripts.baseOptions or ["errexit" "pipefail" "nounset"];
+                text = script.exec;
+                runtimeInputs = script.deps or [];
+              }
         )
         scripts;
     in {

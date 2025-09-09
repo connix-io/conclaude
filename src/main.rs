@@ -419,36 +419,12 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                     }
                 }
             }
-            "grepRules" => {
-                println!("🔍 Grep Rules (Stop Hook):");
-                if config.stop.grep_rules.is_empty() {
-                    println!("   No grep rules configured for stop hook");
-                } else {
-                    for rule in &config.stop.grep_rules {
-                        println!("   File Pattern: {}", rule.file_pattern);
-                        println!("   Forbidden Pattern: {}", rule.forbidden_pattern);
-                        println!("   Description: {}", rule.description);
-                    }
-                }
-
-                println!("\n🔍 Grep Rules (PreToolUse Hook):");
-                if config.pre_tool_use.grep_rules.is_empty() {
-                    println!("   No grep rules configured for pre-tool-use hook");
-                } else {
-                    for rule in &config.pre_tool_use.grep_rules {
-                        println!("   File Pattern: {}", rule.file_pattern);
-                        println!("   Forbidden Pattern: {}", rule.forbidden_pattern);
-                        println!("   Description: {}", rule.description);
-                    }
-                }
-            }
             _ => {
                 println!("❌ Unknown rule: {rule_name}");
                 println!("\nAvailable rules:");
                 println!("   - uneditableFiles");
                 println!("   - preventRootAdditions");
                 println!("   - toolUsageValidation");
-                println!("   - grepRules");
             }
         }
     } else {
@@ -465,14 +441,6 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
         println!(
             "🔧 Tool Usage Validation: {} rules",
             config.rules.tool_usage_validation.len()
-        );
-        println!(
-            "🔍 Stop Hook Grep Rules: {} rules",
-            config.stop.grep_rules.len()
-        );
-        println!(
-            "🔍 PreToolUse Grep Rules: {} rules",
-            config.pre_tool_use.grep_rules.len()
         );
         println!("♾️  Infinite Mode: {}", config.stop.infinite);
         if let Some(rounds) = config.stop.rounds {
