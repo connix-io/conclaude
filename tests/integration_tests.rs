@@ -17,7 +17,6 @@ fn test_cli_help_command() {
     assert!(stdout.contains("init"));
 }
 
-
 #[test]
 fn test_cli_init_command() {
     let temp_dir = tempdir().expect("Failed to create temp directory");
