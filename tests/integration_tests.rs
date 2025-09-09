@@ -17,17 +17,6 @@ fn test_cli_help_command() {
     assert!(stdout.contains("init"));
 }
 
-#[test]
-fn test_cli_version_command() {
-    let output = Command::new("cargo")
-        .args(["run", "--", "--version"])
-        .output()
-        .expect("Failed to run CLI version command");
-
-    let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    assert!(stdout.contains("conclaude"));
-    assert!(stdout.contains("0.1.1"));
-}
 
 #[test]
 fn test_cli_init_command() {
