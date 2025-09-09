@@ -1,9 +1,9 @@
-use crate::config::{ConclaudeConfig, GrepRule, extract_bash_commands, load_conclaude_config};
+use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig, GrepRule};
 use crate::logger::create_session_logger;
 use crate::types::{
-    HookResult, LoggingConfig, NotificationPayload, PostToolUsePayload, PreCompactPayload,
-    PreToolUsePayload, SessionStartPayload, StopPayload, SubagentStopPayload,
-    UserPromptSubmitPayload, validate_base_payload,
+    validate_base_payload, HookResult, LoggingConfig, NotificationPayload, PostToolUsePayload,
+    PreCompactPayload, PreToolUsePayload, SessionStartPayload, StopPayload, SubagentStopPayload,
+    UserPromptSubmitPayload,
 };
 use anyhow::{Context, Result};
 use glob::Pattern;
@@ -13,8 +13,8 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::OnceLock;
 use tokio::process::Command as TokioCommand;
 
 /// Cached configuration instance to avoid repeated loads
@@ -819,7 +819,7 @@ fn execute_grep_rules(rules: &[GrepRule]) -> Result<Option<HookResult>> {
     if rules.is_empty() {
         return Ok(None);
     }
-    
+
     use walkdir::WalkDir;
 
     for rule in rules {
@@ -918,25 +918,21 @@ mod tests {
 
     #[test]
     fn test_matches_uneditable_pattern() {
-        assert!(
-            matches_uneditable_pattern(
-                "package.json",
-                "package.json",
-                "/path/package.json",
-                "package.json"
-            )
-            .unwrap()
-        );
+        assert!(matches_uneditable_pattern(
+            "package.json",
+            "package.json",
+            "/path/package.json",
+            "package.json"
+        )
+        .unwrap());
         assert!(matches_uneditable_pattern("test.md", "test.md", "/path/test.md", "*.md").unwrap());
-        assert!(
-            matches_uneditable_pattern(
-                "src/index.ts",
-                "src/index.ts",
-                "/path/src/index.ts",
-                "src/**/*.ts"
-            )
-            .unwrap()
-        );
+        assert!(matches_uneditable_pattern(
+            "src/index.ts",
+            "src/index.ts",
+            "/path/src/index.ts",
+            "src/**/*.ts"
+        )
+        .unwrap());
         assert!(
             !matches_uneditable_pattern("other.txt", "other.txt", "/path/other.txt", "*.md")
                 .unwrap()
@@ -971,7 +967,10 @@ mod tests {
         // Test that empty grep rules should not block
         let empty_rules: Vec<GrepRule> = vec![];
         let result = execute_grep_rules(&empty_rules).unwrap();
-        assert!(result.is_none(), "Empty grep rules should not block (return None)");
+        assert!(
+            result.is_none(),
+            "Empty grep rules should not block (return None)"
+        );
     }
 
     #[test]
@@ -979,16 +978,16 @@ mod tests {
         // Create a test file
         let test_file = "test_grep_rule_file.txt";
         std::fs::write(test_file, "This is a test file with safe content").unwrap();
-        
+
         let rules = vec![GrepRule {
             file_pattern: "*.txt".to_string(),
             forbidden_pattern: "FORBIDDEN_PATTERN".to_string(),
             description: "Test rule".to_string(),
         }];
-        
+
         let result = execute_grep_rules(&rules).unwrap();
         assert!(result.is_none(), "Non-matching pattern should not block");
-        
+
         // Clean up
         std::fs::remove_file(test_file).ok();
     }
@@ -998,27 +997,42 @@ mod tests {
         // Create a test file that contains "unknown"
         let test_file = "test_api.ts";
         std::fs::write(test_file, "const type: unknown = getData();").unwrap();
-        
+
         // Test with a rule that searches for "unknown" (TypeScript unknown type)
         let rules = vec![GrepRule {
             file_pattern: "*.ts".to_string(),
             forbidden_pattern: "unknown".to_string(),
             description: "Unknown types are not allowed".to_string(),
         }];
-        
+
         let result = execute_grep_rules(&rules).unwrap();
-        
+
         // This should block since the file contains "unknown"
-        assert!(result.is_some(), "Should block when forbidden pattern is found");
-        
+        assert!(
+            result.is_some(),
+            "Should block when forbidden pattern is found"
+        );
+
         if let Some(hook_result) = result {
-            assert!(hook_result.blocked.unwrap_or(false), "Result should be blocked");
-            assert!(hook_result.message.is_some(), "Should have an error message");
+            assert!(
+                hook_result.blocked.unwrap_or(false),
+                "Result should be blocked"
+            );
+            assert!(
+                hook_result.message.is_some(),
+                "Should have an error message"
+            );
             let message = hook_result.message.unwrap();
-            assert!(message.contains("unknown"), "Message should mention the forbidden pattern");
-            assert!(message.contains("test_api.ts"), "Message should mention the file");
+            assert!(
+                message.contains("unknown"),
+                "Message should mention the forbidden pattern"
+            );
+            assert!(
+                message.contains("test_api.ts"),
+                "Message should mention the file"
+            );
         }
-        
+
         // Clean up
         std::fs::remove_file(test_file).ok();
     }
