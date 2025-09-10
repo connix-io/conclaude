@@ -37,7 +37,7 @@ type GitWorktreeConfig struct {
 // ConclaudeConfig represents main configuration interface matching the TypeScript version.
 type ConclaudeConfig struct {
 	Stop        StopConfig             `json:"stop" yaml:"stop" jsonschema:"title=Stop configuration,description=Configuration for stop hooks"`
-	Rules       rules.RulesConfig      `json:"rules" yaml:"rules" jsonschema:"title=Rules configuration,description=Configuration for validation rules"`
+	Rules       rules.Config           `json:"rules" yaml:"rules" jsonschema:"title=Rules configuration,description=Configuration for validation rules"`
 	PreToolUse  rules.PreToolUseConfig `json:"preToolUse" yaml:"preToolUse" jsonschema:"title=PreToolUse configuration,description=Configuration for pre-tool-use hooks"`
 	GitWorktree GitWorktreeConfig      `json:"gitWorktree" yaml:"gitWorktree" jsonschema:"title=Git worktree configuration,description=Configuration for git worktree functionality"`
 }
@@ -51,7 +51,7 @@ func DefaultConfig() ConclaudeConfig {
 			Infinite: false,
 			Rounds:   nil,
 		},
-		Rules: rules.RulesConfig{
+		Rules: rules.Config{
 			PreventRootAdditions: true,
 			UneditableFiles:      []string{},
 			ToolUsageValidation:  []rules.ToolUsageRule{},

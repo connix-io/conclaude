@@ -1,27 +1,27 @@
 // Package claude provides Claude Code settings structure and related types.
 package claude
 
-// ClaudeSettings represents Claude Code settings structure for init command.
-type ClaudeSettings struct {
-	IncludeCoAuthoredBy *bool                          `json:"includeCoAuthoredBy,omitempty"`
-	Permissions         *ClaudePermissions             `json:"permissions,omitempty"`
-	Hooks               map[string][]ClaudeHookMatcher `json:"hooks,omitempty"`
+// Settings represents Claude Code settings structure for init command.
+type Settings struct {
+	CoAuthor    *bool                    `json:"includeCoAuthoredBy,omitempty"`
+	Permissions *Permissions             `json:"permissions,omitempty"`
+	Hooks       map[string][]HookMatcher `json:"hooks,omitempty"`
 }
 
-// ClaudePermissions represents permissions configuration.
-type ClaudePermissions struct {
+// Permissions represents permissions configuration.
+type Permissions struct {
 	Allow []string `json:"allow"`
 	Deny  []string `json:"deny"`
 }
 
-// ClaudeHookMatcher represents hook matcher configuration.
-type ClaudeHookMatcher struct {
-	Matcher string             `json:"matcher"`
-	Hooks   []ClaudeHookConfig `json:"hooks"`
+// HookMatcher represents hook matcher configuration.
+type HookMatcher struct {
+	Matcher string       `json:"matcher"`
+	Hooks   []HookConfig `json:"hooks"`
 }
 
-// ClaudeHookConfig represents individual hook configuration.
-type ClaudeHookConfig struct {
+// HookConfig represents individual hook configuration.
+type HookConfig struct {
 	Type    string `json:"type"`
 	Command string `json:"command"`
 }

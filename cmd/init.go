@@ -104,7 +104,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Handle settings.json
-	var settings claude.ClaudeSettings
+	var settings claude.Settings
 	// Validate settingsPath to prevent path traversal attacks
 	if data, err := os.ReadFile(settingsPath); err == nil { // nolint:gosec
 		if err := json.Unmarshal(data, &settings); err != nil {
@@ -116,12 +116,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 		)
 	} else {
 		fmt.Printf("\n%s Creating Claude Code settings...\n", color.New(color.FgBlue).Sprint("📝"))
-		settings = claude.ClaudeSettings{
-			Permissions: &claude.ClaudePermissions{
+		settings = claude.Settings{
+			Permissions: &claude.Permissions{
 				Allow: []string{},
 				Deny:  []string{},
 			},
-			Hooks: make(map[string][]claude.ClaudeHookMatcher),
+			Hooks: make(map[string][]claude.HookMatcher),
 		}
 	}
 
@@ -139,14 +139,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Add hook configurations
 	if settings.Hooks == nil {
-		settings.Hooks = make(map[string][]claude.ClaudeHookMatcher)
+		settings.Hooks = make(map[string][]claude.HookMatcher)
 	}
 
 	for _, hookType := range hookTypes {
-		settings.Hooks[hookType] = []claude.ClaudeHookMatcher{
+		settings.Hooks[hookType] = []claude.HookMatcher{
 			{
 				Matcher: "",
-				Hooks: []claude.ClaudeHookConfig{
+				Hooks: []claude.HookConfig{
 					{
 						Type:    "command",
 						Command: "conclaude " + hookType,

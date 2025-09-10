@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/connix-io/conclaude/internal/types"
+	"github.com/connix-io/conclaude/internal/hookdata"
 )
 
 const (
@@ -22,7 +22,7 @@ var (
 )
 
 // CreateSessionLogger creates a session-specific logger and sets it as the default.
-func CreateSessionLogger(sessionID string, config *types.LoggingConfig) error {
+func CreateSessionLogger(sessionID string, config *hookdata.LoggingConfig) error {
 	loggerMutex.Lock()
 	defer loggerMutex.Unlock()
 

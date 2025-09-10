@@ -1,5 +1,5 @@
-// Package types provides core data structures and configuration.
-package types
+// Package hookdata provides core data structures and configuration for hooks.
+package hookdata
 
 // LoggingConfig represents configuration options for controlling logger
 // behavior.
