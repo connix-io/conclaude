@@ -16,7 +16,7 @@ var (
 	loggerMutex   sync.RWMutex
 )
 
-// CreateSessionLogger creates a session-specific logger and sets it as the default
+// CreateSessionLogger creates a session-specific logger and sets it as the default.
 func CreateSessionLogger(sessionID string, config *types.LoggingConfig) error {
 	loggerMutex.Lock()
 	defer loggerMutex.Unlock()
@@ -57,7 +57,7 @@ func CreateSessionLogger(sessionID string, config *types.LoggingConfig) error {
 	return nil
 }
 
-// GetLogger returns the current logger instance
+// GetLogger returns the current logger instance.
 func GetLogger() *slog.Logger {
 	loggerMutex.RLock()
 	defer loggerMutex.RUnlock()
@@ -69,7 +69,7 @@ func GetLogger() *slog.Logger {
 	return slog.Default()
 }
 
-// getLogLevel converts environment variable to slog.Level
+// getLogLevel converts environment variable to slog.Level.
 func getLogLevel() slog.Level {
 	logLevel := os.Getenv("CONCLAUDE_LOG_LEVEL")
 	switch logLevel {
@@ -86,7 +86,7 @@ func getLogLevel() slog.Level {
 	}
 }
 
-// createLogFile creates a log file for the session
+// createLogFile creates a log file for the session.
 func createLogFile(sessionID string) (*os.File, error) {
 	tmpDir := os.TempDir()
 	logDir := filepath.Join(tmpDir, "conclaude-logs")

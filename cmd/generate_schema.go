@@ -15,7 +15,7 @@ var (
 	schemaValidate bool
 )
 
-// generateSchemaCmd represents the generate-schema command
+// generateSchemaCmd represents the generate-schema command.
 var generateSchemaCmd = &cobra.Command{
 	Use:   "generate-schema",
 	Short: "Generate JSON Schema for conclaude configuration",

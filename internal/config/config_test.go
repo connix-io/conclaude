@@ -266,7 +266,7 @@ func TestExtractBashCommands(t *testing.T) {
 	}
 }
 
-// Helper function to create string pointer
+// Helper function to create string pointer.
 func stringPtr(s string) *string {
 	return &s
 }

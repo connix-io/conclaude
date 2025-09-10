@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// preToolUseCmd represents the PreToolUse command
+// preToolUseCmd represents the PreToolUse command.
 var preToolUseCmd = &cobra.Command{
 	Use:   "PreToolUse",
 	Short: "Process PreToolUse hook - fired before tool execution",
@@ -15,7 +15,7 @@ var preToolUseCmd = &cobra.Command{
 	},
 }
 
-// postToolUseCmd represents the PostToolUse command
+// postToolUseCmd represents the PostToolUse command.
 var postToolUseCmd = &cobra.Command{
 	Use:   "PostToolUse",
 	Short: "Process PostToolUse hook - fired after tool execution",
@@ -25,7 +25,7 @@ var postToolUseCmd = &cobra.Command{
 	},
 }
 
-// notificationCmd represents the Notification command
+// notificationCmd represents the Notification command.
 var notificationCmd = &cobra.Command{
 	Use:   "Notification",
 	Short: "Process Notification hook - fired for system notifications",
@@ -35,7 +35,7 @@ var notificationCmd = &cobra.Command{
 	},
 }
 
-// userPromptSubmitCmd represents the UserPromptSubmit command
+// userPromptSubmitCmd represents the UserPromptSubmit command.
 var userPromptSubmitCmd = &cobra.Command{
 	Use:   "UserPromptSubmit",
 	Short: "Process UserPromptSubmit hook - fired when user submits input",
@@ -45,7 +45,7 @@ var userPromptSubmitCmd = &cobra.Command{
 	},
 }
 
-// sessionStartCmd represents the SessionStart command
+// sessionStartCmd represents the SessionStart command.
 var sessionStartCmd = &cobra.Command{
 	Use:   "SessionStart",
 	Short: "Process SessionStart hook - fired when session begins",
@@ -55,7 +55,7 @@ var sessionStartCmd = &cobra.Command{
 	},
 }
 
-// stopCmd represents the Stop command
+// stopCmd represents the Stop command.
 var stopCmd = &cobra.Command{
 	Use:   "Stop",
 	Short: "Process Stop hook - fired when session terminates",
@@ -65,7 +65,7 @@ var stopCmd = &cobra.Command{
 	},
 }
 
-// subagentStopCmd represents the SubagentStop command
+// subagentStopCmd represents the SubagentStop command.
 var subagentStopCmd = &cobra.Command{
 	Use:   "SubagentStop",
 	Short: "Process SubagentStop hook - fired when subagent completes",
@@ -75,7 +75,7 @@ var subagentStopCmd = &cobra.Command{
 	},
 }
 
-// preCompactCmd represents the PreCompact command
+// preCompactCmd represents the PreCompact command.
 var preCompactCmd = &cobra.Command{
 	Use:   "PreCompact",
 	Short: "Process PreCompact hook - fired before transcript compaction",

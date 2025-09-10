@@ -70,14 +70,14 @@ type PreToolUsePayload struct {
 // PostToolUsePayload represents payload for PostToolUse hook.
 type PostToolUsePayload struct {
 	BasePayload
-	ToolName     string                 `json:"tool_name"`
+	ToolName     string         `json:"tool_name"`
 	ToolInput    map[string]any `json:"tool_input"`
-	ToolResponse ToolResponse           `json:"tool_response"`
+	ToolResponse ToolResponse   `json:"tool_response"`
 }
 
 // ToolResponse represents the response from a tool execution.
 type ToolResponse struct {
-	Success *bool                  `json:"success,omitempty"`
+	Success *bool          `json:"success,omitempty"`
 	Data    map[string]any `json:"-"`
 }
 
@@ -124,32 +124,32 @@ func (t ToolResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(result)
 }
 
-// NotificationPayload represents payload for Notification hook
+// NotificationPayload represents payload for Notification hook.
 type NotificationPayload struct {
 	BasePayload
 	Message string  `json:"message"`
 	Title   *string `json:"title,omitempty"`
 }
 
-// StopPayload represents payload for Stop hook
+// StopPayload represents payload for Stop hook.
 type StopPayload struct {
 	BasePayload
 	StopHookActive bool `json:"stop_hook_active"`
 }
 
-// SubagentStopPayload represents payload for SubagentStop hook
+// SubagentStopPayload represents payload for SubagentStop hook.
 type SubagentStopPayload struct {
 	BasePayload
 	StopHookActive bool `json:"stop_hook_active"`
 }
 
-// UserPromptSubmitPayload represents payload for UserPromptSubmit hook
+// UserPromptSubmitPayload represents payload for UserPromptSubmit hook.
 type UserPromptSubmitPayload struct {
 	BasePayload
 	Prompt string `json:"prompt"`
 }
 
-// CompactTrigger represents the trigger type for compaction
+// CompactTrigger represents the trigger type for compaction.
 type CompactTrigger string
 
 const (
@@ -159,13 +159,13 @@ const (
 	CompactTriggerAuto CompactTrigger = "auto"
 )
 
-// PreCompactPayload represents payload for PreCompact hook
+// PreCompactPayload represents payload for PreCompact hook.
 type PreCompactPayload struct {
 	BasePayload
 	Trigger CompactTrigger `json:"trigger"`
 }
 
-// SessionStartPayload represents payload for SessionStart hook
+// SessionStartPayload represents payload for SessionStart hook.
 type SessionStartPayload struct {
 	BasePayload
 	Source string `json:"source"`

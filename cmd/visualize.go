@@ -16,7 +16,7 @@ var (
 	visualizeShowMatches bool
 )
 
-// visualizeCmd represents the visualize command
+// visualizeCmd represents the visualize command.
 var visualizeCmd = &cobra.Command{
 	Use:   "visualize",
 	Short: "Visualize file/directory settings from configuration",
@@ -64,6 +64,7 @@ func visualizeSpecificRule(cfg *config.ConclaudeConfig, ruleName string) error {
 		fmt.Println("   - uneditableFiles")
 		fmt.Println("   - preventRootAdditions")
 		fmt.Println("   - toolUsageValidation")
+
 		return nil
 	}
 }
@@ -73,6 +74,7 @@ func visualizeUneditableFiles(cfg *config.ConclaudeConfig) error {
 
 	if len(cfg.Rules.UneditableFiles) == 0 {
 		fmt.Println("   No uneditable files configured")
+
 		return nil
 	}
 
@@ -99,6 +101,7 @@ func visualizeUneditableFiles(cfg *config.ConclaudeConfig) error {
 					fmt.Printf("      - %s\n", path)
 					found = true
 				}
+
 				return nil
 			})
 
@@ -141,6 +144,7 @@ func visualizeToolUsageValidation(cfg *config.ConclaudeConfig) error {
 
 	if len(cfg.Rules.ToolUsageValidation) == 0 {
 		fmt.Println("   No tool usage validation rules configured")
+
 		return nil
 	}
 

@@ -19,7 +19,7 @@ var (
 	initSchemaURL  string
 )
 
-// initCmd represents the init command
+// initCmd represents the init command.
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize conclaude configuration and Claude Code hooks",
