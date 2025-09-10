@@ -1,5 +1,5 @@
 {
-  description = "A development shell for go";
+  description = "Conclaude Flake";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
@@ -18,12 +18,6 @@
         inherit system;
         overlays = [
           (final: prev: {
-            # Add your overlays here
-            # Example:
-            # my-overlay = final: prev: {
-            #   my-package = prev.callPackage ./my-package { };
-            # };
-            final.buildGoModule = prev.buildGo125Module;
             buildGoModule = prev.buildGo125Module;
           })
         ];
@@ -107,14 +101,13 @@
 
       packages = {
         default = pkgs.buildGoModule {
-          pname = "my-go-project";
-          version = "0.0.1";
+          pname = "conclaude";
+          version = "0.1.3";
           src = self;
-          vendorHash = null;
+          vendorHash = "sha256-q0t1k8MYuGgYOSGIbfB1BzSTpqSNpACdsCw16646djI=";
           meta = with pkgs.lib; {
-            description = "My Go project";
-            homepage = "https://github.com/conneroisu/my-go-project";
-            license = licenses.asl20;
+            description = "Conclaude";
+            homepage = "https://github.com/connix-io/conclaude";
             maintainers = with maintainers; [connerohnesorge];
           };
         };

@@ -7,6 +7,8 @@ import (
 
 	"github.com/connix-io/conclaude/internal/config"
 	"github.com/invopop/jsonschema"
+	jsonschemavalidator "github.com/santhosh-tekuri/jsonschema/v6"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -33,7 +35,7 @@ func GenerateSchema() (string, error) {
 	// Set schema metadata
 	schema.Title = "Conclaude Configuration"
 	schema.Description = "Configuration schema for conclaude hook handler"
-	schema.Version = "http://json-schema.org/draft-07/schema#"
+	// Remove the Version field - let the library handle it
 
 	schemaBytes, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
@@ -45,7 +47,8 @@ func GenerateSchema() (string, error) {
 
 // WriteSchemaToFile writes the JSON schema to a file.
 func WriteSchemaToFile(schema string, filePath string) error {
-	if err := os.WriteFile(filePath, []byte(schema), SchemaFilePermission); err != nil {
+	err := os.WriteFile(filePath, []byte(schema), SchemaFilePermission)
+	if err != nil {
 		return fmt.Errorf(
 			"failed to write schema to file %s: %w",
 			filePath,
@@ -59,11 +62,57 @@ func WriteSchemaToFile(schema string, filePath string) error {
 // ValidateConfigAgainstSchema validates a YAML config string against the
 // JSON schema.
 func ValidateConfigAgainstSchema(configYAML string) error {
-	// For now, we'll do basic validation by attempting to unmarshal
-	// In a full implementation, you'd use a proper JSON schema validator
-	var config config.ConclaudeConfig
+	// First, convert YAML to JSON for validation
+	var yamlData interface{}
+	err := yaml.Unmarshal([]byte(configYAML), &yamlData)
+	if err != nil {
+		return fmt.Errorf("failed to parse YAML: %w", err)
+	}
 
-	return json.Unmarshal([]byte(configYAML), &config)
+	jsonData, err := json.Marshal(yamlData)
+	if err != nil {
+		return fmt.Errorf("failed to convert YAML to JSON: %w", err)
+	}
+
+	// Generate the schema
+	schemaStr, err := GenerateSchema()
+	if err != nil {
+		return fmt.Errorf("failed to generate schema: %w", err)
+	}
+
+	// Parse schema to add as resource
+	var schemaDoc interface{}
+	if err := json.Unmarshal([]byte(schemaStr), &schemaDoc); err != nil {
+		return fmt.Errorf("failed to parse schema: %w", err)
+	}
+	
+	// Compile the schema using the v6 API
+	compiler := jsonschemavalidator.NewCompiler()
+	compiler.DefaultDraft(jsonschemavalidator.Draft7)
+	
+	// Add the schema as a resource
+	if err := compiler.AddResource("schema.json", schemaDoc); err != nil {
+		return fmt.Errorf("failed to add schema resource: %w", err)
+	}
+	
+	// Compile the schema
+	schema, err := compiler.Compile("schema.json")
+	if err != nil {
+		return fmt.Errorf("failed to compile schema: %w", err)
+	}
+
+	// Parse the JSON data for validation
+	var instance interface{}
+	if err := json.Unmarshal(jsonData, &instance); err != nil {
+		return fmt.Errorf("failed to parse JSON for validation: %w", err)
+	}
+
+	// Validate against the schema
+	if err := schema.Validate(instance); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
+	return nil
 }
 
 // GenerateYAMLLanguageServerHeader generates the YAML language server header.
