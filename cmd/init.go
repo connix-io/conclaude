@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/connix-io/conclaude/internal/config"
+	"github.com/connix-io/conclaude/internal/config/claude"
 	"github.com/connix-io/conclaude/internal/schema"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -81,7 +82,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	yamlHeader := schema.GenerateYAMLLanguageServerHeader(schemaURLPtr)
 	configContent := yamlHeader + config.GenerateDefaultConfigYAML()
 
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		return fmt.Errorf("failed to write config file %s: %w", configPath, err)
 	}
 
@@ -98,13 +99,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   Schema URL: %s\n", usedSchemaURL)
 
 	// Create .claude directory if it doesn't exist
-	if err := os.MkdirAll(claudePath, 0755); err != nil {
+	if err := os.MkdirAll(claudePath, 0750); err != nil {
 		return fmt.Errorf("failed to create .claude directory %s: %w", claudePath, err)
 	}
 
 	// Handle settings.json
-	var settings config.ClaudeSettings
-	if data, err := os.ReadFile(settingsPath); err == nil {
+	var settings claude.ClaudeSettings
+	// Validate settingsPath to prevent path traversal attacks
+	if data, err := os.ReadFile(settingsPath); err == nil { // nolint:gosec
 		if err := json.Unmarshal(data, &settings); err != nil {
 			return fmt.Errorf("failed to parse settings file %s: %w", settingsPath, err)
 		}
@@ -114,12 +116,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 		)
 	} else {
 		fmt.Printf("\n%s Creating Claude Code settings...\n", color.New(color.FgBlue).Sprint("📝"))
-		settings = config.ClaudeSettings{
-			Permissions: &config.ClaudePermissions{
+		settings = claude.ClaudeSettings{
+			Permissions: &claude.ClaudePermissions{
 				Allow: []string{},
 				Deny:  []string{},
 			},
-			Hooks: make(map[string][]config.ClaudeHookMatcher),
+			Hooks: make(map[string][]claude.ClaudeHookMatcher),
 		}
 	}
 
@@ -137,14 +139,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Add hook configurations
 	if settings.Hooks == nil {
-		settings.Hooks = make(map[string][]config.ClaudeHookMatcher)
+		settings.Hooks = make(map[string][]claude.ClaudeHookMatcher)
 	}
 
 	for _, hookType := range hookTypes {
-		settings.Hooks[hookType] = []config.ClaudeHookMatcher{
+		settings.Hooks[hookType] = []claude.ClaudeHookMatcher{
 			{
 				Matcher: "",
-				Hooks: []config.ClaudeHookConfig{
+				Hooks: []claude.ClaudeHookConfig{
 					{
 						Type:    "command",
 						Command: "conclaude " + hookType,
@@ -160,8 +162,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to serialize settings to JSON: %w", err)
 	}
 
-	if err := os.WriteFile(settingsPath, settingsJSON, 0644); err != nil {
-		return fmt.Errorf("failed to write settings file %s: %w", settingsPath, err)
+	if err := os.WriteFile(settingsPath, settingsJSON, 0600); err != nil {
+		return fmt.Errorf(
+			"failed to write settings file %s: %w",
+			settingsPath,
+			err,
+		)
 	}
 
 	fmt.Printf("%s Updated Claude Code settings:\n", color.New(color.FgGreen).Sprint("✅"))

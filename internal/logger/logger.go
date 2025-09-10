@@ -11,6 +11,11 @@ import (
 	"github.com/connix-io/conclaude/internal/types"
 )
 
+const (
+	// defaultLogDirPermissions defines the default permissions for log directories (rwxr-x---)
+	defaultLogDirPermissions = 0750
+)
+
 var (
 	defaultLogger *slog.Logger
 	loggerMutex   sync.RWMutex
@@ -90,12 +95,13 @@ func getLogLevel() slog.Level {
 func createLogFile(sessionID string) (*os.File, error) {
 	tmpDir := os.TempDir()
 	logDir := filepath.Join(tmpDir, "conclaude-logs")
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, defaultLogDirPermissions); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
 
 	logFile := filepath.Join(logDir, fmt.Sprintf("conclaude-%s.log", sessionID))
-	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	// Validate logFile path to prevent path traversal attacks
+	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600) // nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}

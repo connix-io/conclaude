@@ -9,7 +9,16 @@ import (
 	"github.com/invopop/jsonschema"
 )
 
-const DefaultSchemaURL = "https://raw.githubusercontent.com/connix-io/conclaude/main/conclaude-schema.json"
+const (
+	DefaultSchemaURL = "https://raw.githubusercontent.com/connix-io/conclaude/" +
+		"main/conclaude-schema.json"
+
+	// File permission constants
+	SchemaFilePermission = 0600
+
+	// String constants
+	EmptyString = ""
+)
 
 // GenerateSchema generates JSON schema for the ConclaudeConfig.
 func GenerateSchema() (string, error) {
@@ -36,14 +45,19 @@ func GenerateSchema() (string, error) {
 
 // WriteSchemaToFile writes the JSON schema to a file.
 func WriteSchemaToFile(schema string, filePath string) error {
-	if err := os.WriteFile(filePath, []byte(schema), 0644); err != nil {
-		return fmt.Errorf("failed to write schema to file %s: %w", filePath, err)
+	if err := os.WriteFile(filePath, []byte(schema), SchemaFilePermission); err != nil {
+		return fmt.Errorf(
+			"failed to write schema to file %s: %w",
+			filePath,
+			err,
+		)
 	}
 
 	return nil
 }
 
-// ValidateConfigAgainstSchema validates a YAML config string against the JSON schema.
+// ValidateConfigAgainstSchema validates a YAML config string against the
+// JSON schema.
 func ValidateConfigAgainstSchema(configYAML string) error {
 	// For now, we'll do basic validation by attempting to unmarshal
 	// In a full implementation, you'd use a proper JSON schema validator
@@ -55,7 +69,7 @@ func ValidateConfigAgainstSchema(configYAML string) error {
 // GenerateYAMLLanguageServerHeader generates the YAML language server header.
 func GenerateYAMLLanguageServerHeader(customSchemaURL *string) string {
 	schemaURL := DefaultSchemaURL
-	if customSchemaURL != nil && *customSchemaURL != "" {
+	if customSchemaURL != nil && *customSchemaURL != EmptyString {
 		schemaURL = *customSchemaURL
 	}
 

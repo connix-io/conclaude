@@ -45,6 +45,12 @@
           exec = rooted ''$EDITOR "$REPO_ROOT"/go.mod'';
           description = "Edit go.mod";
         };
+        lint = {
+          exec = rooted ''
+            golangci-lint run "$REPO_ROOT"
+          '';
+          description = "Lint";
+        };
       };
 
       scriptPackages =

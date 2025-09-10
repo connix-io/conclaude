@@ -10,40 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "go run . Notification"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "go run . SubagentStop"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "go run . PreToolUse"
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "go run . PreCompact"
+            "command": "conclaude Notification"
           }
         ]
       }
@@ -54,29 +21,29 @@
         "hooks": [
           {
             "type": "command",
-            "command": "go run . PostToolUse"
+            "command": "conclaude PostToolUse"
           }
         ]
       }
     ],
-    "Stop": [
+    "PreCompact": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "go run . Stop"
+            "command": "conclaude PreCompact"
           }
         ]
       }
     ],
-    "UserPromptSubmit": [
+    "PreToolUse": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "go run . UserPromptSubmit"
+            "command": "conclaude PreToolUse"
           }
         ]
       }
@@ -87,7 +54,40 @@
         "hooks": [
           {
             "type": "command",
-            "command": "go run . SessionStart"
+            "command": "conclaude SessionStart"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "conclaude Stop"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "conclaude SubagentStop"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "conclaude UserPromptSubmit"
           }
         ]
       }

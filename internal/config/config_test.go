@@ -31,7 +31,10 @@ func TestDefaultConfig(t *testing.T) {
 	}
 
 	if config.GitWorktree.Enabled != false {
-		t.Errorf("Expected GitWorktree.Enabled to be false, got %v", config.GitWorktree.Enabled)
+		t.Errorf(
+			"Expected GitWorktree.Enabled to be false, got %v",
+			config.GitWorktree.Enabled,
+		)
 	}
 }
 
@@ -46,7 +49,8 @@ func TestGenerateDefaultConfigYAML(t *testing.T) {
 
 	// Test that it matches default config
 	defaultConfig := DefaultConfig()
-	if config.Rules.PreventRootAdditions != defaultConfig.Rules.PreventRootAdditions {
+	if config.Rules.PreventRootAdditions !=
+		defaultConfig.Rules.PreventRootAdditions {
 		t.Error("YAML config doesn't match default config")
 	}
 }
@@ -69,7 +73,8 @@ func TestLoadConfigNotFound(t *testing.T) {
 
 	// Should return default config when no file found
 	defaultConfig := DefaultConfig()
-	if config.Rules.PreventRootAdditions != defaultConfig.Rules.PreventRootAdditions {
+	if config.Rules.PreventRootAdditions !=
+		defaultConfig.Rules.PreventRootAdditions {
 		t.Error("Expected default config when no file found")
 	}
 }
@@ -96,7 +101,11 @@ stop:
 `
 
 	configPath := filepath.Join(tempDir, ".conclaude.yaml")
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(
+		configPath,
+		[]byte(configContent),
+		0600,
+	); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
@@ -118,7 +127,10 @@ stop:
 	}
 
 	if len(config.Rules.UneditableFiles) != 2 {
-		t.Errorf("Expected 2 uneditable files, got %d", len(config.Rules.UneditableFiles))
+		t.Errorf(
+			"Expected 2 uneditable files, got %d",
+			len(config.Rules.UneditableFiles),
+		)
 	}
 }
 
@@ -252,14 +264,23 @@ func TestExtractBashCommands(t *testing.T) {
 			result := ExtractBashCommands(tt.input)
 
 			if len(result) != len(tt.expected) {
-				t.Errorf("Expected %d commands, got %d", len(tt.expected), len(result))
+				t.Errorf(
+					"Expected %d commands, got %d",
+					len(tt.expected),
+					len(result),
+				)
 
 				return
 			}
 
 			for i, expected := range tt.expected {
 				if i >= len(result) || result[i] != expected {
-					t.Errorf("Expected command[%d] to be %q, got %q", i, expected, result[i])
+					t.Errorf(
+						"Expected command[%d] to be %q, got %q",
+						i,
+						expected,
+						result[i],
+					)
 				}
 			}
 		})
