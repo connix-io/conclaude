@@ -13,10 +13,10 @@ import (
 )
 
 var (
-	initConfigPath *string
-	initClaudePath *string
+	initConfigPath string
+	initClaudePath string
 	initForce      bool
-	initSchemaURL  *string
+	initSchemaURL  string
 )
 
 // initCmd represents the init command
@@ -46,13 +46,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	configPath := filepath.Join(cwd, ".conclaude.yaml")
-	if initConfigPath != nil && *initConfigPath != "" {
-		configPath = *initConfigPath
+	if initConfigPath != "" {
+		configPath = initConfigPath
 	}
 
 	claudePath := filepath.Join(cwd, ".claude")
-	if initClaudePath != nil && *initClaudePath != "" {
-		claudePath = *initClaudePath
+	if initClaudePath != "" {
+		claudePath = initClaudePath
 	}
 
 	settingsPath := filepath.Join(claudePath, "settings.json")
@@ -74,7 +74,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create .conclaude.yaml with YAML language server header
-	yamlHeader := schema.GenerateYAMLLanguageServerHeader(initSchemaURL)
+	var schemaURLPtr *string
+	if initSchemaURL != "" {
+		schemaURLPtr = &initSchemaURL
+	}
+	yamlHeader := schema.GenerateYAMLLanguageServerHeader(schemaURLPtr)
 	configContent := yamlHeader + config.GenerateDefaultConfigYAML()
 
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
@@ -88,8 +92,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   %s\n", configPath)
 	defaultSchemaURL := schema.GetSchemaURL()
 	usedSchemaURL := defaultSchemaURL
-	if initSchemaURL != nil && *initSchemaURL != "" {
-		usedSchemaURL = *initSchemaURL
+	if initSchemaURL != "" {
+		usedSchemaURL = initSchemaURL
 	}
 	fmt.Printf("   Schema URL: %s\n", usedSchemaURL)
 
@@ -143,7 +147,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 				Hooks: []config.ClaudeHookConfig{
 					{
 						Type:    "command",
-						Command: fmt.Sprintf("conclaude %s", hookType),
+						Command: "conclaude " + hookType,
 					},
 				},
 			},

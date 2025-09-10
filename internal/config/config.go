@@ -1,3 +1,4 @@
+// Package config provides configuration management for conclaude hooks and rules.
 package config
 
 import (
@@ -15,7 +16,7 @@ type StopCommand struct {
 	Message *string `json:"message,omitempty" yaml:"message,omitempty" jsonschema:"title=Optional message,description=Message to display when command runs"`
 }
 
-// StopConfig represents configuration interface for stop hook commands
+// StopConfig represents configuration interface for stop hook commands.
 type StopConfig struct {
 	Run             string        `json:"run" yaml:"run" jsonschema:"title=Simple command,description=Single command to run on stop"`
 	Commands        []StopCommand `json:"commands" yaml:"commands" jsonschema:"title=Stop commands,description=List of commands to run on stop"`
@@ -24,7 +25,7 @@ type StopConfig struct {
 	Rounds          *uint32       `json:"rounds,omitempty" yaml:"rounds,omitempty" jsonschema:"title=Number of rounds,description=Number of rounds to run before stopping"`
 }
 
-// ToolUsageRule represents tool usage validation rule
+// ToolUsageRule represents tool usage validation rule.
 type ToolUsageRule struct {
 	Tool    string  `json:"tool" yaml:"tool" jsonschema:"title=Tool name,description=Name of the tool to validate"`
 	Pattern string  `json:"pattern" yaml:"pattern" jsonschema:"title=Pattern to match,description=Regular expression or glob pattern to match against tool usage"`
@@ -32,7 +33,7 @@ type ToolUsageRule struct {
 	Message *string `json:"message,omitempty" yaml:"message,omitempty" jsonschema:"title=Custom message,description=Custom message to display when rule triggers"`
 }
 
-// RulesConfig represents configuration interface for validation rules
+// RulesConfig represents configuration interface for validation rules.
 type RulesConfig struct {
 	PreventRootAdditions bool            `json:"preventRootAdditions" yaml:"preventRootAdditions" jsonschema:"title=Prevent root additions,description=Prevent adding files to repository root,default=true"`
 	UneditableFiles      []string        `json:"uneditableFiles" yaml:"uneditableFiles" jsonschema:"title=Uneditable files,description=List of file patterns that cannot be edited"`
@@ -103,6 +104,7 @@ func LoadConfig() (*ConclaudeConfig, error) {
 		candidatePath := filepath.Join(currentDir, ".conclaude.yaml")
 		if _, err := os.Stat(candidatePath); err == nil {
 			configPath = candidatePath
+
 			break
 		}
 
@@ -117,6 +119,7 @@ func LoadConfig() (*ConclaudeConfig, error) {
 	if configPath == "" {
 		// No config file found, return default config
 		config := DefaultConfig()
+
 		return &config, nil
 	}
 

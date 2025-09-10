@@ -1,3 +1,4 @@
+// Package cmd contains command-line interface implementations for conclaude.
 package cmd
 
 import (
@@ -20,12 +21,12 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// Set logging level environment variable
 		if verbose {
-			os.Setenv("CONCLAUDE_LOG_LEVEL", "debug")
+			_ = os.Setenv("CONCLAUDE_LOG_LEVEL", "debug")
 		}
 
 		// Set file logging environment variable based on CLI flag
 		if disableFileLogging {
-			os.Setenv("CONCLAUDE_DISABLE_FILE_LOGGING", "true")
+			_ = os.Setenv("CONCLAUDE_DISABLE_FILE_LOGGING", "true")
 		}
 	},
 }

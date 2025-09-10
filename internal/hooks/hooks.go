@@ -27,6 +27,7 @@ func getConfig() (*config.ConclaudeConfig, error) {
 	configMutex.RLock()
 	if cachedConfig != nil {
 		defer configMutex.RUnlock()
+
 		return cachedConfig, nil
 	}
 	configMutex.RUnlock()
@@ -45,6 +46,7 @@ func getConfig() (*config.ConclaudeConfig, error) {
 	}
 
 	cachedConfig = cfg
+
 	return cachedConfig, nil
 }
 
@@ -76,6 +78,7 @@ func HandleHookResult(handler func() (types.HookResult, error)) error {
 	}
 
 	os.Exit(0)
+
 	return nil // Never reached
 }
 
@@ -86,7 +89,7 @@ func HandlePreToolUse() (types.HookResult, error) {
 		return types.HookResult{}, err
 	}
 
-	if err := payload.BasePayload.Validate(); err != nil {
+	if err := payload.Validate(); err != nil {
 		return types.HookResult{}, err
 	}
 
@@ -116,6 +119,7 @@ func HandlePreToolUse() (types.HookResult, error) {
 	for _, tool := range fileModifyingTools {
 		if payload.ToolName == tool {
 			isFileModifying = true
+
 			break
 		}
 	}
@@ -156,6 +160,7 @@ func checkToolUsageRules(payload *types.PreToolUsePayload) (*types.HookResult, e
 				"rule", rule.Tool,
 				"pattern", rule.Pattern,
 				"error", err)
+
 			continue
 		}
 
@@ -168,6 +173,7 @@ func checkToolUsageRules(payload *types.PreToolUsePayload) (*types.HookResult, e
 					message = *rule.Message
 				}
 				result := types.NewBlockedResult(message)
+
 				return &result, nil
 			}
 		}
@@ -223,6 +229,7 @@ func checkFileValidationRules(payload *types.PreToolUsePayload) (*types.HookResu
 			slog.Warn("Invalid glob pattern in uneditable files",
 				"pattern", pattern,
 				"error", err)
+
 			continue
 		}
 
@@ -271,7 +278,7 @@ func HandlePostToolUse() (types.HookResult, error) {
 		return types.HookResult{}, err
 	}
 
-	if err := payload.BasePayload.Validate(); err != nil {
+	if err := payload.Validate(); err != nil {
 		return types.HookResult{}, err
 	}
 
@@ -295,7 +302,7 @@ func HandleNotification() (types.HookResult, error) {
 		return types.HookResult{}, err
 	}
 
-	if err := payload.BasePayload.Validate(); err != nil {
+	if err := payload.Validate(); err != nil {
 		return types.HookResult{}, err
 	}
 
@@ -320,7 +327,7 @@ func HandleUserPromptSubmit() (types.HookResult, error) {
 		return types.HookResult{}, err
 	}
 
-	if err := payload.BasePayload.Validate(); err != nil {
+	if err := payload.Validate(); err != nil {
 		return types.HookResult{}, err
 	}
 
@@ -343,7 +350,7 @@ func HandleSessionStart() (types.HookResult, error) {
 		return types.HookResult{}, err
 	}
 
-	if err := payload.BasePayload.Validate(); err != nil {
+	if err := payload.Validate(); err != nil {
 		return types.HookResult{}, err
 	}
 
@@ -367,7 +374,7 @@ func HandleStop() (types.HookResult, error) {
 		return types.HookResult{}, err
 	}
 
-	if err := payload.BasePayload.Validate(); err != nil {
+	if err := payload.Validate(); err != nil {
 		return types.HookResult{}, err
 	}
 
@@ -391,7 +398,7 @@ func HandleSubagentStop() (types.HookResult, error) {
 		return types.HookResult{}, err
 	}
 
-	if err := payload.BasePayload.Validate(); err != nil {
+	if err := payload.Validate(); err != nil {
 		return types.HookResult{}, err
 	}
 
@@ -415,7 +422,7 @@ func HandlePreCompact() (types.HookResult, error) {
 		return types.HookResult{}, err
 	}
 
-	if err := payload.BasePayload.Validate(); err != nil {
+	if err := payload.Validate(); err != nil {
 		return types.HookResult{}, err
 	}
 

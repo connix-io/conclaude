@@ -1,81 +1,87 @@
+// Package types provides data structures and constants for hook payloads and configuration.
 package types
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 )
 
-// LoggingConfig represents configuration options for controlling logger behavior
+// LoggingConfig represents configuration options for controlling logger
+// behavior.
 type LoggingConfig struct {
 	FileLogging bool `json:"file_logging" yaml:"file_logging"`
 }
 
-// HookResult represents response structure returned by hook handlers to control execution flow
+// HookResult represents response structure returned by hook handlers to
+// control execution flow.
 type HookResult struct {
 	Message *string `json:"message,omitempty"`
 	Blocked *bool   `json:"blocked,omitempty"`
 }
 
-// NewSuccessResult creates a successful hook result
+// NewSuccessResult creates a successful hook result.
 func NewSuccessResult() HookResult {
 	blocked := false
+
 	return HookResult{
 		Blocked: &blocked,
 	}
 }
 
-// NewBlockedResult creates a blocked hook result with a message
+// NewBlockedResult creates a blocked hook result with a message.
 func NewBlockedResult(message string) HookResult {
 	blocked := true
+
 	return HookResult{
 		Message: &message,
 		Blocked: &blocked,
 	}
 }
 
-// BasePayload represents base fields present in all hook payloads
+// BasePayload represents base fields present in all hook payloads.
 type BasePayload struct {
 	SessionID      string `json:"session_id"`
 	TranscriptPath string `json:"transcript_path"`
 	HookEventName  string `json:"hook_event_name"`
 }
 
-// Validate validates the base payload fields
+// Validate validates the base payload fields.
 func (b *BasePayload) Validate() error {
 	if b.SessionID == "" {
-		return fmt.Errorf("missing required field: session_id")
+		return errors.New("missing required field: session_id")
 	}
 	if b.TranscriptPath == "" {
-		return fmt.Errorf("missing required field: transcript_path")
+		return errors.New("missing required field: transcript_path")
 	}
 	if b.HookEventName == "" {
-		return fmt.Errorf("missing required field: hook_event_name")
+		return errors.New("missing required field: hook_event_name")
 	}
+
 	return nil
 }
 
-// PreToolUsePayload represents payload for PreToolUse hook
+// PreToolUsePayload represents payload for PreToolUse hook.
 type PreToolUsePayload struct {
 	BasePayload
 	ToolName  string         `json:"tool_name"`
 	ToolInput map[string]any `json:"tool_input"`
 }
 
-// PostToolUsePayload represents payload for PostToolUse hook
+// PostToolUsePayload represents payload for PostToolUse hook.
 type PostToolUsePayload struct {
 	BasePayload
 	ToolName     string                 `json:"tool_name"`
-	ToolInput    map[string]interface{} `json:"tool_input"`
+	ToolInput    map[string]any `json:"tool_input"`
 	ToolResponse ToolResponse           `json:"tool_response"`
 }
 
-// ToolResponse represents the response from a tool execution
+// ToolResponse represents the response from a tool execution.
 type ToolResponse struct {
 	Success *bool                  `json:"success,omitempty"`
-	Data    map[string]interface{} `json:"-"`
+	Data    map[string]any `json:"-"`
 }
 
-// UnmarshalJSON custom unmarshaler for ToolResponse to handle flattened data
+// UnmarshalJSON custom unmarshaler for ToolResponse to handle flattened data.
 func (t *ToolResponse) UnmarshalJSON(data []byte) error {
 	type Alias ToolResponse
 	aux := &struct {
@@ -89,7 +95,7 @@ func (t *ToolResponse) UnmarshalJSON(data []byte) error {
 	}
 
 	// Unmarshal the entire JSON into a map
-	var fullData map[string]interface{}
+	var fullData map[string]any
 	if err := json.Unmarshal(data, &fullData); err != nil {
 		return err
 	}
@@ -101,9 +107,9 @@ func (t *ToolResponse) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON custom marshaler for ToolResponse to flatten data
+// MarshalJSON custom marshaler for ToolResponse to flatten data.
 func (t ToolResponse) MarshalJSON() ([]byte, error) {
-	result := make(map[string]interface{})
+	result := make(map[string]any)
 
 	// Add all data fields
 	for k, v := range t.Data {
@@ -147,8 +153,10 @@ type UserPromptSubmitPayload struct {
 type CompactTrigger string
 
 const (
+	// CompactTriggerManual represents manual compaction trigger.
 	CompactTriggerManual CompactTrigger = "manual"
-	CompactTriggerAuto   CompactTrigger = "auto"
+	// CompactTriggerAuto represents automatic compaction trigger.
+	CompactTriggerAuto CompactTrigger = "auto"
 )
 
 // PreCompactPayload represents payload for PreCompact hook

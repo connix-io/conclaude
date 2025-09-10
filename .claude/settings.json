@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo run Notification"
+            "command": "go run . Notification"
           }
         ]
       }
@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo run SubagentStop"
+            "command": "go run . SubagentStop"
           }
         ]
       }
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo run PreToolUse"
+            "command": "go run . PreToolUse"
           }
         ]
       }
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo run PreCompact"
+            "command": "go run . PreCompact"
           }
         ]
       }
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo run PostToolUse"
+            "command": "go run . PostToolUse"
           }
         ]
       }
@@ -65,7 +65,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo run Stop"
+            "command": "go run . Stop"
           }
         ]
       }
@@ -76,7 +76,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo run UserPromptSubmit"
+            "command": "go run . UserPromptSubmit"
           }
         ]
       }
@@ -87,7 +87,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo run SessionStart"
+            "command": "go run . SessionStart"
           }
         ]
       }

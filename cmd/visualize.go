@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	visualizeRule        *string
+	visualizeRule        string
 	visualizeShowMatches bool
 )
 
@@ -43,8 +43,8 @@ func runVisualize(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	if visualizeRule != nil && *visualizeRule != "" {
-		return visualizeSpecificRule(cfg, *visualizeRule)
+	if visualizeRule != "" {
+		return visualizeSpecificRule(cfg, visualizeRule)
 	}
 
 	return visualizeAllRules(cfg)
@@ -83,6 +83,7 @@ func visualizeUneditableFiles(cfg *config.ConclaudeConfig) error {
 			globPattern, err := glob.Compile(pattern)
 			if err != nil {
 				fmt.Printf("      Error: Invalid pattern - %v\n", err)
+
 				continue
 			}
 

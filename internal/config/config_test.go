@@ -12,21 +12,21 @@ func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
 
 	// Test default values
-	if config.Rules.PreventRootAdditions != true {
+	if !config.Rules.PreventRootAdditions {
 		t.Errorf(
 			"Expected PreventRootAdditions to be true, got %v",
 			config.Rules.PreventRootAdditions,
 		)
 	}
 
-	if config.PreToolUse.PreventGeneratedFileEdits != true {
+	if !config.PreToolUse.PreventGeneratedFileEdits {
 		t.Errorf(
 			"Expected PreventGeneratedFileEdits to be true, got %v",
 			config.PreToolUse.PreventGeneratedFileEdits,
 		)
 	}
 
-	if config.Stop.Infinite != false {
+	if config.Stop.Infinite {
 		t.Errorf("Expected Infinite to be false, got %v", config.Stop.Infinite)
 	}
 
@@ -47,7 +47,7 @@ func TestGenerateDefaultConfigYAML(t *testing.T) {
 	// Test that it matches default config
 	defaultConfig := DefaultConfig()
 	if config.Rules.PreventRootAdditions != defaultConfig.Rules.PreventRootAdditions {
-		t.Errorf("YAML config doesn't match default config")
+		t.Error("YAML config doesn't match default config")
 	}
 }
 
@@ -60,7 +60,7 @@ func TestLoadConfigNotFound(t *testing.T) {
 	if err := os.Chdir(tempDir); err != nil {
 		t.Fatalf("Failed to change directory: %v", err)
 	}
-	defer os.Chdir(originalDir)
+	defer func() { _ = os.Chdir(originalDir) }()
 
 	config, err := LoadConfig()
 	if err != nil {
@@ -70,7 +70,7 @@ func TestLoadConfigNotFound(t *testing.T) {
 	// Should return default config when no file found
 	defaultConfig := DefaultConfig()
 	if config.Rules.PreventRootAdditions != defaultConfig.Rules.PreventRootAdditions {
-		t.Errorf("Expected default config when no file found")
+		t.Error("Expected default config when no file found")
 	}
 }
 
@@ -82,7 +82,7 @@ func TestLoadConfigWithFile(t *testing.T) {
 	if err := os.Chdir(tempDir); err != nil {
 		t.Fatalf("Failed to change directory: %v", err)
 	}
-	defer os.Chdir(originalDir)
+	defer func() { _ = os.Chdir(originalDir) }()
 
 	// Create a test config file
 	configContent := `
@@ -165,11 +165,12 @@ func TestExtractFilePath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ExtractFilePath(tt.input)
 
-			if tt.expected == nil && result != nil {
+			switch {
+			case tt.expected == nil && result != nil:
 				t.Errorf("Expected nil, got %s", *result)
-			} else if tt.expected != nil && result == nil {
+			case tt.expected != nil && result == nil:
 				t.Errorf("Expected %s, got nil", *tt.expected)
-			} else if tt.expected != nil && result != nil && *tt.expected != *result {
+			case tt.expected != nil && result != nil && *tt.expected != *result:
 				t.Errorf("Expected %s, got %s", *tt.expected, *result)
 			}
 		})
@@ -252,6 +253,7 @@ func TestExtractBashCommands(t *testing.T) {
 
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected %d commands, got %d", len(tt.expected), len(result))
+
 				return
 			}
 

@@ -44,6 +44,7 @@ func CreateSessionLogger(sessionID string, config *types.LoggingConfig) error {
 			if a.Key == slog.TimeKey {
 				a.Value = slog.StringValue(a.Value.Time().UTC().Format("2006-01-02T15:04:05.000Z"))
 			}
+
 			return a
 		},
 	})
@@ -64,6 +65,7 @@ func GetLogger() *slog.Logger {
 	if defaultLogger != nil {
 		return defaultLogger
 	}
+
 	return slog.Default()
 }
 

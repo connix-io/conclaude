@@ -39,6 +39,7 @@ func WriteSchemaToFile(schema string, filePath string) error {
 	if err := os.WriteFile(filePath, []byte(schema), 0644); err != nil {
 		return fmt.Errorf("failed to write schema to file %s: %w", filePath, err)
 	}
+
 	return nil
 }
 
