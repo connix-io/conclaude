@@ -67,9 +67,11 @@
           exec = rooted ''
             cd "$REPO_ROOT"
             cargo clippy --all-targets --all-features
+            cd "$REPO_ROOT"/go-implementation && golangci-lint run && cd -
             cd -
           '';
           description = "Run clippy";
+          deps = [pkgs.golangci-lint];
         };
 
         claude-researcher = {

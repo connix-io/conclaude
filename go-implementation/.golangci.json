@@ -1,0 +1,79 @@
+{
+  "formatters": {
+    "exclusions": {
+      "generated": "lax",
+      "paths": [
+        "third_party$",
+        "builtin$",
+        "examples$"
+      ]
+    }
+  },
+  "linters": {
+    "enable": [
+      "asasalint",
+      "exhaustive",
+      "godox",
+      "nlreturn",
+      "bidichk",
+      "bodyclose",
+      "dupl",
+      "gocritic",
+      "godot",
+      "errname",
+      "copyloopvar",
+      "errname",
+      "gosec",
+      "goconst",
+      "intrange",
+      "perfsprint",
+      "usestdlibvars",
+      "gocheckcompilerdirectives",
+      "staticcheck",
+      "intrange",
+      "makezero",
+      "misspell",
+      "nosprintfhostport",
+      "revive",
+      "unconvert",
+      "usestdlibvars",
+      "wastedassign",
+      "whitespace",
+      "govet"
+    ],
+    "settings": {
+      "revive": {
+        "enable-all-rules": true,
+        "rules": [
+          {
+            "exclude": [
+              "vendor/"
+            ],
+            "name": "blank-imports"
+          }
+        ]
+      },
+      "staticcheck": {
+        "checks": [
+          "all"
+        ]
+      }
+    }
+  },
+  "severity": {
+    "default": "debug",
+    "default-severity": "debug",
+    "rules": [
+      {
+        "linters": [
+          "goimports",
+          "intrange",
+          "usestdlibvars",
+          "staticcheck"
+        ],
+        "severity": "error"
+      }
+    ]
+  },
+  "version": "2"
+}

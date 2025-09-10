@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./target/release/conclaude Notification"
+            "command": "cargo run Notification"
           }
         ]
       }
@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./target/release/conclaude SubagentStop"
+            "command": "cargo run SubagentStop"
           }
         ]
       }
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./target/release/conclaude PreToolUse"
+            "command": "cargo run PreToolUse"
           }
         ]
       }
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./target/release/conclaude PreCompact"
+            "command": "cargo run PreCompact"
           }
         ]
       }
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./target/release/conclaude PostToolUse"
+            "command": "cargo run PostToolUse"
           }
         ]
       }
@@ -65,7 +65,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./target/release/conclaude Stop"
+            "command": "cargo run Stop"
           }
         ]
       }
@@ -76,7 +76,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./target/release/conclaude UserPromptSubmit"
+            "command": "cargo run UserPromptSubmit"
           }
         ]
       }
@@ -87,7 +87,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./target/release/conclaude SessionStart"
+            "command": "cargo run SessionStart"
           }
         ]
       }
