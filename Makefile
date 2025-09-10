@@ -5,7 +5,7 @@ BINARY_NAME=conclaude
 VERSION=0.1.2
 BUILD_DIR=bin
 GO_FILES=$(shell find . -name "*.go" -not -path "./vendor/*")
-LDFLAGS=-ldflags "-X github.com/connix-io/conclaude-go/cmd.Version=$(VERSION)"
+LDFLAGS=-ldflags "-X github.com/connix-io/conclaude/cmd.Version=$(VERSION)"
 
 # Default target
 .DEFAULT_GOAL := build

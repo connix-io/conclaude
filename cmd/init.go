@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/connix-io/conclaude-go/internal/config"
-	"github.com/connix-io/conclaude-go/internal/schema"
+	"github.com/connix-io/conclaude/internal/config"
+	"github.com/connix-io/conclaude/internal/schema"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )

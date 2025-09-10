@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/connix-io/conclaude-go/cmd"
+	"github.com/connix-io/conclaude/cmd"
 )
 
 func main() {

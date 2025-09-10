@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/connix-io/conclaude-go/internal/config"
+	"github.com/connix-io/conclaude/internal/config"
 	"github.com/invopop/jsonschema"
 )
 

@@ -1,4 +1,4 @@
-module github.com/connix-io/conclaude-go
+module github.com/connix-io/conclaude
 
 go 1.22
 

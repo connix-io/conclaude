@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/connix-io/conclaude-go/internal/hooks"
+	"github.com/connix-io/conclaude/internal/hooks"
 	"github.com/spf13/cobra"
 )
 

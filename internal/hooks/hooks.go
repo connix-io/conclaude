@@ -11,9 +11,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/connix-io/conclaude-go/internal/config"
-	"github.com/connix-io/conclaude-go/internal/logger"
-	"github.com/connix-io/conclaude-go/internal/types"
+	"github.com/connix-io/conclaude/internal/config"
+	"github.com/connix-io/conclaude/internal/logger"
+	"github.com/connix-io/conclaude/internal/types"
 	"github.com/gobwas/glob"
 )
 

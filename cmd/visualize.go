@@ -5,7 +5,7 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"github.com/connix-io/conclaude-go/internal/config"
+	"github.com/connix-io/conclaude/internal/config"
 	"github.com/fatih/color"
 	"github.com/gobwas/glob"
 	"github.com/spf13/cobra"

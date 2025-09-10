@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/connix-io/conclaude-go/internal/types"
+	"github.com/connix-io/conclaude/internal/types"
 )
 
 var (
