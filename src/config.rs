@@ -140,6 +140,8 @@ pub async fn load_conclaude_config() -> Result<ConclaudeConfig> {
 fn get_config_search_paths() -> Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
     let mut current_dir = std::env::current_dir()?;
+    let mut levels_searched = 0;
+    const MAX_SEARCH_LEVELS: u32 = 12;
 
     loop {
         // Add .conclaude.yaml and .conclaude.yml to search paths
@@ -151,9 +153,17 @@ fn get_config_search_paths() -> Result<Vec<PathBuf>> {
             break;
         }
 
-        // Move to parent directory
+        // Move to parent directory first, then increment level count
         match current_dir.parent() {
-            Some(parent) => current_dir = parent.to_path_buf(),
+            Some(parent) => {
+                current_dir = parent.to_path_buf();
+                levels_searched += 1;
+                
+                // Check if we've reached the maximum search level limit
+                if levels_searched >= MAX_SEARCH_LEVELS {
+                    break;
+                }
+            }
             None => break, // Reached filesystem root
         }
     }
