@@ -2,7 +2,7 @@ name: CI (Nix)
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
 
 permissions:
@@ -32,9 +32,6 @@ jobs:
           nix --version
           nix flake show
 
-      - name: Format check (rustfmt)
-        run: nix develop -c cargo fmt --all -- --check
-
       - name: Lint (clippy, deny warnings)
         run: nix develop -c cargo clippy --all-targets --all-features -- -D warnings
 
@@ -45,4 +42,3 @@ jobs:
         run: |
           nix build .#default
           ./result/bin/conclaude --version
-

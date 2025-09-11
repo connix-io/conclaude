@@ -1,4 +1,5 @@
 use conclaude::config::{extract_bash_commands, generate_default_config, load_conclaude_config};
+use std::fs;
 use tempfile::tempdir;
 
 #[test]
@@ -206,4 +207,83 @@ gitWorktree:
     assert!(config.git_worktree.auto_create_pr);
     assert!(config.git_worktree.auto_create_pr_command.is_some());
     assert!(config.git_worktree.auto_create_pr_template.is_none()); // Should be None when not specified
+}
+
+#[tokio::test]
+async fn test_config_search_level_limit() {
+    let temp_dir = tempdir().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+
+    // Create a deep directory structure (15 levels deep)
+    let mut current_path = temp_dir.path().to_path_buf();
+    for i in 0..15 {
+        current_path = current_path.join(format!("level_{i}"));
+        fs::create_dir(&current_path).unwrap();
+    }
+
+    // Place a config file exactly 13 levels up from the deepest directory
+    // (this should be beyond the 12-level search limit)
+    let mut config_dir = current_path.clone();
+    for _ in 0..13 {
+        config_dir = config_dir.parent().unwrap().to_path_buf();
+    }
+    let deep_config_path = config_dir.join(".conclaude.yaml");
+    fs::write(
+        &deep_config_path,
+        "stop:\n  run: 'deep config'\nrules:\n  preventRootAdditions: true",
+    )
+    .unwrap();
+
+    // Change to the deepest directory
+    std::env::set_current_dir(&current_path).unwrap();
+
+    // Attempt to load config - should not find the deep config due to level limit
+    let result = load_conclaude_config().await;
+
+    // Restore original directory
+    std::env::set_current_dir(original_dir).unwrap();
+
+    // Should fail to find config due to level limit
+    assert!(result.is_err());
+    let error_message = result.unwrap_err().to_string();
+    assert!(error_message.contains("Configuration file not found"));
+}
+
+#[tokio::test]
+async fn test_config_search_within_level_limit() {
+    let temp_dir = tempdir().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+
+    // Create a directory structure within the 12 level limit (10 levels)
+    let mut current_path = temp_dir.path().to_path_buf();
+    for i in 0..10 {
+        current_path = current_path.join(format!("level_{i}"));
+        fs::create_dir(&current_path).unwrap();
+    }
+
+    // Place a config file at level 5 (should be found within limit)
+    let config_path = temp_dir
+        .path()
+        .join("level_0/level_1/level_2/level_3/level_4/.conclaude.yaml");
+    fs::write(
+        &config_path,
+        "stop:\n  run: 'found config'\n  infinite: false\nrules:\n  preventRootAdditions: true",
+    )
+    .unwrap();
+
+    // Change to the deepest directory
+    std::env::set_current_dir(&current_path).unwrap();
+
+    // Attempt to load config - should find the config within level limit
+    let result = load_conclaude_config().await;
+
+    // Restore original directory
+    std::env::set_current_dir(original_dir).unwrap();
+
+    // Should successfully find and parse config
+    assert!(result.is_ok());
+    let config = result.unwrap();
+    assert_eq!(config.stop.run, "found config");
+    assert!(!config.stop.infinite);
+    assert!(config.rules.prevent_root_additions);
 }
