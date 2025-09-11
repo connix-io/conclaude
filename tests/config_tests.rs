@@ -228,9 +228,13 @@ async fn test_config_search_level_limit() {
         config_dir = config_dir.parent().unwrap().to_path_buf();
     }
     let deep_config_path = config_dir.join(".conclaude.yaml");
-    fs::write(&deep_config_path, "stop:\n  run: 'deep config'\nrules:\n  preventRootAdditions: true").unwrap();
+    fs::write(
+        &deep_config_path,
+        "stop:\n  run: 'deep config'\nrules:\n  preventRootAdditions: true",
+    )
+    .unwrap();
 
-    // Change to the deepest directory  
+    // Change to the deepest directory
     std::env::set_current_dir(&current_path).unwrap();
 
     // Attempt to load config - should not find the deep config due to level limit
@@ -258,8 +262,14 @@ async fn test_config_search_within_level_limit() {
     }
 
     // Place a config file at level 5 (should be found within limit)
-    let config_path = temp_dir.path().join("level_0/level_1/level_2/level_3/level_4/.conclaude.yaml");
-    fs::write(&config_path, "stop:\n  run: 'found config'\n  infinite: false\nrules:\n  preventRootAdditions: true").unwrap();
+    let config_path = temp_dir
+        .path()
+        .join("level_0/level_1/level_2/level_3/level_4/.conclaude.yaml");
+    fs::write(
+        &config_path,
+        "stop:\n  run: 'found config'\n  infinite: false\nrules:\n  preventRootAdditions: true",
+    )
+    .unwrap();
 
     // Change to the deepest directory
     std::env::set_current_dir(&current_path).unwrap();

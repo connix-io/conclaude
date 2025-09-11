@@ -158,7 +158,7 @@ fn get_config_search_paths() -> Result<Vec<PathBuf>> {
             Some(parent) => {
                 current_dir = parent.to_path_buf();
                 levels_searched += 1;
-                
+
                 // Check if we've reached the maximum search level limit
                 if levels_searched >= MAX_SEARCH_LEVELS {
                     break;
