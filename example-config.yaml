@@ -1,0 +1,30 @@
+# Example configuration showing the new showStdout and showStderr options
+stop:
+  commands:
+    - run: "echo 'Running tests...'"
+      showStdout: true    # Show the echo output to user
+      showStderr: false   # Don't show stderr (default)
+
+    - run: "npm test"
+      message: "Tests failed - please fix failing tests before continuing"
+      showStdout: true    # Show test output
+      showStderr: true    # Show test errors
+
+    - run: "npm run build"
+      message: "Build failed - please fix compilation errors"
+      showStdout: false   # Hide build output
+      showStderr: true    # But show build errors
+
+    - run: "echo 'All tasks completed successfully!'"
+      showStdout: true    # Show success message
+      # showStderr defaults to false
+
+rules:
+  preventRootAdditions: true
+  uneditableFiles: []
+
+preToolUse:
+  preventGeneratedFileEdits: true
+
+gitWorktree:
+  enabled: false

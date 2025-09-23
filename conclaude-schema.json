@@ -118,6 +118,14 @@
         },
         "run": {
           "type": "string"
+        },
+        "showStdout": {
+          "default": false,
+          "type": "boolean"
+        },
+        "showStderr": {
+          "default": false,
+          "type": "boolean"
         }
       },
       "required": [

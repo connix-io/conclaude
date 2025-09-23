@@ -372,26 +372,31 @@ pub async fn handle_session_start() -> Result<HookResult> {
 /// # Errors
 ///
 /// Returns an error if bash command extraction fails.
-fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<(String, Option<String>)>> {
-    let mut commands_with_messages = Vec::new();
+fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<(String, Option<String>, bool, bool)>> {
+    let mut commands_with_options = Vec::new();
 
     // Add legacy run commands
     if !config.stop.run.is_empty() {
         let commands = extract_bash_commands(&config.stop.run)?;
         for cmd in commands {
-            commands_with_messages.push((cmd, None));
+            commands_with_options.push((cmd, None, false, false));
         }
     }
 
-    // Add new structured commands with messages
+    // Add new structured commands with messages and stdout/stderr options
     for cmd_config in &config.stop.commands {
         let commands = extract_bash_commands(&cmd_config.run)?;
         for cmd in commands {
-            commands_with_messages.push((cmd, cmd_config.message.clone()));
+            commands_with_options.push((
+                cmd,
+                cmd_config.message.clone(),
+                cmd_config.show_stdout,
+                cmd_config.show_stderr,
+            ));
         }
     }
 
-    Ok(commands_with_messages)
+    Ok(commands_with_options)
 }
 
 /// Execute stop hook commands
@@ -400,18 +405,18 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<(String, Option
 ///
 /// Returns an error if command execution fails or process spawning fails.
 async fn execute_stop_commands(
-    commands_with_messages: &[(String, Option<String>)],
+    commands_with_options: &[(String, Option<String>, bool, bool)],
 ) -> Result<Option<HookResult>> {
     log::info!(
         "Executing {} stop hook commands",
-        commands_with_messages.len()
+        commands_with_options.len()
     );
 
-    for (index, (command, custom_message)) in commands_with_messages.iter().enumerate() {
+    for (index, (command, custom_message, show_stdout, show_stderr)) in commands_with_options.iter().enumerate() {
         log::info!(
             "Executing command {}/{}: {}",
             index + 1,
-            commands_with_messages.len(),
+            commands_with_options.len(),
             command
         );
 
@@ -488,6 +493,14 @@ async fn execute_stop_commands(
             return Ok(Some(HookResult::blocked(error_message)));
         }
 
+        // Display stdout/stderr to user if requested
+        if *show_stdout && !stdout.trim().is_empty() {
+            println!("{}", stdout.trim());
+        }
+        if *show_stderr && !stderr.trim().is_empty() {
+            eprintln!("{}", stderr.trim());
+        }
+
         // Always log command execution details with stdout appended
         let separator = "-".repeat(60);
         log::info!(
@@ -546,10 +559,10 @@ pub async fn handle_stop() -> Result<HookResult> {
     };
 
     // Extract and execute commands from config.stop.run and config.stop.commands
-    let commands_with_messages = collect_stop_commands(config)?;
+    let commands_with_options = collect_stop_commands(config)?;
 
     // Execute commands
-    if let Some(result) = execute_stop_commands(&commands_with_messages).await? {
+    if let Some(result) = execute_stop_commands(&commands_with_options).await? {
         return Ok(result);
     }
 
@@ -870,5 +883,107 @@ mod tests {
 
         tool_input.clear();
         assert_eq!(extract_file_path(&tool_input), None);
+    }
+
+    #[test]
+    fn test_collect_stop_commands_legacy_run() {
+        let config = ConclaudeConfig {
+            stop: StopConfig {
+                run: "echo test\nnpm install".to_string(),
+                commands: vec![],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let commands = collect_stop_commands(&config).unwrap();
+        assert_eq!(commands.len(), 2);
+
+        let (cmd1, msg1, show_stdout1, show_stderr1) = &commands[0];
+        assert_eq!(cmd1, "echo test");
+        assert_eq!(*msg1, None);
+        assert!(!show_stdout1);
+        assert!(!show_stderr1);
+
+        let (cmd2, msg2, show_stdout2, show_stderr2) = &commands[1];
+        assert_eq!(cmd2, "npm install");
+        assert_eq!(*msg2, None);
+        assert!(!show_stdout2);
+        assert!(!show_stderr2);
+    }
+
+    #[test]
+    fn test_collect_stop_commands_structured() {
+        let config = ConclaudeConfig {
+            stop: StopConfig {
+                commands: vec![
+                    crate::config::StopCommand {
+                        run: "npm test".to_string(),
+                        message: Some("Tests failed".to_string()),
+                        show_stdout: true,
+                        show_stderr: false,
+                    },
+                    crate::config::StopCommand {
+                        run: "npm run build".to_string(),
+                        message: None,
+                        show_stdout: false,
+                        show_stderr: true,
+                    },
+                ],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let commands = collect_stop_commands(&config).unwrap();
+        assert_eq!(commands.len(), 2);
+
+        let (cmd1, msg1, show_stdout1, show_stderr1) = &commands[0];
+        assert_eq!(cmd1, "npm test");
+        assert_eq!(msg1, &Some("Tests failed".to_string()));
+        assert!(*show_stdout1);
+        assert!(!*show_stderr1);
+
+        let (cmd2, msg2, show_stdout2, show_stderr2) = &commands[1];
+        assert_eq!(cmd2, "npm run build");
+        assert_eq!(*msg2, None);
+        assert!(!*show_stdout2);
+        assert!(*show_stderr2);
+    }
+
+    #[test]
+    fn test_collect_stop_commands_mixed() {
+        let config = ConclaudeConfig {
+            stop: StopConfig {
+                run: "echo legacy".to_string(),
+                commands: vec![
+                    crate::config::StopCommand {
+                        run: "echo structured".to_string(),
+                        message: Some("Custom message".to_string()),
+                        show_stdout: true,
+                        show_stderr: true,
+                    },
+                ],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let commands = collect_stop_commands(&config).unwrap();
+        assert_eq!(commands.len(), 2);
+
+        // Legacy command should come first
+        let (cmd1, msg1, show_stdout1, show_stderr1) = &commands[0];
+        assert_eq!(cmd1, "echo legacy");
+        assert_eq!(*msg1, None);
+        assert!(!show_stdout1);
+        assert!(!show_stderr1);
+
+        // Structured command should come second
+        let (cmd2, msg2, show_stdout2, show_stderr2) = &commands[1];
+        assert_eq!(cmd2, "echo structured");
+        assert_eq!(msg2, &Some("Custom message".to_string()));
+        assert!(*show_stdout2);
+        assert!(*show_stderr2);
     }
 }

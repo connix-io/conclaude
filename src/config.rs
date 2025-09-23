@@ -12,6 +12,10 @@ pub struct StopCommand {
     pub run: String,
     #[serde(default)]
     pub message: Option<String>,
+    #[serde(default, rename = "showStdout")]
+    pub show_stdout: bool,
+    #[serde(default, rename = "showStderr")]
+    pub show_stderr: bool,
 }
 
 /// Configuration interface for stop hook commands
@@ -281,5 +285,81 @@ cd /tmp && echo "test""#;
                 r#"cd /tmp && echo "test""#
             ]
         );
+    }
+
+    #[test]
+    fn test_stop_command_deserialization() {
+        let yaml_content = r#"
+run: "npm test"
+message: "Test failed"
+showStdout: true
+showStderr: false
+"#;
+
+        let cmd: StopCommand = serde_yaml::from_str(yaml_content).unwrap();
+        assert_eq!(cmd.run, "npm test");
+        assert_eq!(cmd.message, Some("Test failed".to_string()));
+        assert!(cmd.show_stdout);
+        assert!(!cmd.show_stderr);
+    }
+
+    #[test]
+    fn test_stop_command_defaults() {
+        let yaml_content = r#"
+run: "npm test"
+"#;
+
+        let cmd: StopCommand = serde_yaml::from_str(yaml_content).unwrap();
+        assert_eq!(cmd.run, "npm test");
+        assert_eq!(cmd.message, None);
+        assert!(!cmd.show_stdout); // Should default to false
+        assert!(!cmd.show_stderr); // Should default to false
+    }
+
+    #[test]
+    fn test_stop_command_serialization() {
+        let cmd = StopCommand {
+            run: "echo test".to_string(),
+            message: Some("Custom message".to_string()),
+            show_stdout: true,
+            show_stderr: true,
+        };
+
+        let serialized = serde_yaml::to_string(&cmd).unwrap();
+        let deserialized: StopCommand = serde_yaml::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.run, cmd.run);
+        assert_eq!(deserialized.message, cmd.message);
+        assert_eq!(deserialized.show_stdout, cmd.show_stdout);
+        assert_eq!(deserialized.show_stderr, cmd.show_stderr);
+    }
+
+    #[test]
+    fn test_stop_config_with_commands() {
+        let yaml_content = r#"
+commands:
+  - run: "npm test"
+    message: "Tests failed"
+    showStdout: true
+    showStderr: false
+  - run: "npm run build"
+    showStdout: false
+    showStderr: true
+"#;
+
+        let config: StopConfig = serde_yaml::from_str(yaml_content).unwrap();
+        assert_eq!(config.commands.len(), 2);
+
+        let first_cmd = &config.commands[0];
+        assert_eq!(first_cmd.run, "npm test");
+        assert_eq!(first_cmd.message, Some("Tests failed".to_string()));
+        assert!(first_cmd.show_stdout);
+        assert!(!first_cmd.show_stderr);
+
+        let second_cmd = &config.commands[1];
+        assert_eq!(second_cmd.run, "npm run build");
+        assert_eq!(second_cmd.message, None);
+        assert!(!second_cmd.show_stdout);
+        assert!(second_cmd.show_stderr);
     }
 }
