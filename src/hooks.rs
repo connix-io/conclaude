@@ -372,22 +372,24 @@ pub async fn handle_session_start() -> Result<HookResult> {
 /// # Errors
 ///
 /// Returns an error if bash command extraction fails.
-fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<(String, Option<String>)>> {
+fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<(String, Option<String>, bool, bool)>> {
     let mut commands_with_messages = Vec::new();
 
     // Add legacy run commands
     if !config.stop.run.is_empty() {
         let commands = extract_bash_commands(&config.stop.run)?;
         for cmd in commands {
-            commands_with_messages.push((cmd, None));
+            commands_with_messages.push((cmd, None, false, false));
         }
     }
 
     // Add new structured commands with messages
     for cmd_config in &config.stop.commands {
         let commands = extract_bash_commands(&cmd_config.run)?;
+        let show_stdout = cmd_config.show_stdout.unwrap_or(false);
+        let show_stderr = cmd_config.show_stderr.unwrap_or(false);
         for cmd in commands {
-            commands_with_messages.push((cmd, cmd_config.message.clone()));
+            commands_with_messages.push((cmd, cmd_config.message.clone(), show_stdout, show_stderr));
         }
     }
 
@@ -400,14 +402,14 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<(String, Option
 ///
 /// Returns an error if command execution fails or process spawning fails.
 async fn execute_stop_commands(
-    commands_with_messages: &[(String, Option<String>)],
+    commands_with_messages: &[(String, Option<String>, bool, bool)],
 ) -> Result<Option<HookResult>> {
     log::info!(
         "Executing {} stop hook commands",
         commands_with_messages.len()
     );
 
-    for (index, (command, custom_message)) in commands_with_messages.iter().enumerate() {
+    for (index, (command, custom_message, show_stdout, show_stderr)) in commands_with_messages.iter().enumerate() {
         log::info!(
             "Executing command {}/{}: {}",
             index + 1,
@@ -465,20 +467,20 @@ async fn execute_stop_commands(
                 separator
             );
 
-            let stdout_section = if stdout.is_empty() {
-                String::new()
-            } else {
+            let stdout_section = if *show_stdout && !stdout.is_empty() {
                 format!("\nStdout: {stdout}")
+            } else {
+                String::new()
             };
 
-            let stderr_section = if stderr.is_empty() {
-                String::new()
-            } else {
+            let stderr_section = if *show_stderr && !stderr.is_empty() {
                 format!("\nStderr: {stderr}")
+            } else {
+                String::new()
             };
 
             let error_message = if let Some(custom_msg) = custom_message {
-                custom_msg.clone()
+                format!("{custom_msg}{stdout_section}{stderr_section}")
             } else {
                 format!(
                     "Command failed with exit code {exit_code}: {command}{stdout_section}{stderr_section}"
@@ -506,6 +508,14 @@ async fn execute_stop_commands(
             },
             separator
         );
+
+        // If showStdout or showStderr is true, print to stdout/stderr for user/Claude to see
+        if *show_stdout && !stdout.is_empty() {
+            print!("{stdout}");
+        }
+        if *show_stderr && !stderr.is_empty() {
+            eprint!("{stderr}");
+        }
     }
 
     log::info!("All stop hook commands completed successfully");

@@ -31,26 +31,6 @@
       },
       "type": "object"
     },
-    "GrepRule": {
-      "description": "Configuration interface for grep rules",
-      "properties": {
-        "description": {
-          "type": "string"
-        },
-        "filePattern": {
-          "type": "string"
-        },
-        "forbiddenPattern": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "description",
-        "filePattern",
-        "forbiddenPattern"
-      ],
-      "type": "object"
-    },
     "PreToolUseConfig": {
       "description": "Configuration for pre tool use hooks",
       "properties": {
@@ -60,13 +40,6 @@
             "string",
             "null"
           ]
-        },
-        "grepRules": {
-          "default": [],
-          "items": {
-            "$ref": "#/definitions/GrepRule"
-          },
-          "type": "array"
         },
         "preventAdditions": {
           "default": [],
@@ -118,6 +91,20 @@
         },
         "run": {
           "type": "string"
+        },
+        "showStderr": {
+          "default": null,
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "showStdout": {
+          "default": null,
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "required": [
@@ -132,13 +119,6 @@
           "default": [],
           "items": {
             "$ref": "#/definitions/StopCommand"
-          },
-          "type": "array"
-        },
-        "grepRules": {
-          "default": [],
-          "items": {
-            "$ref": "#/definitions/GrepRule"
           },
           "type": "array"
         },
@@ -219,7 +199,6 @@
       ],
       "default": {
         "generatedFileMessage": null,
-        "grepRules": [],
         "preventAdditions": [],
         "preventGeneratedFileEdits": false
       }
@@ -244,7 +223,6 @@
       ],
       "default": {
         "commands": [],
-        "grepRules": [],
         "infinite": false,
         "infiniteMessage": null,
         "rounds": null,
