@@ -403,6 +403,39 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                     }
                 }
             }
+            "unviewableFiles" => {
+                println!("🔒 Unviewable Files:");
+                if config.rules.unviewable_files.is_empty() {
+                    println!("   No unviewable files configured");
+                } else {
+                    for pattern_str in &config.rules.unviewable_files {
+                        println!("   Pattern: {pattern_str}");
+
+                        if show_matches {
+                            let pattern = Pattern::new(pattern_str)?;
+                            println!("   Matching files:");
+                            let mut found = false;
+
+                            for entry in WalkDir::new(".")
+                                .into_iter()
+                                .filter_map(std::result::Result::ok)
+                            {
+                                if entry.file_type().is_file() {
+                                    let path = entry.path();
+                                    if pattern.matches(&path.to_string_lossy()) {
+                                        println!("      - {}", path.display());
+                                        found = true;
+                                    }
+                                }
+                            }
+
+                            if !found {
+                                println!("      (no matching files found)");
+                            }
+                        }
+                    }
+                }
+            }
             "toolUsageValidation" => {
                 println!("🔧 Tool Usage Validation Rules:");
                 if config.rules.tool_usage_validation.is_empty() {
@@ -423,6 +456,7 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                 println!("❌ Unknown rule: {rule_name}");
                 println!("\nAvailable rules:");
                 println!("   - uneditableFiles");
+                println!("   - unviewableFiles");
                 println!("   - preventRootAdditions");
                 println!("   - toolUsageValidation");
             }
@@ -437,6 +471,10 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
         println!(
             "📁 Uneditable Files: {} patterns",
             config.rules.uneditable_files.len()
+        );
+        println!(
+            "🔒 Unviewable Files: {} patterns",
+            config.rules.unviewable_files.len()
         );
         println!(
             "🔧 Tool Usage Validation: {} rules",

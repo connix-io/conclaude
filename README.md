@@ -68,7 +68,8 @@ While other tools try to bolt-on AI safety as an afterthought, conclaude was bui
 - **Comprehensive Hook System**: Handle all Claude Code lifecycle events with precision
 - **YAML Configuration**: Human-readable configuration that scales with your team
 - **Command Execution**: Run your existing lint, test, and build commands automatically
-- **File Protection**: Prevent unwanted file creation with intelligent pattern matching
+- **File Protection**: Prevent unwanted file creation and modification with intelligent pattern matching
+- **Privacy Controls**: Block read access to sensitive files using `unviewableFiles` patterns
 - **Session Logging**: Winston-based logging with session-specific file output
 - **Infinite Monitoring**: Optional continuous monitoring for long-running development sessions
 
@@ -238,11 +239,15 @@ stop:
 # File protection rules
 rules:
   preventRootAdditions: true    # Keep project root clean
-  uneditableFiles:              # Protect critical files
+  uneditableFiles:              # Protect critical files from editing
     - "Cargo.toml"              # Don't modify package manifest
     - "Cargo.lock"              # Lock file is sacred
     - ".env*"                   # Secrets stay secret
     - "target/**"               # Build artifacts
+  unviewableFiles:              # Prevent reading sensitive files
+    - ".env*"                   # Environment secrets
+    - "**/*.key"                # Private keys
+    - "**/*.pem"                # Certificates
 ```
 
 **What this accomplishes:**
@@ -251,6 +256,7 @@ rules:
 - 🎨 Your formatting and linting rules are automatically enforced
 - 📁 No surprise files cluttering your project root
 - 🔒 Critical configuration files stay untouched
+- 🔐 Sensitive files remain private and unreadable
 
 ### Advanced Scenarios
 
@@ -285,6 +291,11 @@ rules:
     - "target/**"
     - ".github/workflows/**"
     - "src/lib.rs"            # Protect main library entry point
+  unviewableFiles:
+    - ".env*"                 # Environment secrets
+    - "**/*.key"              # Private keys
+    - "**/*.pem"              # Certificates
+    - "secrets/**"            # Entire secrets directory
 ```
 
 ### Configuration Reference
@@ -650,6 +661,10 @@ config.stop.run → extract_bash_commands() → tokio::process::Command → sequ
 
 - **YAML Configuration**: Human-readable configuration with JSON Schema validation
 - **File Protection**: Prevent edits to critical files using glob patterns
+- **Privacy Controls**: Prevent read access to sensitive files using `unviewableFiles` glob patterns
+  - Blocks Read tool operations on matching files
+  - Blocks bash `cat` commands on matching files
+  - Returns clear error messages when access is denied
 - **Root Directory Protection**: Keep project root clean from unwanted files
 - **Command Validation**: Run custom validation commands (tests, linting, builds)
 - **Infinite Mode**: Continuous monitoring for long development sessions
