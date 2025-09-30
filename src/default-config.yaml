@@ -58,6 +58,19 @@ rules:
   #   - "docs/**"             # entire directories
   #   - "{package,tsconfig}.json"  # multiple specific files
   
+  # Files that Claude cannot read or view, using glob patterns
+  # Prevents all Read operations and bash commands like 'cat' on matching files
+  # Useful for sensitive files, secrets, or privacy compliance
+  unviewableFiles: []
+  # Examples:
+  # unviewableFiles:
+  #   - ".env*"               # environment/secret files
+  #   - "**/*.key"            # private keys
+  #   - "**/*.pem"            # certificates
+  #   - "secrets/**"          # secrets directory
+  #   - "credentials.json"    # credential files
+  #   - "*.secret"            # any secret files
+  
   # Tool usage validation rules - control which tools can be used on which files
   # Allows fine-grained control over tool usage based on file patterns
   toolUsageValidation: []

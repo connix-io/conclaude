@@ -113,6 +113,11 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
         return Ok(result);
     }
 
+    // Check unviewable files for Read and Bash operations
+    if let Some(result) = check_unviewable_files(&payload).await? {
+        return Ok(result);
+    }
+
     let file_modifying_tools = ["Write", "Edit", "MultiEdit", "NotebookEdit"];
 
     if file_modifying_tools.contains(&payload.tool_name.as_str()) {
@@ -195,6 +200,110 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
     }
 
     Ok(None)
+}
+
+/// Check unviewable files rules for read operations
+///
+/// # Errors
+///
+/// Returns an error if configuration loading fails, directory access fails, or glob pattern processing fails.
+async fn check_unviewable_files(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
+    let config = get_config().await?;
+
+    // Only check for Read tool and Bash tool
+    if payload.tool_name != "Read" && payload.tool_name != "Bash" {
+        return Ok(None);
+    }
+
+    // Extract file path based on tool type
+    let file_path = if payload.tool_name == "Read" {
+        extract_file_path(&payload.tool_input)
+    } else if payload.tool_name == "Bash" {
+        // For Bash tool, check if command contains 'cat' followed by a file path
+        payload.tool_input.get("command")
+            .and_then(|v| v.as_str())
+            .and_then(extract_file_from_cat_command)
+    } else {
+        None
+    };
+
+    let Some(file_path) = file_path else {
+        return Ok(None);
+    };
+
+    let cwd = std::env::current_dir().context("Failed to get current working directory")?;
+    let resolved_path = cwd.join(&file_path);
+    let relative_path = resolved_path
+        .strip_prefix(&cwd)
+        .unwrap_or(resolved_path.as_path())
+        .to_string_lossy()
+        .to_string();
+
+    // Check unviewableFiles rule
+    for pattern in &config.rules.unviewable_files {
+        if matches_uneditable_pattern(
+            &file_path,
+            &relative_path,
+            &resolved_path.to_string_lossy(),
+            pattern,
+        )? {
+            let error_message = format!(
+                "Blocked {} operation: file matches unviewable pattern '{}'. File: {}",
+                payload.tool_name, pattern, file_path
+            );
+
+            log::warn!(
+                "PreToolUse blocked by unviewableFiles rule: tool_name={}, file_path={}, pattern={}",
+                payload.tool_name,
+                file_path,
+                pattern
+            );
+
+            return Ok(Some(HookResult::blocked(error_message)));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Extract file path from cat command in bash
+/// Supports: cat file.txt, cat ./file.txt, cat /path/to/file.txt
+pub fn extract_file_from_cat_command(command: &str) -> Option<String> {
+    let trimmed = command.trim();
+    
+    // Check if command starts with 'cat '
+    if !trimmed.starts_with("cat ") {
+        return None;
+    }
+
+    // Extract the file path after 'cat '
+    let after_cat = trimmed.strip_prefix("cat ")?.trim();
+    
+    if after_cat.is_empty() {
+        return None;
+    }
+    
+    // Handle quoted strings
+    if (after_cat.starts_with('"') && after_cat.contains('"')) 
+        || (after_cat.starts_with('\'') && after_cat.contains('\'')) {
+        let quote_char = after_cat.chars().next()?;
+        let rest = &after_cat[1..];
+        
+        // Find the closing quote
+        if let Some(end_idx) = rest.find(quote_char) {
+            return Some(rest[..end_idx].to_string());
+        }
+    }
+    
+    // Handle simple case: just a file path (no pipes, redirects, etc.)
+    // Split on whitespace and take first token
+    let file_path = after_cat.split_whitespace().next()?;
+    
+    if file_path.is_empty() {
+        None
+    } else {
+        Some(file_path.to_string())
+    }
 }
 
 /// Extract file path from tool input

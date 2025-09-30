@@ -36,6 +36,8 @@ pub struct RulesConfig {
     pub prevent_root_additions: bool,
     #[serde(default, rename = "uneditableFiles")]
     pub uneditable_files: Vec<String>,
+    #[serde(default, rename = "unviewableFiles")]
+    pub unviewable_files: Vec<String>,
     #[serde(default, rename = "toolUsageValidation")]
     pub tool_usage_validation: Vec<ToolUsageRule>,
 }
@@ -54,6 +56,7 @@ impl Default for RulesConfig {
         Self {
             prevent_root_additions: true,
             uneditable_files: Vec::new(),
+            unviewable_files: Vec::new(),
             tool_usage_validation: Vec::new(),
         }
     }

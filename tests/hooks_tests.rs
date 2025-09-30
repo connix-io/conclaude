@@ -399,3 +399,105 @@ fn test_check_generated_file_markers_within_100_lines() {
 // easily tested due to the global config cache. The functionality is tested
 // through unit tests of the marker detection function and will be tested in
 // real usage when the hook is invoked.
+
+// Tests for extract_file_from_cat_command
+#[test]
+fn test_extract_file_from_cat_command_simple() {
+    let result = extract_file_from_cat_command("cat file.txt");
+    assert_eq!(result, Some("file.txt".to_string()));
+}
+
+#[test]
+fn test_extract_file_from_cat_command_with_path() {
+    let result = extract_file_from_cat_command("cat ./src/config.rs");
+    assert_eq!(result, Some("./src/config.rs".to_string()));
+}
+
+#[test]
+fn test_extract_file_from_cat_command_absolute_path() {
+    let result = extract_file_from_cat_command("cat /etc/passwd");
+    assert_eq!(result, Some("/etc/passwd".to_string()));
+}
+
+#[test]
+fn test_extract_file_from_cat_command_with_quotes() {
+    let result = extract_file_from_cat_command("cat \"file with spaces.txt\"");
+    assert_eq!(result, Some("file with spaces.txt".to_string()));
+}
+
+#[test]
+fn test_extract_file_from_cat_command_single_quotes() {
+    let result = extract_file_from_cat_command("cat 'file.txt'");
+    assert_eq!(result, Some("file.txt".to_string()));
+}
+
+#[test]
+fn test_extract_file_from_cat_command_with_extra_whitespace() {
+    let result = extract_file_from_cat_command("  cat   file.txt  ");
+    assert_eq!(result, Some("file.txt".to_string()));
+}
+
+#[test]
+fn test_extract_file_from_cat_command_not_cat() {
+    let result = extract_file_from_cat_command("echo hello");
+    assert_eq!(result, None);
+}
+
+#[test]
+fn test_extract_file_from_cat_command_empty() {
+    let result = extract_file_from_cat_command("");
+    assert_eq!(result, None);
+}
+
+#[test]
+fn test_extract_file_from_cat_command_only_cat() {
+    let result = extract_file_from_cat_command("cat");
+    assert_eq!(result, None);
+}
+
+// Tests for matches_uneditable_pattern used by unviewable files
+#[test]
+fn test_matches_unviewable_pattern_env_files() {
+    assert!(
+        matches_uneditable_pattern(".env", ".env", "/path/.env", ".env*").unwrap()
+    );
+    assert!(
+        matches_uneditable_pattern(".env.local", ".env.local", "/path/.env.local", ".env*").unwrap()
+    );
+    assert!(
+        !matches_uneditable_pattern("config.env", "config.env", "/path/config.env", ".env*").unwrap()
+    );
+}
+
+#[test]
+fn test_matches_unviewable_pattern_secret_files() {
+    assert!(
+        matches_uneditable_pattern("api.key", "api.key", "/path/api.key", "**/*.key").unwrap()
+    );
+    assert!(
+        matches_uneditable_pattern("secrets/api.key", "secrets/api.key", "/path/secrets/api.key", "**/*.key").unwrap()
+    );
+}
+
+#[test]
+fn test_matches_unviewable_pattern_secrets_directory() {
+    assert!(
+        matches_uneditable_pattern(
+            "secrets/password.txt",
+            "secrets/password.txt",
+            "/path/secrets/password.txt",
+            "secrets/**"
+        )
+        .unwrap()
+    );
+    assert!(
+        !matches_uneditable_pattern(
+            "public/readme.txt",
+            "public/readme.txt",
+            "/path/public/readme.txt",
+            "secrets/**"
+        )
+        .unwrap()
+    );
+}
+
