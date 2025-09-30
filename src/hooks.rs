@@ -17,6 +17,14 @@ use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::process::Command as TokioCommand;
 
+/// Represents a stop command with its configuration
+struct StopCommandConfig {
+    command: String,
+    message: Option<String>,
+    show_stdout: bool,
+    show_stderr: bool,
+}
+
 /// Cached configuration instance to avoid repeated loads
 static CACHED_CONFIG: OnceLock<ConclaudeConfig> = OnceLock::new();
 
@@ -372,28 +380,38 @@ pub async fn handle_session_start() -> Result<HookResult> {
 /// # Errors
 ///
 /// Returns an error if bash command extraction fails.
-fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<(String, Option<String>, bool, bool)>> {
-    let mut commands_with_messages = Vec::new();
+fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConfig>> {
+    let mut commands = Vec::new();
 
     // Add legacy run commands
     if !config.stop.run.is_empty() {
-        let commands = extract_bash_commands(&config.stop.run)?;
-        for cmd in commands {
-            commands_with_messages.push((cmd, None, false, false));
+        let extracted = extract_bash_commands(&config.stop.run)?;
+        for cmd in extracted {
+            commands.push(StopCommandConfig {
+                command: cmd,
+                message: None,
+                show_stdout: false,
+                show_stderr: false,
+            });
         }
     }
 
     // Add new structured commands with messages
     for cmd_config in &config.stop.commands {
-        let commands = extract_bash_commands(&cmd_config.run)?;
+        let extracted = extract_bash_commands(&cmd_config.run)?;
         let show_stdout = cmd_config.show_stdout.unwrap_or(false);
         let show_stderr = cmd_config.show_stderr.unwrap_or(false);
-        for cmd in commands {
-            commands_with_messages.push((cmd, cmd_config.message.clone(), show_stdout, show_stderr));
+        for cmd in extracted {
+            commands.push(StopCommandConfig {
+                command: cmd,
+                message: cmd_config.message.clone(),
+                show_stdout,
+                show_stderr,
+            });
         }
     }
 
-    Ok(commands_with_messages)
+    Ok(commands)
 }
 
 /// Execute stop hook commands
@@ -402,34 +420,34 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<(String, Option
 ///
 /// Returns an error if command execution fails or process spawning fails.
 async fn execute_stop_commands(
-    commands_with_messages: &[(String, Option<String>, bool, bool)],
+    commands: &[StopCommandConfig],
 ) -> Result<Option<HookResult>> {
     log::info!(
         "Executing {} stop hook commands",
-        commands_with_messages.len()
+        commands.len()
     );
 
-    for (index, (command, custom_message, show_stdout, show_stderr)) in commands_with_messages.iter().enumerate() {
+    for (index, cmd_config) in commands.iter().enumerate() {
         log::info!(
             "Executing command {}/{}: {}",
             index + 1,
-            commands_with_messages.len(),
-            command
+            commands.len(),
+            cmd_config.command
         );
 
         let child = TokioCommand::new("bash")
             .arg("-c")
-            .arg(command)
+            .arg(&cmd_config.command)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .with_context(|| format!("Failed to spawn command: {command}"))?;
+            .with_context(|| format!("Failed to spawn command: {}", cmd_config.command))?;
 
         let output = child
             .wait_with_output()
             .await
-            .with_context(|| format!("Failed to wait for command: {command}"))?;
+            .with_context(|| format!("Failed to wait for command: {}", cmd_config.command))?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -442,7 +460,7 @@ async fn execute_stop_commands(
             log::error!(
                 "Stop command failed:\n{}\n  Command: {}\n  Status: Failed (exit code: {})\n  Stdout:\n{}\n  Stderr:\n{}\n{}",
                 separator,
-                command,
+                cmd_config.command,
                 exit_code,
                 if stdout.trim().is_empty() {
                     "    (no stdout)".to_string()
@@ -467,23 +485,24 @@ async fn execute_stop_commands(
                 separator
             );
 
-            let stdout_section = if *show_stdout && !stdout.is_empty() {
+            let stdout_section = if cmd_config.show_stdout && !stdout.is_empty() {
                 format!("\nStdout: {stdout}")
             } else {
                 String::new()
             };
 
-            let stderr_section = if *show_stderr && !stderr.is_empty() {
+            let stderr_section = if cmd_config.show_stderr && !stderr.is_empty() {
                 format!("\nStderr: {stderr}")
             } else {
                 String::new()
             };
 
-            let error_message = if let Some(custom_msg) = custom_message {
+            let error_message = if let Some(custom_msg) = &cmd_config.message {
                 format!("{custom_msg}{stdout_section}{stderr_section}")
             } else {
                 format!(
-                    "Command failed with exit code {exit_code}: {command}{stdout_section}{stderr_section}"
+                    "Command failed with exit code {exit_code}: {}{stdout_section}{stderr_section}",
+                    cmd_config.command
                 )
             };
 
@@ -495,7 +514,7 @@ async fn execute_stop_commands(
         log::info!(
             "Stop command executed:\n{}\n  Command: {}\n  Status: Success\n  Output:\n{}\n{}",
             separator,
-            command,
+            cmd_config.command,
             if stdout.trim().is_empty() {
                 "    (no output)".to_string()
             } else {
@@ -510,10 +529,10 @@ async fn execute_stop_commands(
         );
 
         // If showStdout or showStderr is true, print to stdout/stderr for user/Claude to see
-        if *show_stdout && !stdout.is_empty() {
+        if cmd_config.show_stdout && !stdout.is_empty() {
             print!("{stdout}");
         }
-        if *show_stderr && !stderr.is_empty() {
+        if cmd_config.show_stderr && !stderr.is_empty() {
             eprint!("{stderr}");
         }
     }
