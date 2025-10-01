@@ -454,12 +454,10 @@ async fn execute_stop_commands(
 
         if !output.status.success() {
             let exit_code = output.status.code().unwrap_or(1);
-            let separator = "-".repeat(60);
 
             // Log detailed failure information with command and outputs appended
             log::error!(
-                "Stop command failed:\n{}\n  Command: {}\n  Status: Failed (exit code: {})\n  Stdout:\n{}\n  Stderr:\n{}\n{}",
-                separator,
+                "Stop command failed:\n  Command: {}\n  Status: Failed (exit code: {})\n  Stdout:\n{}\n  Stderr:\n{}",
                 cmd_config.command,
                 exit_code,
                 if stdout.trim().is_empty() {
@@ -481,8 +479,7 @@ async fn execute_stop_commands(
                         .map(|line| format!("    {}", line))
                         .collect::<Vec<_>>()
                         .join("\n")
-                },
-                separator
+                }
             );
 
             let stdout_section = if cmd_config.show_stdout && !stdout.is_empty() {
@@ -509,32 +506,7 @@ async fn execute_stop_commands(
             return Ok(Some(HookResult::blocked(error_message)));
         }
 
-        // Always log command execution details with stdout appended
-        let separator = "-".repeat(60);
-        log::info!(
-            "Stop command executed:\n{}\n  Command: {}\n  Status: Success\n  Output:\n{}\n{}",
-            separator,
-            cmd_config.command,
-            if stdout.trim().is_empty() {
-                "    (no output)".to_string()
-            } else {
-                stdout
-                    .trim()
-                    .lines()
-                    .map(|line| format!("    {}", line))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            },
-            separator
-        );
-
-        // If showStdout or showStderr is true, print to stdout/stderr for user/Claude to see
-        if cmd_config.show_stdout && !stdout.is_empty() {
-            print!("{stdout}");
-        }
-        if cmd_config.show_stderr && !stderr.is_empty() {
-            eprint!("{stderr}");
-        }
+        // Successful commands are completely silent
     }
 
     log::info!("All stop hook commands completed successfully");
