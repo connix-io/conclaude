@@ -12,6 +12,10 @@ pub struct StopCommand {
     pub run: String,
     #[serde(default)]
     pub message: Option<String>,
+    #[serde(default, rename = "showStdout")]
+    pub show_stdout: Option<bool>,
+    #[serde(default, rename = "showStderr")]
+    pub show_stderr: Option<bool>,
 }
 
 /// Configuration interface for stop hook commands
