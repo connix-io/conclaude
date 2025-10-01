@@ -506,7 +506,7 @@ async fn execute_stop_commands(
             return Ok(Some(HookResult::blocked(error_message)));
         }
 
-        // Successful commands are completely silent
+        // Successful individual commands produce no output
     }
 
     log::info!("All stop hook commands completed successfully");
