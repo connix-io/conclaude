@@ -79,13 +79,13 @@ where
     match handler().await {
         Ok(result) => {
             if result.blocked.unwrap_or(false) && result.message.is_some() {
-                eprintln!("❌ Hook blocked: {}", result.message.unwrap());
+                eprintln!("{}", result.message.unwrap());
                 std::process::exit(2);
             }
             std::process::exit(0);
         }
         Err(error) => {
-            eprintln!("❌ Hook failed: {error}");
+            eprintln!("{error}");
             std::process::exit(1);
         }
     }

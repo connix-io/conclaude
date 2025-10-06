@@ -79,16 +79,14 @@ rules:
     - "*.lock"
 "#;
 
-    println!("YAML content:\n{config_content}");
-
     let result = serde_yaml::from_str::<conclaude::config::ConclaudeConfig>(config_content);
     match result {
         Ok(config) => {
-            println!("Successfully parsed config: {config:?}");
-            println!("stop.infinite_message: {:?}", config.stop.infinite_message);
+            // Config parsed successfully, validate infinite_message field
+            assert_eq!(config.stop.infinite_message, Some("continue".to_string()));
         }
         Err(e) => {
-            println!("YAML parsing error: {e:?}");
+            panic!("YAML parsing failed: {e:?}");
         }
     }
 }
@@ -106,7 +104,6 @@ async fn test_load_config_not_found() {
         Ok(dir) => dir,
         Err(_) => {
             // If we can't get current dir, skip the test
-            eprintln!("Warning: Skipping test_load_config_not_found - cannot get current directory");
             return;
         }
     };
