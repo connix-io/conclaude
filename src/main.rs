@@ -119,7 +119,11 @@ async fn main() -> Result<()> {
     }
 
     // Initialize logger for CLI commands (without session ID)
-    let _ = logger::init_logger(None, None);
+    // If logger initialization fails, we still continue but log the error to stderr
+    // since all other output now goes through the logger
+    if let Err(e) = logger::init_logger(None, None) {
+        eprintln!("Warning: Failed to initialize logger: {e}");
+    }
 
     match cli.command {
         Commands::Init {
