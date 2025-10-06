@@ -118,6 +118,13 @@ async fn main() -> Result<()> {
         std::env::set_var("CONCLAUDE_DISABLE_FILE_LOGGING", "true");
     }
 
+    // Initialize logger for CLI commands (without session ID)
+    // If logger initialization fails, we still continue but log the error to stderr
+    // since all other output now goes through the logger
+    if let Err(e) = logger::init_logger(None, None) {
+        eprintln!("Warning: Failed to initialize logger: {e}");
+    }
+
     match cli.command {
         Commands::Init {
             config_path,
@@ -190,13 +197,12 @@ async fn handle_init(
     let claude_path = claude_path.map_or_else(|| cwd.join(".claude"), PathBuf::from);
     let settings_path = claude_path.join("settings.json");
 
-    println!("🚀 Initializing conclaude configuration...\n");
+    log::info!("🚀 Initializing conclaude configuration...");
 
     // Check if config file exists
     if config_path.exists() && !force {
-        println!("⚠️  Configuration file already exists:");
-        println!("   {}", config_path.display());
-        println!("\nUse --force to overwrite existing configuration.");
+        log::warn!("⚠️  Configuration file already exists: {}", config_path.display());
+        log::warn!("Use --force to overwrite existing configuration.");
         std::process::exit(1);
     }
 
@@ -206,11 +212,10 @@ async fn handle_init(
     fs::write(&config_path, config_content)
         .with_context(|| format!("Failed to write config file: {}", config_path.display()))?;
 
-    println!("✅ Created configuration file with YAML language server support:");
-    println!("   {}", config_path.display());
+    log::info!("✅ Created configuration file with YAML language server support: {}", config_path.display());
     let default_schema_url = schema::get_schema_url();
     let used_schema_url = schema_url.as_deref().unwrap_or(&default_schema_url);
-    println!("   Schema URL: {used_schema_url}");
+    log::info!("   Schema URL: {used_schema_url}");
 
     // Create .claude directory if it doesn't exist
     fs::create_dir_all(&claude_path).with_context(|| {
@@ -229,10 +234,10 @@ async fn handle_init(
             serde_json::from_str(&settings_content).with_context(|| {
                 format!("Failed to parse settings file: {}", settings_path.display())
             })?;
-        println!("\n📝 Found existing Claude settings, updating hooks...");
+        log::info!("📝 Found existing Claude settings, updating hooks...");
         settings
     } else {
-        println!("\n📝 Creating Claude Code settings...");
+        log::info!("📝 Creating Claude Code settings...");
         ClaudeSettings {
             include_co_authored_by: None,
             permissions: Some(ClaudePermissions {
@@ -278,15 +283,14 @@ async fn handle_init(
     fs::write(&settings_path, settings_json)
         .with_context(|| format!("Failed to write settings file: {}", settings_path.display()))?;
 
-    println!("✅ Updated Claude Code settings:");
-    println!("   {}", settings_path.display());
+    log::info!("✅ Updated Claude Code settings: {}", settings_path.display());
 
-    println!("\n🎉 Conclaude initialization complete!");
-    println!("\nConfigured hooks:");
+    log::info!("🎉 Conclaude initialization complete!");
+    log::info!("Configured hooks:");
     for hook_type in &hook_types {
-        println!("   • {hook_type}");
+        log::info!("   • {hook_type}");
     }
-    println!("\nYou can now use Claude Code with conclaude hook handling.");
+    log::info!("You can now use Claude Code with conclaude hook handling.");
 
     Ok(())
 }
@@ -300,7 +304,7 @@ async fn handle_init(
 async fn handle_generate_schema(output: String, validate: bool) -> Result<()> {
     let output_path = PathBuf::from(output);
 
-    println!("🔧 Generating JSON Schema for conclaude configuration...");
+    log::info!("🔧 Generating JSON Schema for conclaude configuration...");
 
     // Generate the schema
     let schema = schema::generate_config_schema().context("Failed to generate JSON schema")?;
@@ -309,30 +313,27 @@ async fn handle_generate_schema(output: String, validate: bool) -> Result<()> {
     schema::write_schema_to_file(&schema, &output_path)
         .context("Failed to write schema to file")?;
 
-    println!("✅ Schema generated successfully:");
-    println!("   {}", output_path.display());
+    log::info!("✅ Schema generated successfully: {}", output_path.display());
 
     // Optionally validate the schema
     if validate {
-        println!("\n🔍 Validating generated schema...");
+        log::info!("🔍 Validating generated schema...");
 
         // Test with the default configuration
         let default_config = config::generate_default_config();
         schema::validate_config_against_schema(&default_config)
             .context("Default configuration failed schema validation")?;
 
-        println!("✅ Schema validation passed!");
-        println!("   Default configuration is valid against the generated schema.");
+        log::info!("✅ Schema validation passed!");
+        log::info!("   Default configuration is valid against the generated schema.");
     }
 
     // Display schema URL info
     let schema_url = schema::get_schema_url();
-    println!("\n📋 Schema URL for YAML language server:");
-    println!("   {schema_url}");
+    log::info!("📋 Schema URL for YAML language server: {schema_url}");
 
-    println!("\n💡 Add this header to your .conclaude.yaml files for IDE support:");
-    println!(
-        "   {}",
+    log::info!(
+        "💡 Add this header to your .conclaude.yaml files for IDE support: {}",
         schema::generate_yaml_language_server_header(None).trim()
     );
 
@@ -350,7 +351,7 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
     use glob::Pattern;
     use walkdir::WalkDir;
 
-    println!("🔍 Visualizing configuration rules...\n");
+    log::info!("🔍 Visualizing configuration rules...");
 
     let config = config::load_conclaude_config()
         .await
@@ -359,16 +360,16 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
     if let Some(rule_name) = rule {
         match rule_name.as_str() {
             "uneditableFiles" => {
-                println!("📁 Uneditable Files:");
+                log::info!("📁 Uneditable Files:");
                 if config.rules.uneditable_files.is_empty() {
-                    println!("   No uneditable files configured");
+                    log::info!("   No uneditable files configured");
                 } else {
                     for pattern_str in &config.rules.uneditable_files {
-                        println!("   Pattern: {pattern_str}");
+                        log::info!("   Pattern: {pattern_str}");
 
                         if show_matches {
                             let pattern = Pattern::new(pattern_str)?;
-                            println!("   Matching files:");
+                            log::info!("   Matching files:");
                             let mut found = false;
 
                             for entry in WalkDir::new(".")
@@ -378,77 +379,77 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                                 if entry.file_type().is_file() {
                                     let path = entry.path();
                                     if pattern.matches(&path.to_string_lossy()) {
-                                        println!("      - {}", path.display());
+                                        log::info!("      - {}", path.display());
                                         found = true;
                                     }
                                 }
                             }
 
                             if !found {
-                                println!("      (no matching files found)");
+                                log::info!("      (no matching files found)");
                             }
                         }
                     }
                 }
             }
             "preventRootAdditions" => {
-                println!(
+                log::info!(
                     "🚫 Prevent Root Additions: {}",
                     config.rules.prevent_root_additions
                 );
                 if config.rules.prevent_root_additions && show_matches {
-                    println!("\n   Root directory contents:");
+                    log::info!("   Root directory contents:");
                     for entry in (fs::read_dir(".")?).flatten() {
-                        println!("      - {}", entry.file_name().to_string_lossy());
+                        log::info!("      - {}", entry.file_name().to_string_lossy());
                     }
                 }
             }
             "toolUsageValidation" => {
-                println!("🔧 Tool Usage Validation Rules:");
+                log::info!("🔧 Tool Usage Validation Rules:");
                 if config.rules.tool_usage_validation.is_empty() {
-                    println!("   No tool usage validation rules configured");
+                    log::info!("   No tool usage validation rules configured");
                 } else {
                     for rule in &config.rules.tool_usage_validation {
-                        println!(
+                        log::info!(
                             "   Tool: {} | Pattern: {} | Action: {}",
                             rule.tool, rule.pattern, rule.action
                         );
                         if let Some(msg) = &rule.message {
-                            println!("      Message: {msg}");
+                            log::info!("      Message: {msg}");
                         }
                     }
                 }
             }
             _ => {
-                println!("❌ Unknown rule: {rule_name}");
-                println!("\nAvailable rules:");
-                println!("   - uneditableFiles");
-                println!("   - preventRootAdditions");
-                println!("   - toolUsageValidation");
+                log::error!("❌ Unknown rule: {rule_name}");
+                log::info!("Available rules:");
+                log::info!("   - uneditableFiles");
+                log::info!("   - preventRootAdditions");
+                log::info!("   - toolUsageValidation");
             }
         }
     } else {
         // Show all rules overview
-        println!("📋 Configuration Overview:\n");
-        println!(
+        log::info!("📋 Configuration Overview:");
+        log::info!(
             "🚫 Prevent Root Additions: {}",
             config.rules.prevent_root_additions
         );
-        println!(
+        log::info!(
             "📁 Uneditable Files: {} patterns",
             config.rules.uneditable_files.len()
         );
-        println!(
+        log::info!(
             "🔧 Tool Usage Validation: {} rules",
             config.rules.tool_usage_validation.len()
         );
-        println!("♾️  Infinite Mode: {}", config.stop.infinite);
+        log::info!("♾️  Infinite Mode: {}", config.stop.infinite);
         if let Some(rounds) = config.stop.rounds {
-            println!("🔄 Rounds Mode: {rounds} rounds");
+            log::info!("🔄 Rounds Mode: {rounds} rounds");
         }
 
-        println!("\nUse --rule <rule-name> to see details for a specific rule");
-        println!("Use --show-matches to see which files match the patterns");
+        log::info!("Use --rule <rule-name> to see details for a specific rule");
+        log::info!("Use --show-matches to see which files match the patterns");
     }
 
     Ok(())

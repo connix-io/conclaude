@@ -35,10 +35,8 @@ fn test_cli_init_command() {
         .output()
         .expect("Failed to run CLI init command");
 
-    let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    assert!(stdout.contains("Initializing conclaude configuration"));
-    assert!(stdout.contains("Created configuration file"));
-    assert!(stdout.contains("Conclaude initialization complete"));
+    // Command should succeed (all output goes to log files now)
+    assert!(output.status.success(), "Init command should succeed");
 
     // Verify files were created
     assert!(temp_path.join(".conclaude.yaml").exists());
@@ -72,7 +70,7 @@ fn test_cli_init_command_force_overwrite() {
     file.write_all(b"existing content")
         .expect("Failed to write existing content");
 
-    // First init without force should fail
+    // First init without force should fail (exit code 1)
     let output = Command::new("cargo")
         .args([
             "run",
@@ -86,9 +84,8 @@ fn test_cli_init_command_force_overwrite() {
         .output()
         .expect("Failed to run CLI init command");
 
-    let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    assert!(stdout.contains("Configuration file already exists"));
-    assert!(!output.status.success());
+    // Should fail because config already exists
+    assert!(!output.status.success(), "Init without force should fail when config exists");
 
     // Second init with force should succeed
     let output = Command::new("cargo")
@@ -105,9 +102,8 @@ fn test_cli_init_command_force_overwrite() {
         .output()
         .expect("Failed to run CLI init command");
 
-    let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
-    assert!(stdout.contains("Created configuration file"));
-    assert!(output.status.success());
+    // Should succeed with --force flag
+    assert!(output.status.success(), "Init with --force should succeed");
 
     // Verify the config was overwritten
     let config_content = fs::read_to_string(&config_path).expect("Failed to read config file");
