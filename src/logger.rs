@@ -151,7 +151,31 @@ pub fn create_session_logger(
     session_id: &str,
     config: Option<&LoggingConfig>,
 ) -> anyhow::Result<()> {
-    init_logger(Some(session_id), config)
+    let log_path = get_log_file_path(session_id);
+    let temp_dir = std::env::temp_dir();
+    let resolved_config = resolve_logging_config(config);
+
+    init_logger(Some(session_id), config).map_err(|e| {
+        let temp_readonly = std::fs::metadata(&temp_dir)
+            .map(|m| m.permissions().readonly())
+            .unwrap_or(true);
+
+        eprintln!("Failed to initialize session logger");
+        eprintln!("  Session ID: {}", session_id);
+        eprintln!("  Error: {}", e);
+        eprintln!("  Attempted log path: {}", log_path.display());
+        eprintln!("  Temp directory: {}", temp_dir.display());
+        eprintln!("  Temp dir exists: {}", temp_dir.exists());
+        eprintln!("  File logging enabled: {}", resolved_config.file_logging);
+        eprintln!("  Temp dir readonly: {}", temp_readonly);
+
+        anyhow::anyhow!(
+            "Failed to initialize session logger: {} (session_id={}, log_path={})",
+            e,
+            session_id,
+            log_path.display()
+        )
+    })
 }
 
 #[cfg(test)]

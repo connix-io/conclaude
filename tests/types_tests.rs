@@ -21,6 +21,8 @@ fn test_validate_base_payload_valid() {
         session_id: "test_session".to_string(),
         transcript_path: "/path/to/transcript".to_string(),
         hook_event_name: "PreToolUse".to_string(),
+        cwd: "/current/dir".to_string(),
+        permission_mode: Some("default".to_string()),
     };
     assert!(validate_base_payload(&valid_base).is_ok());
 }
@@ -31,6 +33,8 @@ fn test_validate_base_payload_missing_session_id() {
         session_id: String::new(),
         transcript_path: "/path/to/transcript".to_string(),
         hook_event_name: "PreToolUse".to_string(),
+        cwd: "/current/dir".to_string(),
+        permission_mode: Some("default".to_string()),
     };
     let result = validate_base_payload(&invalid_base);
     assert!(result.is_err());
@@ -43,6 +47,8 @@ fn test_validate_base_payload_missing_transcript_path() {
         session_id: "test_session".to_string(),
         transcript_path: String::new(),
         hook_event_name: "PreToolUse".to_string(),
+        cwd: "/current/dir".to_string(),
+        permission_mode: Some("default".to_string()),
     };
     let result = validate_base_payload(&invalid_base);
     assert!(result.is_err());
@@ -55,6 +61,8 @@ fn test_validate_base_payload_missing_hook_event_name() {
         session_id: "test_session".to_string(),
         transcript_path: "/path/to/transcript".to_string(),
         hook_event_name: String::new(),
+        cwd: "/current/dir".to_string(),
+        permission_mode: Some("default".to_string()),
     };
     let result = validate_base_payload(&invalid_base);
     assert!(result.is_err());
@@ -102,6 +110,8 @@ fn test_pre_tool_use_payload_serialization() {
             session_id: "test_session".to_string(),
             transcript_path: "/path/to/transcript".to_string(),
             hook_event_name: "PreToolUse".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
         },
         tool_name: "Edit".to_string(),
         tool_input,
@@ -119,6 +129,8 @@ fn test_notification_payload_deserialization() {
         "session_id": "test_session",
         "transcript_path": "/path/to/transcript",
         "hook_event_name": "Notification",
+        "cwd": "/current/dir",
+        "permission_mode": "default",
         "message": "Test notification",
         "title": "Test Title"
     }"#;
@@ -135,6 +147,8 @@ fn test_stop_payload_deserialization() {
         "session_id": "test_session",
         "transcript_path": "/path/to/transcript",
         "hook_event_name": "Stop",
+        "cwd": "/current/dir",
+        "permission_mode": "default",
         "stop_hook_active": true
     }"#;
 
@@ -149,6 +163,8 @@ fn test_user_prompt_submit_payload_deserialization() {
         "session_id": "test_session",
         "transcript_path": "/path/to/transcript",
         "hook_event_name": "UserPromptSubmit",
+        "cwd": "/current/dir",
+        "permission_mode": "default",
         "prompt": "Hello Claude"
     }"#;
 
@@ -163,7 +179,10 @@ fn test_pre_compact_payload_deserialization() {
         "session_id": "test_session",
         "transcript_path": "/path/to/transcript",
         "hook_event_name": "PreCompact",
-        "trigger": "auto"
+        "cwd": "/current/dir",
+        "permission_mode": "default",
+        "trigger": "auto",
+        "custom_instructions": null
     }"#;
 
     let payload: PreCompactPayload = serde_json::from_str(json).unwrap();
@@ -177,6 +196,8 @@ fn test_session_start_payload_deserialization() {
         "session_id": "test_session",
         "transcript_path": "/path/to/transcript",
         "hook_event_name": "SessionStart",
+        "cwd": "/current/dir",
+        "permission_mode": "default",
         "source": "CLI"
     }"#;
 

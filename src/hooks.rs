@@ -2,7 +2,7 @@ use crate::config::{ConclaudeConfig, extract_bash_commands, load_conclaude_confi
 use crate::logger::create_session_logger;
 use crate::types::{
     HookResult, LoggingConfig, NotificationPayload, PostToolUsePayload, PreCompactPayload,
-    PreToolUsePayload, SessionStartPayload, StopPayload, SubagentStopPayload,
+    PreToolUsePayload, SessionEndPayload, SessionStartPayload, StopPayload, SubagentStopPayload,
     UserPromptSubmitPayload, validate_base_payload,
 };
 use anyhow::{Context, Result};
@@ -370,6 +370,35 @@ pub async fn handle_session_start() -> Result<HookResult> {
         "Processing SessionStart hook: session_id={}, source={}",
         payload.base.session_id,
         payload.source
+    );
+
+    Ok(HookResult::success())
+}
+
+/// Handles `SessionEnd` hook events when a Claude session terminates.
+///
+/// # Errors
+///
+/// Returns an error if payload validation fails or logger creation fails.
+#[allow(clippy::unused_async)]
+pub async fn handle_session_end() -> Result<HookResult> {
+    let payload: SessionEndPayload = read_payload_from_stdin()?;
+
+    validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
+
+    if payload.reason.is_empty() {
+        return Err(anyhow::anyhow!("Missing required field: reason"));
+    }
+
+    // Initialize logger
+    let logging_config = LoggingConfig::default();
+    create_session_logger(&payload.base.session_id, Some(&logging_config))
+        .context("Failed to create session logger")?;
+
+    log::info!(
+        "Processing SessionEnd hook: session_id={}, reason={}",
+        payload.base.session_id,
+        payload.reason
     );
 
     Ok(HookResult::success())

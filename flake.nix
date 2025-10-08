@@ -116,6 +116,7 @@
             rust-bin.stable.latest.rust-analyzer
             napi-rs-cli
             yarn
+            cargo-dist
           ]
           ++ builtins.attrValues scriptPackages;
         shellHook = ''

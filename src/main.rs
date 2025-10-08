@@ -9,8 +9,8 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use hooks::{
     handle_hook_result, handle_notification, handle_post_tool_use, handle_pre_compact,
-    handle_pre_tool_use, handle_session_start, handle_stop, handle_subagent_stop,
-    handle_user_prompt_submit,
+    handle_pre_tool_use, handle_session_end, handle_session_start, handle_stop,
+    handle_subagent_stop, handle_user_prompt_submit,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -83,6 +83,9 @@ enum Commands {
     /// Process `SessionStart` hook - fired when session begins
     #[clap(name = "SessionStart")]
     SessionStart,
+    /// Process `SessionEnd` hook - fired when session terminates
+    #[clap(name = "SessionEnd")]
+    SessionEnd,
     /// Process Stop hook - fired when session terminates
     #[clap(name = "Stop")]
     Stop,
@@ -118,11 +121,25 @@ async fn main() -> Result<()> {
         std::env::set_var("CONCLAUDE_DISABLE_FILE_LOGGING", "true");
     }
 
-    // Initialize logger for CLI commands (without session ID)
-    // If logger initialization fails, we still continue but log the error to stderr
-    // since all other output now goes through the logger
-    if let Err(e) = logger::init_logger(None, None) {
-        eprintln!("Warning: Failed to initialize logger: {e}");
+    // Determine if this is a hook command (hook commands initialize their own session-specific loggers)
+    let is_hook_command = matches!(
+        cli.command,
+        Commands::PreToolUse
+            | Commands::PostToolUse
+            | Commands::Notification
+            | Commands::UserPromptSubmit
+            | Commands::SessionStart
+            | Commands::SessionEnd
+            | Commands::Stop
+            | Commands::SubagentStop
+            | Commands::PreCompact
+    );
+
+    // Initialize logger only for non-hook commands (hook commands initialize session-specific loggers)
+    if !is_hook_command {
+        if let Err(e) = logger::init_logger(None, None) {
+            eprintln!("Warning: Failed to initialize logger: {e}");
+        }
     }
 
     match cli.command {
@@ -140,6 +157,7 @@ async fn main() -> Result<()> {
         Commands::Notification => handle_hook_result(handle_notification).await,
         Commands::UserPromptSubmit => handle_hook_result(handle_user_prompt_submit).await,
         Commands::SessionStart => handle_hook_result(handle_session_start).await,
+        Commands::SessionEnd => handle_hook_result(handle_session_end).await,
         Commands::Stop => handle_hook_result(handle_stop).await,
         Commands::SubagentStop => handle_hook_result(handle_subagent_stop).await,
         Commands::PreCompact => handle_hook_result(handle_pre_compact).await,
@@ -258,6 +276,7 @@ async fn handle_init(
         "SubagentStop",
         "PreCompact",
         "SessionStart",
+        "SessionEnd",
     ];
 
     // Add hook configurations

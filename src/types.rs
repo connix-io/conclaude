@@ -43,6 +43,10 @@ pub struct BasePayload {
     pub transcript_path: String,
     /// Hook event type identifier
     pub hook_event_name: String,
+    /// Current working directory
+    pub cwd: String,
+    /// Current permission mode (e.g., "default", "acceptEdits", "bypassPermissions", "plan")
+    pub permission_mode: Option<String>,
 }
 
 /// Payload for `PreToolUse` hook - fired before Claude executes a tool.
@@ -67,16 +71,8 @@ pub struct PostToolUsePayload {
     pub tool_name: String,
     /// Input parameters that were passed to the tool
     pub tool_input: HashMap<String, serde_json::Value>,
-    /// Response data returned by the tool execution
-    pub tool_response: ToolResponse,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolResponse {
-    #[serde(flatten)]
-    pub data: HashMap<String, serde_json::Value>,
-    /// Whether the tool execution completed successfully
-    pub success: Option<bool>,
+    /// Response data returned by the tool execution (can be any JSON value)
+    pub tool_response: serde_json::Value,
 }
 
 /// Payload for Notification hook - fired when Claude sends system notifications.
@@ -129,6 +125,8 @@ pub struct PreCompactPayload {
     pub base: BasePayload,
     /// Whether compaction was triggered manually by user or automatically by system
     pub trigger: CompactTrigger,
+    /// Custom instructions provided for compaction (if any)
+    pub custom_instructions: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,6 +144,16 @@ pub struct SessionStartPayload {
     pub base: BasePayload,
     /// Source that initiated the session (e.g., CLI, IDE integration)
     pub source: String,
+}
+
+/// Payload for `SessionEnd` hook - fired when a Claude session terminates.
+/// Allows cleanup operations or final logging at the end of a conversation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionEndPayload {
+    #[serde(flatten)]
+    pub base: BasePayload,
+    /// Reason for session termination (e.g., "user_exit", "error", "completion")
+    pub reason: String,
 }
 
 /// Union type of all possible hook event payloads.
@@ -169,6 +177,8 @@ pub enum HookPayload {
     PreCompact(PreCompactPayload),
     #[serde(rename = "SessionStart")]
     SessionStart(SessionStartPayload),
+    #[serde(rename = "SessionEnd")]
+    SessionEnd(SessionEndPayload),
 }
 
 impl HookPayload {
@@ -184,6 +194,7 @@ impl HookPayload {
             HookPayload::UserPromptSubmit(p) => &p.base.session_id,
             HookPayload::PreCompact(p) => &p.base.session_id,
             HookPayload::SessionStart(p) => &p.base.session_id,
+            HookPayload::SessionEnd(p) => &p.base.session_id,
         }
     }
 
@@ -199,6 +210,7 @@ impl HookPayload {
             HookPayload::UserPromptSubmit(p) => &p.base.transcript_path,
             HookPayload::PreCompact(p) => &p.base.transcript_path,
             HookPayload::SessionStart(p) => &p.base.transcript_path,
+            HookPayload::SessionEnd(p) => &p.base.transcript_path,
         }
     }
 
@@ -214,6 +226,7 @@ impl HookPayload {
             HookPayload::UserPromptSubmit(p) => &p.base.hook_event_name,
             HookPayload::PreCompact(p) => &p.base.hook_event_name,
             HookPayload::SessionStart(p) => &p.base.hook_event_name,
+            HookPayload::SessionEnd(p) => &p.base.hook_event_name,
         }
     }
 }
@@ -232,6 +245,9 @@ pub fn validate_base_payload(base: &BasePayload) -> Result<(), String> {
     }
     if base.hook_event_name.is_empty() {
         return Err("Missing required field: hook_event_name".to_string());
+    }
+    if base.cwd.is_empty() {
+        return Err("Missing required field: cwd".to_string());
     }
     Ok(())
 }
@@ -260,6 +276,8 @@ mod tests {
             session_id: "test_session".to_string(),
             transcript_path: "/path/to/transcript".to_string(),
             hook_event_name: "PreToolUse".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
         };
         assert!(validate_base_payload(&valid_base).is_ok());
 
@@ -267,6 +285,8 @@ mod tests {
             session_id: String::new(),
             transcript_path: "/path/to/transcript".to_string(),
             hook_event_name: "PreToolUse".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
         };
         assert!(validate_base_payload(&invalid_base).is_err());
     }
