@@ -14,19 +14,42 @@ Born from real developer frustration, conclaude transforms chaotic AI coding ses
 
 ## Releases
 
-Official builds are published on GitHub Releases when tags matching `v*` are pushed. The CI builds with Nix and uploads a Linux x86_64 binary.
+Official builds are published on GitHub Releases when tags matching `v*` are pushed. The latest version is **v0.1.6**.
 
-- Latest binary: https://github.com/connix-io/conclaude/releases/latest/download/conclaude-linux-amd64
 - All releases: https://github.com/connix-io/conclaude/releases
 
-Quick install of latest Linux binary:
+### Quick Install Options
+
+#### Option 1: Shell Script (Recommended)
 
 ```bash
-curl -L -o conclaude \
-  https://github.com/connix-io/conclaude/releases/latest/download/conclaude-linux-amd64
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/connix-io/conclaude/releases/download/v0.1.6/conclaude-installer.sh | sh
+```
+
+#### Option 2: PowerShell (Windows)
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/connix-io/conclaude/releases/download/v0.1.6/conclaude-installer.ps1 | iex"
+```
+
+#### Option 3: NPM Package
+
+```bash
+npm install conclaude@0.1.6
+```
+
+#### Option 4: Manual Binary Download
+
+```bash
+# Linux x86_64 example
+curl -L -o conclaude.tar.xz \
+  https://github.com/connix-io/conclaude/releases/download/v0.1.6/conclaude-x86_64-unknown-linux-gnu.tar.xz
+tar -xf conclaude.tar.xz
 chmod +x conclaude && sudo mv conclaude /usr/local/bin/
 conclaude --version
 ```
+
+**Available platforms:** Apple Silicon macOS, Intel macOS, x64 Windows, ARM64 Linux, x64 Linux, x64 MUSL Linux.
 
 ## The Problem We Solve
 
