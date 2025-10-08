@@ -9,6 +9,8 @@ fn create_test_base_payload() -> BasePayload {
         session_id: "test_session_123".to_string(),
         transcript_path: "/tmp/test_transcript.jsonl".to_string(),
         hook_event_name: "PreToolUse".to_string(),
+        cwd: "/home/user/project".to_string(),
+        permission_mode: Some("default".to_string()),
     }
 }
 
@@ -291,6 +293,8 @@ fn test_validate_base_payload_integration() {
         session_id: String::new(),
         transcript_path: "/path/to/transcript".to_string(),
         hook_event_name: "PreToolUse".to_string(),
+        cwd: "/home/user/project".to_string(),
+        permission_mode: Some("default".to_string()),
     };
     assert!(validate_base_payload(&invalid_base).is_err());
 }
