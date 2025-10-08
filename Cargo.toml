@@ -8,6 +8,12 @@ authors = ["Conner Ohnesorge"]
 repository = "https://github.com/connix-io/conclaude"
 keywords = ["claude-code", "hooks", "cli", "ai", "automation"]
 
+[package.metadata.wix]
+upgrade-guid = "9AF570DA-8336-405C-A402-9B76ECDD4C3E"
+path-guid = "5D54B933-97E1-4A8E-AD21-A67167B1FDAD"
+license = false
+eula = false
+
 [[bin]]
 name = "conclaude"
 path = "src/main.rs"
@@ -33,3 +39,8 @@ walkdir = "2.4"
 
 [dev-dependencies]
 tempfile = "3.8"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
