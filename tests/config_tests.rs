@@ -287,7 +287,7 @@ async fn test_config_search_within_level_limit() {
 
     // Should successfully find and parse config
     assert!(result.is_ok());
-    let config = result.unwrap();
+    let (config, _config_path) = result.unwrap();
     assert_eq!(config.stop.run, "found config");
     assert!(!config.stop.infinite);
     assert!(config.rules.prevent_root_additions);

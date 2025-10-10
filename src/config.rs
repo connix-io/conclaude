@@ -112,7 +112,7 @@ pub struct ConclaudeConfig {
 /// # Errors
 ///
 /// Returns an error if no configuration file is found, file reading fails, or YAML parsing fails.
-pub async fn load_conclaude_config() -> Result<ConclaudeConfig> {
+pub async fn load_conclaude_config() -> Result<(ConclaudeConfig, PathBuf)> {
     let search_paths = get_config_search_paths()?;
 
     for path in &search_paths {
@@ -123,7 +123,7 @@ pub async fn load_conclaude_config() -> Result<ConclaudeConfig> {
             let config: ConclaudeConfig = serde_yaml::from_str(&content)
                 .with_context(|| format!("Failed to parse config file: {}", path.display()))?;
 
-            return Ok(config);
+            return Ok((config, path.clone()));
         }
     }
 
