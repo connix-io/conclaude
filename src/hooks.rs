@@ -26,14 +26,14 @@ struct StopCommandConfig {
 }
 
 /// Cached configuration instance to avoid repeated loads
-static CACHED_CONFIG: OnceLock<ConclaudeConfig> = OnceLock::new();
+static CACHED_CONFIG: OnceLock<(ConclaudeConfig, std::path::PathBuf)> = OnceLock::new();
 
 /// Load configuration with caching to avoid repeated file system operations
 ///
 /// # Errors
 ///
 /// Returns an error if the configuration file cannot be loaded or parsed.
-async fn get_config() -> Result<&'static ConclaudeConfig> {
+async fn get_config() -> Result<&'static (ConclaudeConfig, std::path::PathBuf)> {
     if let Some(config) = CACHED_CONFIG.get() {
         Ok(config)
     } else {
@@ -143,7 +143,7 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
 ///
 /// Returns an error if configuration loading fails, directory access fails, or glob pattern processing fails.
 async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
-    let config = get_config().await?;
+    let (config, config_path) = get_config().await?;
 
     // Extract file path from tool input
     let file_path = extract_file_path(&payload.tool_input);
@@ -162,7 +162,7 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
     // Check preventRootAdditions rule - only applies to Write tool
     if config.rules.prevent_root_additions
         && payload.tool_name == "Write"
-        && is_root_addition(&file_path, &relative_path)
+        && is_root_addition(&file_path, &relative_path, config_path)
     {
         let error_message = format!(
             "Blocked {} operation: preventRootAdditions rule prevents creating files at repository root. File: {}",
@@ -217,28 +217,36 @@ pub fn extract_file_path<S: std::hash::BuildHasher>(
 }
 
 /// Check if a file path represents a root addition
+///
+/// A file is considered a root addition if it's being created at the same directory
+/// level as the .conclaude.yaml config file.
 #[must_use]
-pub fn is_root_addition(_file_path: &str, relative_path: &str) -> bool {
-    let path = Path::new(relative_path);
-    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+pub fn is_root_addition(_file_path: &str, relative_path: &str, config_path: &Path) -> bool {
+    // Handle edge cases - empty paths and parent directory references
+    if relative_path.is_empty() || relative_path == ".." {
+        return false;
+    }
 
-    // Check if the file is directly in the root directory (no subdirectories)
-    let is_in_root = !relative_path.contains(std::path::MAIN_SEPARATOR)
-        && !relative_path.is_empty()
-        && relative_path != "..";
+    // Get the directory containing the config file
+    let config_dir = config_path.parent().unwrap_or(Path::new("."));
 
-    // Allow dotfiles and configuration files
-    // TODO: REMOVE THIS HACK
-    let is_config_file = file_name.contains("config")
-        || file_name.contains("settings")
-        || file_name == "package.json"
-        || file_name == "tsconfig.json"
-        || file_name == "bun.lockb"
-        || file_name == "bun.lock";
+    // Get the current working directory
+    let Ok(cwd) = std::env::current_dir() else {
+        return false;
+    };
 
-    let is_dotfile = file_name.starts_with('.');
+    // Resolve the full path of the file being created
+    let resolved_file_path = cwd.join(relative_path);
 
-    is_in_root && !is_dotfile && !is_config_file
+    // Get the directory that will contain the new file
+    let file_parent_dir = resolved_file_path.parent().unwrap_or(&cwd);
+
+    // Compare the canonical paths if possible, otherwise compare as-is
+    let config_dir_canonical = config_dir.canonicalize().unwrap_or_else(|_| config_dir.to_path_buf());
+    let file_dir_canonical = file_parent_dir.canonicalize().unwrap_or_else(|_| file_parent_dir.to_path_buf());
+
+    // Block if the file is being created in the same directory as the config
+    config_dir_canonical == file_dir_canonical
 }
 
 /// Check if a file matches an uneditable pattern
@@ -566,7 +574,7 @@ pub async fn handle_stop() -> Result<HookResult> {
         payload.base.session_id
     );
 
-    let config = get_config().await?;
+    let (config, _config_path) = get_config().await?;
 
     // Snapshot root directory if preventRootAdditions is enabled
     let root_snapshot = if config.rules.prevent_root_additions {
@@ -671,7 +679,7 @@ pub async fn handle_pre_compact() -> Result<HookResult> {
 ///
 /// Returns an error if configuration loading fails or glob pattern creation fails.
 async fn check_tool_usage_rules(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
-    let config = get_config().await?;
+    let (config, _config_path) = get_config().await?;
 
     for rule in &config.rules.tool_usage_validation {
         if rule.tool == payload.tool_name || rule.tool == "*" {
@@ -746,7 +754,7 @@ pub fn check_generated_file_markers(content: &str) -> Option<String> {
 ///
 /// Returns an error if configuration loading fails or file cannot be read.
 pub async fn check_auto_generated_file(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
-    let config = get_config().await?;
+    let (config, _config_path) = get_config().await?;
 
     // Only check if the feature is enabled
     if !config.pre_tool_use.prevent_generated_file_edits {
@@ -845,11 +853,30 @@ mod tests {
 
     #[test]
     fn test_is_root_addition() {
-        assert!(is_root_addition("test.txt", "test.txt"));
-        assert!(!is_root_addition(".gitignore", ".gitignore"));
-        assert!(!is_root_addition("package.json", "package.json"));
-        assert!(!is_root_addition("src/test.txt", "src/test.txt"));
-        assert!(!is_root_addition("config.yaml", "config.yaml"));
+        use std::env;
+
+        // Get current working directory for testing
+        let cwd = env::current_dir().unwrap();
+
+        // Simulate config file in the current directory
+        let config_path = cwd.join(".conclaude.yaml");
+
+        // Files at the same level as config should be blocked
+        assert!(is_root_addition("test.txt", "test.txt", &config_path));
+        assert!(is_root_addition("newfile.rs", "newfile.rs", &config_path));
+
+        // BREAKING CHANGE: Dotfiles are now also blocked at root level
+        assert!(is_root_addition(".gitignore", ".gitignore", &config_path));
+        assert!(is_root_addition(".env", ".env", &config_path));
+
+        // BREAKING CHANGE: Config files are now also blocked at root level
+        assert!(is_root_addition("package.json", "package.json", &config_path));
+        assert!(is_root_addition("config.yaml", "config.yaml", &config_path));
+
+        // Files in subdirectories should not be blocked
+        assert!(!is_root_addition("src/test.txt", "src/test.txt", &config_path));
+        assert!(!is_root_addition("tests/foo.rs", "tests/foo.rs", &config_path));
+        assert!(!is_root_addition("nested/deep/file.txt", "nested/deep/file.txt", &config_path));
     }
 
     #[test]
