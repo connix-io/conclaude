@@ -379,3 +379,45 @@ rules:
     assert_eq!(config.stop.commands[1].run, "npm run build");
     assert_eq!(config.stop.commands[1].max_output_lines, Some(100));
 }
+
+#[test]
+fn test_truncate_output_logic() {
+    // Simulate the truncation logic from execute_stop_commands
+    let truncate_output = |text: &str, max_lines: Option<usize>| -> String {
+        if let Some(max) = max_lines {
+            let lines: Vec<&str> = text.trim().lines().collect();
+            if lines.len() > max {
+                let truncated: Vec<&str> = lines.iter().take(max).copied().collect();
+                let remaining = lines.len() - max;
+                format!("{}\n... ({} more lines omitted)", truncated.join("\n"), remaining)
+            } else {
+                text.to_string()
+            }
+        } else {
+            text.to_string()
+        }
+    };
+
+    // Test case 1: Text with more lines than max
+    let text1 = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5";
+    let result1 = truncate_output(text1, Some(2));
+    assert!(result1.contains("Line 1"));
+    assert!(result1.contains("Line 2"));
+    assert!(result1.contains("... (3 more lines omitted)"));
+    assert!(!result1.contains("Line 3"));
+    
+    // Test case 2: Text with fewer lines than max
+    let text2 = "Line 1\nLine 2";
+    let result2 = truncate_output(text2, Some(5));
+    assert_eq!(result2, text2);
+    
+    // Test case 3: No max specified
+    let text3 = "Line 1\nLine 2\nLine 3";
+    let result3 = truncate_output(text3, None);
+    assert_eq!(result3, text3);
+    
+    // Test case 4: Exactly max lines
+    let text4 = "Line 1\nLine 2\nLine 3";
+    let result4 = truncate_output(text4, Some(3));
+    assert_eq!(result4, text4);
+}

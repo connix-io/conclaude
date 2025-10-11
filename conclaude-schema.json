@@ -82,6 +82,15 @@
     "StopCommand": {
       "description": "Configuration for individual stop commands with optional messages",
       "properties": {
+        "maxOutputLines": {
+          "default": null,
+          "format": "uint",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "message": {
           "default": null,
           "type": [
@@ -132,6 +141,10 @@
             "string",
             "null"
           ]
+        },
+        "reduceContext": {
+          "default": false,
+          "type": "boolean"
         },
         "rounds": {
           "default": null,
@@ -225,6 +238,7 @@
         "commands": [],
         "infinite": false,
         "infiniteMessage": null,
+        "reduceContext": false,
         "rounds": null,
         "run": ""
       }
