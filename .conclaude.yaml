@@ -16,8 +16,10 @@ stop:
   # commands:
   #   - run: "npm test"
   #     message: "Tests failed - please fix failing tests before continuing"
+  #     maxOutputLines: 20  # Limit output to 20 lines (truncate if longer)
   #   - run: "npm run build"
   #     message: "Build failed - please fix compilation errors"
+  #     maxOutputLines: 50  # Limit error output to 50 lines
 
   # Infinite mode - allows Claude to continue automatically
   # When enabled, Claude receives the infiniteMessage to continue working
@@ -31,6 +33,11 @@ stop:
   # When set, Claude will continue for the specified number of rounds
   rounds: null
   # Example: rounds: 3
+
+  # Reduce context in stop hook messages to minimize token usage
+  # When enabled, error messages exclude command details and output
+  # Only the essential message is shown (reduces distractions for agents)
+  reduceContext: false
 
   # Grep rules for stop hook - scan files for forbidden patterns
   # Files matching filePattern are checked for forbiddenPattern

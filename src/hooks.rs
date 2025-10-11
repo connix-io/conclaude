@@ -23,6 +23,7 @@ struct StopCommandConfig {
     message: Option<String>,
     show_stdout: bool,
     show_stderr: bool,
+    max_output_lines: Option<usize>,
 }
 
 /// Cached configuration instance to avoid repeated loads
@@ -421,6 +422,7 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
                 message: None,
                 show_stdout: false,
                 show_stderr: false,
+                max_output_lines: None,
             });
         }
     }
@@ -436,6 +438,7 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
                 message: cmd_config.message.clone(),
                 show_stdout,
                 show_stderr,
+                max_output_lines: cmd_config.max_output_lines,
             });
         }
     }
@@ -450,6 +453,7 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
 /// Returns an error if command execution fails or process spawning fails.
 async fn execute_stop_commands(
     commands: &[StopCommandConfig],
+    reduce_context: bool,
 ) -> Result<Option<HookResult>> {
     log::info!(
         "Executing {} stop hook commands",
@@ -511,20 +515,40 @@ async fn execute_stop_commands(
                 }
             );
 
-            let stdout_section = if cmd_config.show_stdout && !stdout.is_empty() {
-                format!("\nStdout: {stdout}")
+            // Helper to truncate output based on maxOutputLines
+            let truncate_output = |text: &str, max_lines: Option<usize>| -> String {
+                if let Some(max) = max_lines {
+                    let lines: Vec<&str> = text.trim().lines().collect();
+                    if lines.len() > max {
+                        let truncated: Vec<&str> = lines.iter().take(max).copied().collect();
+                        let remaining = lines.len() - max;
+                        format!("{}\n... ({} more lines omitted)", truncated.join("\n"), remaining)
+                    } else {
+                        text.to_string()
+                    }
+                } else {
+                    text.to_string()
+                }
+            };
+
+            let stdout_section = if !reduce_context && cmd_config.show_stdout && !stdout.is_empty() {
+                let truncated = truncate_output(&stdout, cmd_config.max_output_lines);
+                format!("\nStdout: {truncated}")
             } else {
                 String::new()
             };
 
-            let stderr_section = if cmd_config.show_stderr && !stderr.is_empty() {
-                format!("\nStderr: {stderr}")
+            let stderr_section = if !reduce_context && cmd_config.show_stderr && !stderr.is_empty() {
+                let truncated = truncate_output(&stderr, cmd_config.max_output_lines);
+                format!("\nStderr: {truncated}")
             } else {
                 String::new()
             };
 
             let error_message = if let Some(custom_msg) = &cmd_config.message {
                 format!("{custom_msg}{stdout_section}{stderr_section}")
+            } else if reduce_context {
+                format!("Command failed with exit code {exit_code}")
             } else {
                 format!(
                     "Command failed with exit code {exit_code}: {}{stdout_section}{stderr_section}",
@@ -579,7 +603,7 @@ pub async fn handle_stop() -> Result<HookResult> {
     let commands_with_messages = collect_stop_commands(config)?;
 
     // Execute commands
-    if let Some(result) = execute_stop_commands(&commands_with_messages).await? {
+    if let Some(result) = execute_stop_commands(&commands_with_messages, config.stop.reduce_context).await? {
         return Ok(result);
     }
 

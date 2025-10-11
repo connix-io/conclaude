@@ -16,6 +16,8 @@ pub struct StopCommand {
     pub show_stdout: Option<bool>,
     #[serde(default, rename = "showStderr")]
     pub show_stderr: Option<bool>,
+    #[serde(default, rename = "maxOutputLines")]
+    pub max_output_lines: Option<usize>,
 }
 
 /// Configuration interface for stop hook commands
@@ -31,6 +33,8 @@ pub struct StopConfig {
     pub infinite_message: Option<String>,
     #[serde(default)]
     pub rounds: Option<u32>,
+    #[serde(default, rename = "reduceContext")]
+    pub reduce_context: bool,
 }
 
 /// Configuration interface for validation rules

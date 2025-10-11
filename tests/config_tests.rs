@@ -292,3 +292,90 @@ async fn test_config_search_within_level_limit() {
     assert!(!config.stop.infinite);
     assert!(config.rules.prevent_root_additions);
 }
+
+#[test]
+fn test_stop_config_with_reduce_context() {
+    let config_content = r#"
+stop:
+  run: "echo test"
+  reduceContext: true
+rules:
+  preventRootAdditions: true
+"#;
+    let config: conclaude::config::ConclaudeConfig = serde_yaml::from_str(config_content).unwrap();
+    assert!(config.stop.reduce_context);
+}
+
+#[test]
+fn test_stop_config_reduce_context_defaults_to_false() {
+    let config_content = r#"
+stop:
+  run: "echo test"
+rules:
+  preventRootAdditions: true
+"#;
+    let config: conclaude::config::ConclaudeConfig = serde_yaml::from_str(config_content).unwrap();
+    assert!(!config.stop.reduce_context);
+}
+
+#[test]
+fn test_stop_command_with_max_output_lines() {
+    let config_content = r#"
+stop:
+  commands:
+    - run: "npm test"
+      message: "Tests failed"
+      maxOutputLines: 20
+rules:
+  preventRootAdditions: true
+"#;
+    let config: conclaude::config::ConclaudeConfig = serde_yaml::from_str(config_content).unwrap();
+    assert_eq!(config.stop.commands.len(), 1);
+    assert_eq!(config.stop.commands[0].max_output_lines, Some(20));
+}
+
+#[test]
+fn test_stop_command_max_output_lines_defaults_to_none() {
+    let config_content = r#"
+stop:
+  commands:
+    - run: "npm test"
+      message: "Tests failed"
+rules:
+  preventRootAdditions: true
+"#;
+    let config: conclaude::config::ConclaudeConfig = serde_yaml::from_str(config_content).unwrap();
+    assert_eq!(config.stop.commands.len(), 1);
+    assert_eq!(config.stop.commands[0].max_output_lines, None);
+}
+
+#[test]
+fn test_stop_config_with_all_new_fields() {
+    let config_content = r#"
+stop:
+  run: "echo test"
+  reduceContext: true
+  commands:
+    - run: "npm test"
+      message: "Tests failed"
+      showStdout: true
+      showStderr: true
+      maxOutputLines: 50
+    - run: "npm run build"
+      message: "Build failed"
+      maxOutputLines: 100
+rules:
+  preventRootAdditions: true
+"#;
+    let config: conclaude::config::ConclaudeConfig = serde_yaml::from_str(config_content).unwrap();
+    assert!(config.stop.reduce_context);
+    assert_eq!(config.stop.commands.len(), 2);
+    
+    assert_eq!(config.stop.commands[0].run, "npm test");
+    assert_eq!(config.stop.commands[0].max_output_lines, Some(50));
+    assert_eq!(config.stop.commands[0].show_stdout, Some(true));
+    assert_eq!(config.stop.commands[0].show_stderr, Some(true));
+    
+    assert_eq!(config.stop.commands[1].run, "npm run build");
+    assert_eq!(config.stop.commands[1].max_output_lines, Some(100));
+}
