@@ -85,7 +85,10 @@ fn test_cli_init_command_force_overwrite() {
         .expect("Failed to run CLI init command");
 
     // Should fail because config already exists
-    assert!(!output.status.success(), "Init without force should fail when config exists");
+    assert!(
+        !output.status.success(),
+        "Init without force should fail when config exists"
+    );
 
     // Second init with force should succeed
     let output = Command::new("cargo")

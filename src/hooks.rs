@@ -1,9 +1,9 @@
-use crate::config::{ConclaudeConfig, extract_bash_commands, load_conclaude_config};
+use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig};
 use crate::logger::create_session_logger;
 use crate::types::{
-    HookResult, LoggingConfig, NotificationPayload, PostToolUsePayload, PreCompactPayload,
-    PreToolUsePayload, SessionEndPayload, SessionStartPayload, StopPayload, SubagentStopPayload,
-    UserPromptSubmitPayload, validate_base_payload,
+    validate_base_payload, HookResult, LoggingConfig, NotificationPayload, PostToolUsePayload,
+    PreCompactPayload, PreToolUsePayload, SessionEndPayload, SessionStartPayload, StopPayload,
+    SubagentStopPayload, UserPromptSubmitPayload,
 };
 use anyhow::{Context, Result};
 use glob::Pattern;
@@ -13,8 +13,8 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::OnceLock;
 use tokio::process::Command as TokioCommand;
 
 /// Represents a stop command with its configuration
@@ -455,10 +455,7 @@ async fn execute_stop_commands(
     commands: &[StopCommandConfig],
     reduce_context: bool,
 ) -> Result<Option<HookResult>> {
-    log::info!(
-        "Executing {} stop hook commands",
-        commands.len()
-    );
+    log::info!("Executing {} stop hook commands", commands.len());
 
     for (index, cmd_config) in commands.iter().enumerate() {
         log::info!(
@@ -522,7 +519,11 @@ async fn execute_stop_commands(
                     if lines.len() > max {
                         let truncated: Vec<&str> = lines.iter().take(max).copied().collect();
                         let remaining = lines.len() - max;
-                        format!("{}\n... ({} more lines omitted)", truncated.join("\n"), remaining)
+                        format!(
+                            "{}\n... ({} more lines omitted)",
+                            truncated.join("\n"),
+                            remaining
+                        )
                     } else {
                         text.to_string()
                     }
@@ -531,14 +532,16 @@ async fn execute_stop_commands(
                 }
             };
 
-            let stdout_section = if !reduce_context && cmd_config.show_stdout && !stdout.is_empty() {
+            let stdout_section = if !reduce_context && cmd_config.show_stdout && !stdout.is_empty()
+            {
                 let truncated = truncate_output(&stdout, cmd_config.max_output_lines);
                 format!("\nStdout: {truncated}")
             } else {
                 String::new()
             };
 
-            let stderr_section = if !reduce_context && cmd_config.show_stderr && !stderr.is_empty() {
+            let stderr_section = if !reduce_context && cmd_config.show_stderr && !stderr.is_empty()
+            {
                 let truncated = truncate_output(&stderr, cmd_config.max_output_lines);
                 format!("\nStderr: {truncated}")
             } else {
@@ -603,7 +606,9 @@ pub async fn handle_stop() -> Result<HookResult> {
     let commands_with_messages = collect_stop_commands(config)?;
 
     // Execute commands
-    if let Some(result) = execute_stop_commands(&commands_with_messages, config.stop.reduce_context).await? {
+    if let Some(result) =
+        execute_stop_commands(&commands_with_messages, config.stop.reduce_context).await?
+    {
         return Ok(result);
     }
 
@@ -878,25 +883,21 @@ mod tests {
 
     #[test]
     fn test_matches_uneditable_pattern() {
-        assert!(
-            matches_uneditable_pattern(
-                "package.json",
-                "package.json",
-                "/path/package.json",
-                "package.json"
-            )
-            .unwrap()
-        );
+        assert!(matches_uneditable_pattern(
+            "package.json",
+            "package.json",
+            "/path/package.json",
+            "package.json"
+        )
+        .unwrap());
         assert!(matches_uneditable_pattern("test.md", "test.md", "/path/test.md", "*.md").unwrap());
-        assert!(
-            matches_uneditable_pattern(
-                "src/index.ts",
-                "src/index.ts",
-                "/path/src/index.ts",
-                "src/**/*.ts"
-            )
-            .unwrap()
-        );
+        assert!(matches_uneditable_pattern(
+            "src/index.ts",
+            "src/index.ts",
+            "/path/src/index.ts",
+            "src/**/*.ts"
+        )
+        .unwrap());
         assert!(
             !matches_uneditable_pattern("other.txt", "other.txt", "/path/other.txt", "*.md")
                 .unwrap()

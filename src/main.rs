@@ -219,7 +219,10 @@ async fn handle_init(
 
     // Check if config file exists
     if config_path.exists() && !force {
-        log::warn!("⚠️  Configuration file already exists: {}", config_path.display());
+        log::warn!(
+            "⚠️  Configuration file already exists: {}",
+            config_path.display()
+        );
         log::warn!("Use --force to overwrite existing configuration.");
         std::process::exit(1);
     }
@@ -230,7 +233,10 @@ async fn handle_init(
     fs::write(&config_path, config_content)
         .with_context(|| format!("Failed to write config file: {}", config_path.display()))?;
 
-    log::info!("✅ Created configuration file with YAML language server support: {}", config_path.display());
+    log::info!(
+        "✅ Created configuration file with YAML language server support: {}",
+        config_path.display()
+    );
     let default_schema_url = schema::get_schema_url();
     let used_schema_url = schema_url.as_deref().unwrap_or(&default_schema_url);
     log::info!("   Schema URL: {used_schema_url}");
@@ -302,7 +308,10 @@ async fn handle_init(
     fs::write(&settings_path, settings_json)
         .with_context(|| format!("Failed to write settings file: {}", settings_path.display()))?;
 
-    log::info!("✅ Updated Claude Code settings: {}", settings_path.display());
+    log::info!(
+        "✅ Updated Claude Code settings: {}",
+        settings_path.display()
+    );
 
     log::info!("🎉 Conclaude initialization complete!");
     log::info!("Configured hooks:");
@@ -332,7 +341,10 @@ async fn handle_generate_schema(output: String, validate: bool) -> Result<()> {
     schema::write_schema_to_file(&schema, &output_path)
         .context("Failed to write schema to file")?;
 
-    log::info!("✅ Schema generated successfully: {}", output_path.display());
+    log::info!(
+        "✅ Schema generated successfully: {}",
+        output_path.display()
+    );
 
     // Optionally validate the schema
     if validate {
@@ -431,7 +443,9 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                     for rule in &config.rules.tool_usage_validation {
                         log::info!(
                             "   Tool: {} | Pattern: {} | Action: {}",
-                            rule.tool, rule.pattern, rule.action
+                            rule.tool,
+                            rule.pattern,
+                            rule.action
                         );
                         if let Some(msg) = &rule.message {
                             log::info!("      Message: {msg}");

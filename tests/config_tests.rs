@@ -370,12 +370,12 @@ rules:
     let config: conclaude::config::ConclaudeConfig = serde_yaml::from_str(config_content).unwrap();
     assert!(config.stop.reduce_context);
     assert_eq!(config.stop.commands.len(), 2);
-    
+
     assert_eq!(config.stop.commands[0].run, "npm test");
     assert_eq!(config.stop.commands[0].max_output_lines, Some(50));
     assert_eq!(config.stop.commands[0].show_stdout, Some(true));
     assert_eq!(config.stop.commands[0].show_stderr, Some(true));
-    
+
     assert_eq!(config.stop.commands[1].run, "npm run build");
     assert_eq!(config.stop.commands[1].max_output_lines, Some(100));
 }
@@ -389,7 +389,11 @@ fn test_truncate_output_logic() {
             if lines.len() > max {
                 let truncated: Vec<&str> = lines.iter().take(max).copied().collect();
                 let remaining = lines.len() - max;
-                format!("{}\n... ({} more lines omitted)", truncated.join("\n"), remaining)
+                format!(
+                    "{}\n... ({} more lines omitted)",
+                    truncated.join("\n"),
+                    remaining
+                )
             } else {
                 text.to_string()
             }
@@ -405,17 +409,17 @@ fn test_truncate_output_logic() {
     assert!(result1.contains("Line 2"));
     assert!(result1.contains("... (3 more lines omitted)"));
     assert!(!result1.contains("Line 3"));
-    
+
     // Test case 2: Text with fewer lines than max
     let text2 = "Line 1\nLine 2";
     let result2 = truncate_output(text2, Some(5));
     assert_eq!(result2, text2);
-    
+
     // Test case 3: No max specified
     let text3 = "Line 1\nLine 2\nLine 3";
     let result3 = truncate_output(text3, None);
     assert_eq!(result3, text3);
-    
+
     // Test case 4: Exactly max lines
     let text4 = "Line 1\nLine 2\nLine 3";
     let result4 = truncate_output(text4, Some(3));
