@@ -76,34 +76,50 @@ fn test_extract_file_path_with_non_string_value() {
 
 #[test]
 fn test_is_root_addition_true_cases() {
-    // File directly in root directory
-    assert!(is_root_addition("", "test.txt"));
-    assert!(is_root_addition("", "script.sh"));
-    assert!(is_root_addition("", "data.json"));
+    use std::env;
+
+    // Get current working directory for testing
+    let cwd = env::current_dir().unwrap();
+
+    // Simulate config file in the current directory
+    let config_path = cwd.join(".conclaude.yaml");
+
+    // Files directly in root directory (same level as config)
+    assert!(is_root_addition("", "test.txt", &config_path));
+    assert!(is_root_addition("", "script.sh", &config_path));
+    assert!(is_root_addition("", "data.json", &config_path));
+
+    // BREAKING CHANGE: Dotfiles are now also blocked at root level
+    assert!(is_root_addition("", ".gitignore", &config_path));
+    assert!(is_root_addition("", ".env", &config_path));
+
+    // BREAKING CHANGE: Config files are now also blocked at root level
+    assert!(is_root_addition("", "package.json", &config_path));
+    assert!(is_root_addition("", "tsconfig.json", &config_path));
+    assert!(is_root_addition("", "config.yaml", &config_path));
+    assert!(is_root_addition("", "settings.ini", &config_path));
+    assert!(is_root_addition("", "bun.lockb", &config_path));
+    assert!(is_root_addition("", "bun.lock", &config_path));
 }
 
 #[test]
 fn test_is_root_addition_false_cases() {
-    // Dotfiles should be allowed
-    assert!(!is_root_addition("", ".gitignore"));
-    assert!(!is_root_addition("", ".env"));
+    use std::env;
 
-    // Config files should be allowed
-    assert!(!is_root_addition("", "package.json"));
-    assert!(!is_root_addition("", "tsconfig.json"));
-    assert!(!is_root_addition("", "config.yaml"));
-    assert!(!is_root_addition("", "settings.ini"));
-    assert!(!is_root_addition("", "bun.lockb"));
-    assert!(!is_root_addition("", "bun.lock"));
+    // Get current working directory for testing
+    let cwd = env::current_dir().unwrap();
 
-    // Files in subdirectories should be allowed
-    assert!(!is_root_addition("", "src/test.txt"));
-    assert!(!is_root_addition("", "docs/readme.md"));
-    assert!(!is_root_addition("", "tests/unit.rs"));
+    // Simulate config file in the current directory
+    let config_path = cwd.join(".conclaude.yaml");
 
-    // Edge cases
-    assert!(!is_root_addition("", ""));
-    assert!(!is_root_addition("", ".."));
+    // Files in subdirectories should not be blocked
+    assert!(!is_root_addition("", "src/test.txt", &config_path));
+    assert!(!is_root_addition("", "docs/readme.md", &config_path));
+    assert!(!is_root_addition("", "tests/unit.rs", &config_path));
+
+    // Edge cases - empty paths
+    assert!(!is_root_addition("", "", &config_path));
+    assert!(!is_root_addition("", "..", &config_path));
 }
 
 #[test]
