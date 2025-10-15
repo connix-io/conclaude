@@ -79,18 +79,6 @@ pub struct PreToolUseConfig {
     pub generated_file_message: Option<String>,
 }
 
-/// Configuration for git worktree auto finish
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
-pub struct GitWorktreeConfig {
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default, rename = "autoCreatePR")]
-    pub auto_create_pr: bool,
-    #[serde(default, rename = "autoCreatePRCommand")]
-    pub auto_create_pr_command: Option<String>,
-    #[serde(default, rename = "autoCreatePRTemplate")]
-    pub auto_create_pr_template: Option<String>,
-}
 
 /// Main configuration interface matching the TypeScript version
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
@@ -102,8 +90,6 @@ pub struct ConclaudeConfig {
     pub rules: RulesConfig,
     #[serde(default, rename = "preToolUse")]
     pub pre_tool_use: PreToolUseConfig,
-    #[serde(default, rename = "gitWorktree")]
-    pub git_worktree: GitWorktreeConfig,
 }
 
 /// Load YAML configuration using native search strategies

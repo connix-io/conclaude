@@ -130,89 +130,8 @@ fn test_generate_default_config() {
     assert!(config.contains("infinite: false"));
 }
 
-#[test]
-fn test_git_worktree_config_with_pr_command() {
-    let config_content = r#"
-stop:
-  run: ""
-rules:
-  preventRootAdditions: true
-gitWorktree:
-  enabled: true
-  autoCreatePR: true
-  autoCreatePRCommand: |
-    gh pr create \
-      --title "{title}" \
-      --body "{body}" \
-      --base "main" \
-      --head "{branch}"
-  autoCreatePRTemplate: |
-    ## Summary
-    Changes in branch `{branch}`
-    
-    ## Changes
-    {changes_summary}
-"#;
 
-    let config =
-        serde_yaml::from_str::<conclaude::config::ConclaudeConfig>(config_content).unwrap();
-    assert!(config.git_worktree.enabled);
-    assert!(config.git_worktree.auto_create_pr);
-    assert!(config.git_worktree.auto_create_pr_command.is_some());
 
-    let pr_command = config.git_worktree.auto_create_pr_command.unwrap();
-    assert!(pr_command.contains("gh pr create"));
-    assert!(pr_command.contains("{title}"));
-    assert!(pr_command.contains("{body}"));
-    assert!(pr_command.contains("{branch}"));
-
-    let pr_template = config.git_worktree.auto_create_pr_template.unwrap();
-    assert!(pr_template.contains("## Summary"));
-    assert!(pr_template.contains("{branch}"));
-    assert!(pr_template.contains("{changes_summary}"));
-}
-
-#[test]
-fn test_git_worktree_config_defaults() {
-    let config_content = r#"
-stop:
-  run: ""
-rules:
-  preventRootAdditions: true
-gitWorktree:
-  enabled: false
-  autoCreatePR: false
-"#;
-
-    let config =
-        serde_yaml::from_str::<conclaude::config::ConclaudeConfig>(config_content).unwrap();
-    assert!(!config.git_worktree.enabled);
-    assert!(!config.git_worktree.auto_create_pr);
-    assert!(config.git_worktree.auto_create_pr_command.is_none());
-    assert!(config.git_worktree.auto_create_pr_template.is_none());
-}
-
-#[test]
-fn test_git_worktree_config_partial() {
-    // Test that partial config with only some fields works
-    let config_content = r#"
-stop:
-  run: ""
-rules:
-  preventRootAdditions: true
-gitWorktree:
-  enabled: true
-  autoCreatePR: true
-  autoCreatePRCommand: "gh pr create --title \"{title}\" --body \"{body}\""
-"#;
-
-    let config =
-        serde_yaml::from_str::<conclaude::config::ConclaudeConfig>(config_content).unwrap();
-    assert!(config.git_worktree.enabled);
-    assert!(config.git_worktree.auto_create_pr);
-    assert!(config.git_worktree.auto_create_pr_command.is_some());
-    assert!(config.git_worktree.auto_create_pr_template.is_none()); // Should be None when not specified
-}
 
 #[tokio::test]
 async fn test_config_search_level_limit() {
