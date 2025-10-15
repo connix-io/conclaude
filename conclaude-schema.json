@@ -3,34 +3,6 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "definitions": {
-    "GitWorktreeConfig": {
-      "description": "Configuration for git worktree auto finish",
-      "properties": {
-        "autoCreatePR": {
-          "default": false,
-          "type": "boolean"
-        },
-        "autoCreatePRCommand": {
-          "default": null,
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "autoCreatePRTemplate": {
-          "default": null,
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "enabled": {
-          "default": false,
-          "type": "boolean"
-        }
-      },
-      "type": "object"
-    },
     "PreToolUseConfig": {
       "description": "Configuration for pre tool use hooks",
       "properties": {
@@ -178,19 +150,6 @@
   },
   "description": "Configuration schema for Conclaude - Claude Code hook handler",
   "properties": {
-    "gitWorktree": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/GitWorktreeConfig"
-        }
-      ],
-      "default": {
-        "autoCreatePR": false,
-        "autoCreatePRCommand": null,
-        "autoCreatePRTemplate": null,
-        "enabled": false
-      }
-    },
     "preToolUse": {
       "allOf": [
         {

@@ -317,7 +317,6 @@ The complete configuration schema is defined as Rust structs with serde serializ
 - **stop**: Commands and settings for session termination hooks
 - **rules**: File protection and validation rules
 - **preToolUse**: Pre-execution validation and controls
-- **gitWorktree**: Git integration settings
 
 Generate a complete JSON schema with: `conclaude generate-schema`
 
@@ -679,7 +678,6 @@ config.stop.run → extract_bash_commands() → tokio::process::Command → sequ
 - **Rounds Mode**: Run validation for a specific number of iterations
 - **Grep Rules**: Content-based validation using pattern matching
 - **Tool Usage Validation**: Control which tools can operate on which files
-- **Git Worktree Integration**: Automatic branch and PR management
 
 ### Performance & Reliability
 
@@ -787,10 +785,6 @@ preToolUse:
     - "docs/"
     - "examples/"
 
-# Git worktree integration
-gitWorktree:
-  enabled: false
-  autoCreatePR: false
 ```
 
 ### Environment Variables
