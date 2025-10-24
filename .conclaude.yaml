@@ -7,7 +7,7 @@
 stop:
   # Commands to run during Stop hook
   # Each line is executed as a separate bash command
-  run: ""
+  run: "echo 'Stop hook is not configured'"
 
   # Alternative structured command format with optional custom error messages
   # Each command can have its own error message, and control output display
@@ -38,15 +38,6 @@ stop:
   # When set, Claude will continue for the specified number of rounds
   rounds: null
   # Example: rounds: 3
-
-  # Grep rules for stop hook - scan files for forbidden patterns
-  # Files matching filePattern are checked for forbiddenPattern
-  grepRules: []
-  # Example:
-  # grepRules:
-  #   - filePattern: "**/*.js"
-  #     forbiddenPattern: "console\\.log"
-  #     description: "No console.log statements allowed in production code"
 
 # Validation rules for hook processing
 rules:
@@ -82,15 +73,6 @@ rules:
 
 # Pre-tool-use hook configuration - runs before tools are executed
 preToolUse:
-  # Grep rules that run before tools execute on files
-  # Checks file content for forbidden patterns before allowing modifications
-  grepRules: []
-  # Example:
-  # grepRules:
-  #   - filePattern: "**/*.py"
-  #     forbiddenPattern: "exec\\(|eval\\("
-  #     description: "Dangerous eval/exec functions not allowed"
-
   # Directories where file additions are prevented (in addition to root)
   # List of directory paths where new files cannot be created
   preventAdditions: []
@@ -113,7 +95,7 @@ preToolUse:
 # System notifications configuration
 notifications:
   # Enable system notifications for hook execution
-  enabled: false
+  enabled: true
 
   # List of hook names that should trigger notifications
   # Use ["*"] to receive notifications for all hooks
