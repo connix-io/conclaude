@@ -106,11 +106,11 @@ notifications:
   # hooks: ["Stop"]                 # Only stop hook notifications
 
   # Show error notifications (hook failures, system errors)
-  show_errors: false
+  showErrors: false
 
   # Show success notifications (hook completion, successful operations)
-  show_success: false
+  showSuccess: false
 
   # Show system event notifications (session start/end, configuration loaded)
-  show_system_events: true
+  showSystemEvents: true
 
