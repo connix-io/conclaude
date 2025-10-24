@@ -95,13 +95,13 @@ pub struct NotificationsConfig {
     #[serde(default)]
     pub hooks: Vec<String>,
     /// Whether to show error notifications
-    #[serde(default)]
+    #[serde(default, rename = "showErrors")]
     pub show_errors: bool,
     /// Whether to show success notifications
-    #[serde(default)]
+    #[serde(default, rename = "showSuccess")]
     pub show_success: bool,
     /// Whether to show system event notifications
-    #[serde(default = "default_show_system_events")]
+    #[serde(default = "default_show_system_events", rename = "showSystemEvents")]
     pub show_system_events: bool,
 }
 
@@ -171,7 +171,7 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &PathBuf) -> Strin
                 .to_string(),
         );
         parts.push(
-            "  notifications: enabled, hooks, show_errors, show_success, show_system_events"
+            "  notifications: enabled, hooks, showErrors, showSuccess, showSystemEvents"
                 .to_string(),
         );
     } else if base_error.contains("invalid type") {
