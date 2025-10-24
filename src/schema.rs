@@ -63,7 +63,29 @@ pub fn write_schema_to_file(schema: &Value, output_path: &PathBuf) -> Result<()>
 pub fn validate_config_against_schema(config_content: &str) -> Result<()> {
     // Parse the YAML to ensure it's valid
     let _: ConclaudeConfig = serde_yaml::from_str(config_content)
-        .context("Configuration file contains invalid YAML or does not match expected structure")?;
+        .map_err(|e| {
+            let base_error = e.to_string();
+            let mut parts = vec![
+                "Configuration validation failed".to_string(),
+                String::new(),
+                format!("Error: {}", base_error),
+            ];
+
+            // Add specific guidance based on error type
+            if base_error.contains("unknown field") {
+                parts.push(String::new());
+                parts.push("The configuration contains an unknown field.".to_string());
+                parts.push("Check the field name for typos or incorrect casing.".to_string());
+            } else if base_error.contains("invalid type") {
+                parts.push(String::new());
+                parts.push("A field has the wrong type (e.g., string instead of boolean).".to_string());
+            } else if base_error.contains("expected") || base_error.contains("while parsing") {
+                parts.push(String::new());
+                parts.push("YAML syntax error detected. Check indentation and formatting.".to_string());
+            }
+
+            anyhow::anyhow!(parts.join("\n"))
+        })?;
 
     Ok(())
 }

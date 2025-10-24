@@ -8,6 +8,7 @@ use std::process::{Command, Stdio};
 
 /// Configuration for individual stop commands with optional messages
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct StopCommand {
     pub run: String,
     #[serde(default)]
@@ -20,6 +21,7 @@ pub struct StopCommand {
 
 /// Configuration interface for stop hook commands
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
 pub struct StopConfig {
     #[serde(default)]
     pub run: String,
@@ -35,6 +37,7 @@ pub struct StopConfig {
 
 /// Configuration interface for validation rules
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RulesConfig {
     #[serde(default, rename = "preventRootAdditions")]
     pub prevent_root_additions: bool,
@@ -46,6 +49,7 @@ pub struct RulesConfig {
 
 /// Tool usage validation rule
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ToolUsageRule {
     pub tool: String,
     pub pattern: String,
@@ -70,6 +74,7 @@ fn default_true() -> bool {
 
 /// Configuration for pre tool use hooks
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
 pub struct PreToolUseConfig {
     #[serde(default, rename = "preventAdditions")]
     pub prevent_additions: Vec<String>,
@@ -81,6 +86,7 @@ pub struct PreToolUseConfig {
 
 /// Configuration for system notifications
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
 pub struct NotificationsConfig {
     /// Whether notifications are enabled
     #[serde(default)]
@@ -135,6 +141,79 @@ pub struct ConclaudeConfig {
     pub notifications: NotificationsConfig,
 }
 
+/// Format a descriptive error message for YAML parsing failures
+fn format_parse_error(error: &serde_yaml::Error, config_path: &PathBuf) -> String {
+    let base_error = error.to_string();
+    let mut parts = vec![
+        format!(
+            "Failed to parse configuration file: {}",
+            config_path.display()
+        ),
+        String::new(),
+        format!("Error: {}", base_error),
+    ];
+
+    // Add specific guidance based on error type
+    if base_error.contains("unknown field") {
+        parts.push(String::new());
+        parts.push("Common causes:".to_string());
+        parts.push("  • Typo in field name (check spelling and capitalization)".to_string());
+        parts.push("  • Using a field that doesn't exist in this section".to_string());
+        parts.push("  • Using camelCase vs snake_case incorrectly".to_string());
+        parts.push(String::new());
+        parts.push("Valid field names:".to_string());
+        parts.push("  stop: run, commands, infinite, infiniteMessage, rounds".to_string());
+        parts.push(
+            "  rules: preventRootAdditions, uneditableFiles, toolUsageValidation".to_string(),
+        );
+        parts.push(
+            "  preToolUse: preventAdditions, preventGeneratedFileEdits, generatedFileMessage"
+                .to_string(),
+        );
+        parts.push(
+            "  notifications: enabled, hooks, show_errors, show_success, show_system_events"
+                .to_string(),
+        );
+    } else if base_error.contains("invalid type") {
+        parts.push(String::new());
+        parts.push("Common causes:".to_string());
+        parts.push(
+            "  • Using quotes around a boolean value (use true/false without quotes)".to_string(),
+        );
+        parts.push("  • Using a string where a number is expected".to_string());
+        parts.push("  • Using a single value where an array is expected (wrap in [])".to_string());
+        parts.push(String::new());
+        parts.push("Example valid types:".to_string());
+        parts.push("  infinite: true          # boolean (no quotes)".to_string());
+        parts.push("  rounds: 3               # number (no quotes)".to_string());
+        parts.push("  run: \"echo hello\"       # string (with quotes)".to_string());
+        parts.push("  hooks: [\"Stop\"]         # array".to_string());
+    } else if base_error.contains("expected") || base_error.contains("while parsing") {
+        parts.push(String::new());
+        parts.push("This is likely a YAML syntax error. Common causes:".to_string());
+        parts.push(
+            "  • Incorrect indentation (YAML requires consistent spaces, not tabs)".to_string(),
+        );
+        parts.push("  • Missing colon after a field name".to_string());
+        parts.push("  • Unmatched quotes or brackets".to_string());
+        parts.push("  • Using tabs instead of spaces for indentation".to_string());
+        parts.push(String::new());
+        parts.push(
+            "Tip: Use a YAML validator or ensure consistent 2-space indentation.".to_string(),
+        );
+    } else if base_error.contains("missing field") {
+        parts.push(String::new());
+        parts.push("A required field is missing from the configuration.".to_string());
+        parts.push("Check the default configuration with: conclaude init".to_string());
+    }
+
+    parts.push(String::new());
+    parts.push("For a valid configuration template, run:".to_string());
+    parts.push("  conclaude init".to_string());
+
+    parts.join("\n")
+}
+
 /// Load YAML configuration using native search strategies
 /// Search strategy: searches up directory tree until a config file is found
 ///
@@ -149,8 +228,10 @@ pub async fn load_conclaude_config() -> Result<(ConclaudeConfig, PathBuf)> {
             let content = fs::read_to_string(path)
                 .with_context(|| format!("Failed to read config file: {}", path.display()))?;
 
-            let config: ConclaudeConfig = serde_yaml::from_str(&content)
-                .with_context(|| format!("Failed to parse config file: {}", path.display()))?;
+            let config: ConclaudeConfig = serde_yaml::from_str(&content).map_err(|e| {
+                let error_msg = format_parse_error(&e, path);
+                anyhow::anyhow!(error_msg)
+            })?;
 
             return Ok((config, path.clone()));
         }

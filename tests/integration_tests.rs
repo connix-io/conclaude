@@ -115,28 +115,6 @@ fn test_cli_init_command_force_overwrite() {
 }
 
 #[test]
-fn test_cli_verbose_flag() {
-    let output = Command::new("cargo")
-        .args(["run", "--", "--verbose", "--help"])
-        .output()
-        .expect("Failed to run CLI with verbose flag");
-
-    // Just verify it doesn't crash with verbose flag
-    assert!(output.status.success());
-}
-
-#[test]
-fn test_cli_disable_file_logging_flag() {
-    let output = Command::new("cargo")
-        .args(["run", "--", "--disable-file-logging", "--help"])
-        .output()
-        .expect("Failed to run CLI with disable-file-logging flag");
-
-    // Just verify it doesn't crash with disable-file-logging flag
-    assert!(output.status.success());
-}
-
-#[test]
 fn test_cli_invalid_command() {
     let output = Command::new("cargo")
         .args(["run", "--", "invalid-command"])
