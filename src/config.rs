@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// Configuration for individual stop commands with optional messages
@@ -142,7 +142,7 @@ pub struct ConclaudeConfig {
 }
 
 /// Format a descriptive error message for YAML parsing failures
-fn format_parse_error(error: &serde_yaml::Error, config_path: &PathBuf) -> String {
+fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
     let base_error = error.to_string();
     let mut parts = vec![
         format!(
