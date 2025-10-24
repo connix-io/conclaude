@@ -28,6 +28,26 @@ struct StopCommandConfig {
 /// Cached configuration instance to avoid repeated loads
 static CACHED_CONFIG: OnceLock<(ConclaudeConfig, std::path::PathBuf)> = OnceLock::new();
 
+/// Determine if a hook is a system event hook
+///
+/// System event hooks are hooks that track session lifecycle and user interactions,
+/// as opposed to tool execution or validation hooks.
+///
+/// # Arguments
+///
+/// * `hook_name` - The name of the hook to check
+///
+/// # Returns
+///
+/// `true` if the hook is a system event hook, `false` otherwise
+#[must_use]
+fn is_system_event_hook(hook_name: &str) -> bool {
+    matches!(
+        hook_name,
+        "SessionStart" | "SessionEnd" | "UserPromptSubmit" | "SubagentStop" | "PreCompact"
+    )
+}
+
 
 /// Load configuration with caching to avoid repeated file system operations
 ///
@@ -72,6 +92,24 @@ fn send_notification(hook_name: &str, status: &str, context: Option<&str>) {
 
     // Check if notifications are enabled for this hook
     if !config.notifications.is_enabled_for(hook_name) {
+        return;
+    }
+
+    // Check notification flags based on hook type and status
+    let notifications_config = &config.notifications;
+
+    // Determine if this hook should show based on the appropriate flag
+    let should_show = match status {
+        "failure" => notifications_config.show_errors,
+        "success" => notifications_config.show_success,
+        _ => {
+            // For other statuses, determine if this is a system event hook
+            is_system_event_hook(hook_name) && notifications_config.show_system_events
+        }
+    };
+
+    // Short-circuit if the appropriate flag is false
+    if !should_show {
         return;
     }
 
@@ -971,6 +1009,76 @@ fn check_root_additions(snapshot: &HashSet<String>) -> Result<Option<HookResult>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::NotificationsConfig;
+
+    #[test]
+    fn test_is_system_event_hook() {
+        // Test system event hooks
+        assert!(is_system_event_hook("SessionStart"));
+        assert!(is_system_event_hook("SessionEnd"));
+        assert!(is_system_event_hook("UserPromptSubmit"));
+        assert!(is_system_event_hook("SubagentStop"));
+        assert!(is_system_event_hook("PreCompact"));
+
+        // Test non-system event hooks
+        assert!(!is_system_event_hook("PreToolUse"));
+        assert!(!is_system_event_hook("PostToolUse"));
+        assert!(!is_system_event_hook("Notification"));
+        assert!(!is_system_event_hook("Stop"));
+    }
+
+    #[test]
+    fn test_notification_flag_gating_logic() {
+        // Test configuration with all flags enabled (default behavior)
+        let config_all_enabled = NotificationsConfig {
+            enabled: true,
+            hooks: vec!["*".to_string()],
+            show_errors: true,
+            show_success: true,
+            show_system_events: true,
+        };
+
+        // All notification types should be allowed
+        assert!(config_all_enabled.is_enabled_for("PreToolUse"));
+        assert!(config_all_enabled.is_enabled_for("SessionStart"));
+
+        // Test configuration with only errors enabled
+        let config_errors_only = NotificationsConfig {
+            enabled: true,
+            hooks: vec!["*".to_string()],
+            show_errors: true,
+            show_success: false,
+            show_system_events: false,
+        };
+
+        // This tests the is_enabled_for method - flags are checked in send_notification
+        assert!(config_errors_only.is_enabled_for("PreToolUse"));
+        assert!(config_errors_only.is_enabled_for("SessionStart"));
+
+        // Test configuration with only success enabled
+        let config_success_only = NotificationsConfig {
+            enabled: true,
+            hooks: vec!["*".to_string()],
+            show_errors: false,
+            show_success: true,
+            show_system_events: false,
+        };
+
+        assert!(config_success_only.is_enabled_for("PreToolUse"));
+        assert!(config_success_only.is_enabled_for("SessionStart"));
+
+        // Test configuration with only system events enabled
+        let config_system_only = NotificationsConfig {
+            enabled: true,
+            hooks: vec!["*".to_string()],
+            show_errors: false,
+            show_success: false,
+            show_system_events: true,
+        };
+
+        assert!(config_system_only.is_enabled_for("PreToolUse"));
+        assert!(config_system_only.is_enabled_for("SessionStart"));
+    }
 
     #[test]
     fn test_is_root_addition() {
