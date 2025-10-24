@@ -7,11 +7,15 @@
 stop:
   # Commands to run during Stop hook
   # Each line is executed as a separate bash command
-  run: "echo 'Stop hook is not configured'"
+  # run: "echo 'Stop hook is not configured'"
 
   # Alternative structured command format with optional custom error messages
   # Each command can have its own error message, and control output display
-  commands: []
+  commands:
+    - run: "openspec validate --all --strict"
+      showStdout: true
+      showStderr: true
+      message: "OpenSpec validation failed - please fix errors before continuing"
   # Examples:
   # commands:
   #   - run: "echo 'Starting build...'"
@@ -107,10 +111,10 @@ notifications:
   # hooks: ["Stop"]                 # Only stop hook notifications
 
   # Show error notifications (hook failures, system errors)
-  show_errors: false
+  showErrors: false
 
   # Show success notifications (hook completion, successful operations)
-  show_success: false
+  showSuccess: false
 
   # Show system event notifications (session start/end, configuration loaded)
-  show_system_events: true
+  showSystemEvents: true
