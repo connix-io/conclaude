@@ -1,4 +1,4 @@
-use conclaude::config::{extract_bash_commands, generate_default_config, load_conclaude_config};
+use conclaude::config::{extract_bash_commands, generate_default_config, load_conclaude_config, ConclaudeConfig};
 use std::fs;
 use std::sync::Mutex;
 use tempfile::tempdir;
@@ -207,9 +207,9 @@ preToolUse:
 notifications:
   enabled: false
   hooks: []
-  show_errors: false
-  show_success: false
-  show_system_events: true
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
 "#;
 
     let result = serde_yaml::from_str::<conclaude::config::ConclaudeConfig>(config_content);
@@ -719,4 +719,47 @@ preventRootAdditions: true
         "Error should mention syntax or parsing issue: {}",
         error_message
     );
+}
+
+#[test]
+fn test_notifications_config_camelcase_field_names() {
+    // Test that the new camelCase field names work correctly
+    let config_content = r#"
+notifications:
+  enabled: true
+  hooks: ["*"]
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+
+    let result = serde_yaml::from_str::<ConclaudeConfig>(config_content);
+    assert!(result.is_ok(), "Config with camelCase field names should parse successfully");
+
+    let config = result.unwrap();
+    assert_eq!(config.notifications.enabled, true);
+    assert_eq!(config.notifications.show_errors, false);
+    assert_eq!(config.notifications.show_success, false);
+    assert_eq!(config.notifications.show_system_events, true);
+}
+
+#[test]
+fn test_notifications_config_snake_case_field_names_error() {
+    // Test that old snake_case field names produce a helpful error message
+    let config_content = r#"
+notifications:
+  enabled: true
+  hooks: ["*"]
+  show_errors: false
+  show_success: false
+  show_system_events: true
+"#;
+
+    let result = serde_yaml::from_str::<ConclaudeConfig>(config_content);
+    assert!(result.is_err(), "Config with snake_case field names should fail to parse");
+
+    let error = result.unwrap_err().to_string();
+    assert!(error.contains("showErrors"), "Error should mention showErrors field name");
+    assert!(error.contains("showSuccess"), "Error should mention showSuccess field name");
+    assert!(error.contains("showSystemEvents"), "Error should mention showSystemEvents field name");
 }
