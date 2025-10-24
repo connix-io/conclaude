@@ -109,3 +109,26 @@ preToolUse:
   # Example:
   # generatedFileMessage: "Cannot modify {file_path} - it contains '{marker}' indicating it's auto-generated"
 
+# System notifications configuration
+notifications:
+  # Enable system notifications for hook execution
+  enabled: false
+
+  # List of hook names that should trigger notifications
+  # Use ["*"] to receive notifications for all hooks
+  # Common hook names: "Stop", "PreToolUse", "PostToolUse", "SessionStart", "UserPromptSubmit", "Notification", "SubagentStop", "PreCompact"
+  hooks: []
+  # Examples:
+  # hooks: ["*"]                    # All hooks
+  # hooks: ["Stop", "PreToolUse"]   # Only specific hooks
+  # hooks: ["Stop"]                 # Only stop hook notifications
+
+  # Show error notifications (hook failures, system errors)
+  show_errors: false
+
+  # Show success notifications (hook completion, successful operations)
+  show_success: false
+
+  # Show system event notifications (session start/end, configuration loaded)
+  show_system_events: true
+

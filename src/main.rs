@@ -1,7 +1,6 @@
 // Testing GitHub Actions workflow fixes
 mod config;
 mod hooks;
-mod logger;
 mod schema;
 mod types;
 
@@ -28,14 +27,6 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-
-    /// Enable verbose logging output
-    #[arg(short, long, global = true)]
-    verbose: bool,
-
-    /// Disable logging to temporary files (overrides `CONCLAUDE_DISABLE_FILE_LOGGING`)
-    #[arg(long, global = true)]
-    disable_file_logging: bool,
 }
 
 #[derive(Subcommand)]
@@ -111,37 +102,6 @@ enum Commands {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Set logging level environment variable
-    if cli.verbose {
-        std::env::set_var("CONCLAUDE_LOG_LEVEL", "debug");
-    }
-
-    // Set file logging environment variable based on CLI flag
-    if cli.disable_file_logging {
-        std::env::set_var("CONCLAUDE_DISABLE_FILE_LOGGING", "true");
-    }
-
-    // Determine if this is a hook command (hook commands initialize their own session-specific loggers)
-    let is_hook_command = matches!(
-        cli.command,
-        Commands::PreToolUse
-            | Commands::PostToolUse
-            | Commands::Notification
-            | Commands::UserPromptSubmit
-            | Commands::SessionStart
-            | Commands::SessionEnd
-            | Commands::Stop
-            | Commands::SubagentStop
-            | Commands::PreCompact
-    );
-
-    // Initialize logger only for non-hook commands (hook commands initialize session-specific loggers)
-    if !is_hook_command {
-        if let Err(e) = logger::init_logger(None, None) {
-            eprintln!("Warning: Failed to initialize logger: {e}");
-        }
-    }
-
     match cli.command {
         Commands::Init {
             config_path,
@@ -215,12 +175,15 @@ async fn handle_init(
     let claude_path = claude_path.map_or_else(|| cwd.join(".claude"), PathBuf::from);
     let settings_path = claude_path.join("settings.json");
 
-    log::info!("🚀 Initializing conclaude configuration...");
+    println!("🚀 Initializing conclaude configuration...");
 
     // Check if config file exists
     if config_path.exists() && !force {
-        log::warn!("⚠️  Configuration file already exists: {}", config_path.display());
-        log::warn!("Use --force to overwrite existing configuration.");
+        eprintln!(
+            "⚠️  Configuration file already exists: {}",
+            config_path.display()
+        );
+        eprintln!("Use --force to overwrite existing configuration.");
         std::process::exit(1);
     }
 
@@ -230,10 +193,13 @@ async fn handle_init(
     fs::write(&config_path, config_content)
         .with_context(|| format!("Failed to write config file: {}", config_path.display()))?;
 
-    log::info!("✅ Created configuration file with YAML language server support: {}", config_path.display());
+    println!(
+        "✅ Created configuration file with YAML language server support: {}",
+        config_path.display()
+    );
     let default_schema_url = schema::get_schema_url();
     let used_schema_url = schema_url.as_deref().unwrap_or(&default_schema_url);
-    log::info!("   Schema URL: {used_schema_url}");
+    println!("   Schema URL: {used_schema_url}");
 
     // Create .claude directory if it doesn't exist
     fs::create_dir_all(&claude_path).with_context(|| {
@@ -252,10 +218,10 @@ async fn handle_init(
             serde_json::from_str(&settings_content).with_context(|| {
                 format!("Failed to parse settings file: {}", settings_path.display())
             })?;
-        log::info!("📝 Found existing Claude settings, updating hooks...");
+        println!("📝 Found existing Claude settings, updating hooks...");
         settings
     } else {
-        log::info!("📝 Creating Claude Code settings...");
+        println!("📝 Creating Claude Code settings...");
         ClaudeSettings {
             include_co_authored_by: None,
             permissions: Some(ClaudePermissions {
@@ -302,14 +268,17 @@ async fn handle_init(
     fs::write(&settings_path, settings_json)
         .with_context(|| format!("Failed to write settings file: {}", settings_path.display()))?;
 
-    log::info!("✅ Updated Claude Code settings: {}", settings_path.display());
+    println!(
+        "✅ Updated Claude Code settings: {}",
+        settings_path.display()
+    );
 
-    log::info!("🎉 Conclaude initialization complete!");
-    log::info!("Configured hooks:");
+    println!("🎉 Conclaude initialization complete!");
+    println!("Configured hooks:");
     for hook_type in &hook_types {
-        log::info!("   • {hook_type}");
+        println!("   • {hook_type}");
     }
-    log::info!("You can now use Claude Code with conclaude hook handling.");
+    println!("You can now use Claude Code with conclaude hook handling.");
 
     Ok(())
 }
@@ -323,7 +292,7 @@ async fn handle_init(
 async fn handle_generate_schema(output: String, validate: bool) -> Result<()> {
     let output_path = PathBuf::from(output);
 
-    log::info!("🔧 Generating JSON Schema for conclaude configuration...");
+    println!("🔧 Generating JSON Schema for conclaude configuration...");
 
     // Generate the schema
     let schema = schema::generate_config_schema().context("Failed to generate JSON schema")?;
@@ -332,26 +301,29 @@ async fn handle_generate_schema(output: String, validate: bool) -> Result<()> {
     schema::write_schema_to_file(&schema, &output_path)
         .context("Failed to write schema to file")?;
 
-    log::info!("✅ Schema generated successfully: {}", output_path.display());
+    println!(
+        "✅ Schema generated successfully: {}",
+        output_path.display()
+    );
 
     // Optionally validate the schema
     if validate {
-        log::info!("🔍 Validating generated schema...");
+        println!("🔍 Validating generated schema...");
 
         // Test with the default configuration
         let default_config = config::generate_default_config();
         schema::validate_config_against_schema(&default_config)
             .context("Default configuration failed schema validation")?;
 
-        log::info!("✅ Schema validation passed!");
-        log::info!("   Default configuration is valid against the generated schema.");
+        println!("✅ Schema validation passed!");
+        println!("   Default configuration is valid against the generated schema.");
     }
 
     // Display schema URL info
     let schema_url = schema::get_schema_url();
-    log::info!("📋 Schema URL for YAML language server: {schema_url}");
+    println!("📋 Schema URL for YAML language server: {schema_url}");
 
-    log::info!(
+    println!(
         "💡 Add this header to your .conclaude.yaml files for IDE support: {}",
         schema::generate_yaml_language_server_header(None).trim()
     );
@@ -370,7 +342,7 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
     use glob::Pattern;
     use walkdir::WalkDir;
 
-    log::info!("🔍 Visualizing configuration rules...");
+    println!("🔍 Visualizing configuration rules...");
 
     let (config, _config_path) = config::load_conclaude_config()
         .await
@@ -379,16 +351,16 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
     if let Some(rule_name) = rule {
         match rule_name.as_str() {
             "uneditableFiles" => {
-                log::info!("📁 Uneditable Files:");
+                println!("📁 Uneditable Files:");
                 if config.rules.uneditable_files.is_empty() {
-                    log::info!("   No uneditable files configured");
+                    println!("   No uneditable files configured");
                 } else {
                     for pattern_str in &config.rules.uneditable_files {
-                        log::info!("   Pattern: {pattern_str}");
+                        println!("   Pattern: {pattern_str}");
 
                         if show_matches {
                             let pattern = Pattern::new(pattern_str)?;
-                            log::info!("   Matching files:");
+                            println!("   Matching files:");
                             let mut found = false;
 
                             for entry in WalkDir::new(".")
@@ -398,77 +370,79 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                                 if entry.file_type().is_file() {
                                     let path = entry.path();
                                     if pattern.matches(&path.to_string_lossy()) {
-                                        log::info!("      - {}", path.display());
+                                        println!("      - {}", path.display());
                                         found = true;
                                     }
                                 }
                             }
 
                             if !found {
-                                log::info!("      (no matching files found)");
+                                println!("      (no matching files found)");
                             }
                         }
                     }
                 }
             }
             "preventRootAdditions" => {
-                log::info!(
+                println!(
                     "🚫 Prevent Root Additions: {}",
                     config.rules.prevent_root_additions
                 );
                 if config.rules.prevent_root_additions && show_matches {
-                    log::info!("   Root directory contents:");
+                    println!("   Root directory contents:");
                     for entry in (fs::read_dir(".")?).flatten() {
-                        log::info!("      - {}", entry.file_name().to_string_lossy());
+                        println!("      - {}", entry.file_name().to_string_lossy());
                     }
                 }
             }
             "toolUsageValidation" => {
-                log::info!("🔧 Tool Usage Validation Rules:");
+                println!("🔧 Tool Usage Validation Rules:");
                 if config.rules.tool_usage_validation.is_empty() {
-                    log::info!("   No tool usage validation rules configured");
+                    println!("   No tool usage validation rules configured");
                 } else {
                     for rule in &config.rules.tool_usage_validation {
-                        log::info!(
+                        println!(
                             "   Tool: {} | Pattern: {} | Action: {}",
-                            rule.tool, rule.pattern, rule.action
+                            rule.tool,
+                            rule.pattern,
+                            rule.action
                         );
                         if let Some(msg) = &rule.message {
-                            log::info!("      Message: {msg}");
+                            println!("      Message: {msg}");
                         }
                     }
                 }
             }
             _ => {
-                log::error!("❌ Unknown rule: {rule_name}");
-                log::info!("Available rules:");
-                log::info!("   - uneditableFiles");
-                log::info!("   - preventRootAdditions");
-                log::info!("   - toolUsageValidation");
+                eprintln!("❌ Unknown rule: {rule_name}");
+                println!("Available rules:");
+                println!("   - uneditableFiles");
+                println!("   - preventRootAdditions");
+                println!("   - toolUsageValidation");
             }
         }
     } else {
         // Show all rules overview
-        log::info!("📋 Configuration Overview:");
-        log::info!(
+        println!("📋 Configuration Overview:");
+        println!(
             "🚫 Prevent Root Additions: {}",
             config.rules.prevent_root_additions
         );
-        log::info!(
+        println!(
             "📁 Uneditable Files: {} patterns",
             config.rules.uneditable_files.len()
         );
-        log::info!(
+        println!(
             "🔧 Tool Usage Validation: {} rules",
             config.rules.tool_usage_validation.len()
         );
-        log::info!("♾️  Infinite Mode: {}", config.stop.infinite);
+        println!("♾️  Infinite Mode: {}", config.stop.infinite);
         if let Some(rounds) = config.stop.rounds {
-            log::info!("🔄 Rounds Mode: {rounds} rounds");
+            println!("🔄 Rounds Mode: {rounds} rounds");
         }
 
-        log::info!("Use --rule <rule-name> to see details for a specific rule");
-        log::info!("Use --show-matches to see which files match the patterns");
+        println!("Use --rule <rule-name> to see details for a specific rule");
+        println!("Use --show-matches to see which files match the patterns");
     }
 
     Ok(())

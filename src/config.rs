@@ -79,6 +79,47 @@ pub struct PreToolUseConfig {
     pub generated_file_message: Option<String>,
 }
 
+/// Configuration for system notifications
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+pub struct NotificationsConfig {
+    /// Whether notifications are enabled
+    #[serde(default)]
+    pub enabled: bool,
+    /// List of hook names that should trigger notifications. Use ["*"] for all hooks
+    #[serde(default)]
+    pub hooks: Vec<String>,
+    /// Whether to show error notifications
+    #[serde(default)]
+    pub show_errors: bool,
+    /// Whether to show success notifications
+    #[serde(default)]
+    pub show_success: bool,
+    /// Whether to show system event notifications
+    #[serde(default = "default_show_system_events")]
+    pub show_system_events: bool,
+}
+
+fn default_show_system_events() -> bool {
+    true
+}
+
+impl NotificationsConfig {
+    /// Check if notifications are enabled for a specific hook
+    #[must_use]
+    pub fn is_enabled_for(&self, hook_name: &str) -> bool {
+        if !self.enabled {
+            return false;
+        }
+
+        // Check for wildcard
+        if self.hooks.iter().any(|hook| hook == "*") {
+            return true;
+        }
+
+        // Check for specific hook name
+        self.hooks.iter().any(|hook| hook == hook_name)
+    }
+}
 
 /// Main configuration interface matching the TypeScript version
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
@@ -90,6 +131,8 @@ pub struct ConclaudeConfig {
     pub rules: RulesConfig,
     #[serde(default, rename = "preToolUse")]
     pub pre_tool_use: PreToolUseConfig,
+    #[serde(default)]
+    pub notifications: NotificationsConfig,
 }
 
 /// Load YAML configuration using native search strategies
@@ -212,7 +255,7 @@ EOF"#
     // Check for errors
     if !output.stderr.is_empty() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        log::warn!("Bash reported errors: {stderr}");
+        eprintln!("Bash reported errors: {stderr}");
     }
 
     Ok(commands)

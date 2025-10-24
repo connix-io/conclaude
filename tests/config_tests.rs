@@ -130,9 +130,6 @@ fn test_generate_default_config() {
     assert!(config.contains("infinite: false"));
 }
 
-
-
-
 #[tokio::test]
 async fn test_config_search_level_limit() {
     let temp_dir = tempdir().unwrap();
@@ -210,4 +207,136 @@ async fn test_config_search_within_level_limit() {
     assert_eq!(config.stop.run, "found config");
     assert!(!config.stop.infinite);
     assert!(config.rules.prevent_root_additions);
+}
+
+#[tokio::test]
+async fn test_notification_config_default_disabled() {
+    let temp_dir = tempdir().unwrap();
+    let config_path = temp_dir.path().join(".conclaude.yaml");
+
+    // Create a config with default notification settings
+    fs::write(&config_path, generate_default_config()).unwrap();
+
+    std::env::set_current_dir(&temp_dir.path()).unwrap();
+
+    let result = load_conclaude_config().await;
+    assert!(result.is_ok());
+
+    let (config, _config_path) = result.unwrap();
+
+    // Test default notification settings
+    assert!(!config.notifications.enabled);
+    assert!(config.notifications.hooks.is_empty());
+
+    // Test that no hooks are enabled when disabled
+    assert!(!config.notifications.is_enabled_for("Stop"));
+    assert!(!config.notifications.is_enabled_for("PreToolUse"));
+    assert!(!config.notifications.is_enabled_for("*"));
+}
+
+#[tokio::test]
+async fn test_notification_config_enabled_specific_hooks() {
+    let temp_dir = tempdir().unwrap();
+    let config_path = temp_dir.path().join(".conclaude.yaml");
+
+    // Create config with specific hooks enabled
+    let config_content = r#"
+stop:
+  run: ""
+rules:
+  preventRootAdditions: true
+notifications:
+  enabled: true
+  hooks: ["Stop", "PreToolUse"]
+"#;
+
+    fs::write(&config_path, config_content).unwrap();
+    std::env::set_current_dir(&temp_dir.path()).unwrap();
+
+    let result = load_conclaude_config().await;
+    assert!(result.is_ok());
+
+    let (config, _config_path) = result.unwrap();
+
+    // Test enabled configuration
+    assert!(config.notifications.enabled);
+    assert_eq!(config.notifications.hooks, vec!["Stop", "PreToolUse"]);
+
+    // Test that only configured hooks are enabled
+    assert!(config.notifications.is_enabled_for("Stop"));
+    assert!(config.notifications.is_enabled_for("PreToolUse"));
+    assert!(!config.notifications.is_enabled_for("PostToolUse"));
+    assert!(!config.notifications.is_enabled_for("SessionStart"));
+    assert!(!config.notifications.is_enabled_for("NonExistentHook"));
+}
+
+#[tokio::test]
+async fn test_notification_config_enabled_wildcard() {
+    let temp_dir = tempdir().unwrap();
+    let config_path = temp_dir.path().join(".conclaude.yaml");
+
+    // Create config with wildcard enabled
+    let config_content = r#"
+stop:
+  run: ""
+rules:
+  preventRootAdditions: true
+notifications:
+  enabled: true
+  hooks: ["*"]
+"#;
+
+    fs::write(&config_path, config_content).unwrap();
+    std::env::set_current_dir(&temp_dir.path()).unwrap();
+
+    let result = load_conclaude_config().await;
+    assert!(result.is_ok());
+
+    let (config, _config_path) = result.unwrap();
+
+    // Test wildcard configuration
+    assert!(config.notifications.enabled);
+    assert_eq!(config.notifications.hooks, vec!["*"]);
+
+    // Test that all hooks are enabled with wildcard
+    assert!(config.notifications.is_enabled_for("Stop"));
+    assert!(config.notifications.is_enabled_for("PreToolUse"));
+    assert!(config.notifications.is_enabled_for("PostToolUse"));
+    assert!(config.notifications.is_enabled_for("SessionStart"));
+    assert!(config.notifications.is_enabled_for("AnyRandomHook"));
+    assert!(config.notifications.is_enabled_for("NonExistentHook"));
+}
+
+#[tokio::test]
+async fn test_notification_config_enabled_empty_hooks() {
+    let temp_dir = tempdir().unwrap();
+    let config_path = temp_dir.path().join(".conclaude.yaml");
+
+    // Create config with enabled but empty hooks list
+    let config_content = r#"
+stop:
+  run: ""
+rules:
+  preventRootAdditions: true
+notifications:
+  enabled: true
+  hooks: []
+"#;
+
+    fs::write(&config_path, config_content).unwrap();
+    std::env::set_current_dir(&temp_dir.path()).unwrap();
+
+    let result = load_conclaude_config().await;
+    assert!(result.is_ok());
+
+    let (config, _config_path) = result.unwrap();
+
+    // Test enabled but empty configuration
+    assert!(config.notifications.enabled);
+    assert!(config.notifications.hooks.is_empty());
+
+    // Test that no hooks are enabled when hooks list is empty
+    assert!(!config.notifications.is_enabled_for("Stop"));
+    assert!(!config.notifications.is_enabled_for("PreToolUse"));
+    assert!(!config.notifications.is_enabled_for("AnyHook"));
 }

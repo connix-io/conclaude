@@ -1,20 +1,20 @@
-use crate::config::{ConclaudeConfig, extract_bash_commands, load_conclaude_config};
-use crate::logger::create_session_logger;
+use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig};
 use crate::types::{
-    HookResult, LoggingConfig, NotificationPayload, PostToolUsePayload, PreCompactPayload,
-    PreToolUsePayload, SessionEndPayload, SessionStartPayload, StopPayload, SubagentStopPayload,
-    UserPromptSubmitPayload, validate_base_payload,
+    validate_base_payload, HookResult, NotificationPayload, PostToolUsePayload,
+    PreCompactPayload, PreToolUsePayload, SessionEndPayload, SessionStartPayload, StopPayload,
+    SubagentStopPayload, UserPromptSubmitPayload,
 };
 use anyhow::{Context, Result};
 use glob::Pattern;
+use notify_rust::{Notification, Urgency};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::OnceLock;
 use tokio::process::Command as TokioCommand;
 
 /// Represents a stop command with its configuration
@@ -27,6 +27,7 @@ struct StopCommandConfig {
 
 /// Cached configuration instance to avoid repeated loads
 static CACHED_CONFIG: OnceLock<(ConclaudeConfig, std::path::PathBuf)> = OnceLock::new();
+
 
 /// Load configuration with caching to avoid repeated file system operations
 ///
@@ -42,7 +43,74 @@ async fn get_config() -> Result<&'static (ConclaudeConfig, std::path::PathBuf)> 
     }
 }
 
-/// Reads and validates hook payload from stdin, creating a session-specific logger.
+/// Send a system notification for hook execution
+///
+/// This function sends a system notification when a hook is executed.
+/// It gracefully handles errors and logs failures without blocking hook execution.
+///
+/// # Arguments
+///
+/// * `hook_name` - The name of the hook being executed
+/// * `status` - The execution status ("success" or "failure")
+/// * `context` - Optional additional context about the execution
+fn send_notification(hook_name: &str, status: &str, context: Option<&str>) {
+    // Get configuration to check if notifications are enabled for this hook
+    let config_future = get_config();
+
+    // Use tokio::task::block_in_place to safely block in async context
+    let config_result =
+        tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(config_future));
+
+    let (config, _) = match config_result {
+        Ok(config) => config,
+        Err(e) => {
+            // Silently continue if config can't be loaded - notifications are not critical
+            eprintln!("Failed to load config for notification: {e}");
+            return;
+        }
+    };
+
+    // Check if notifications are enabled for this hook
+    if !config.notifications.is_enabled_for(hook_name) {
+        return;
+    }
+
+    // Format notification title and body
+    let title = format!("Conclaude - {}", hook_name);
+    let body = match context {
+        Some(ctx) => format!("{}: {}", status, ctx),
+        None => match status {
+            "success" => "All checks passed".to_string(),
+            "failure" => "Command failed".to_string(),
+            _ => format!("Hook completed with status: {}", status),
+        },
+    };
+
+    // Set urgency based on status
+    let urgency = if status == "failure" {
+        Urgency::Critical
+    } else {
+        Urgency::Normal
+    };
+
+    // Send notification with error handling
+    match Notification::new()
+        .summary(&title)
+        .body(&body)
+        .urgency(urgency)
+        .show()
+    {
+        Ok(_) => {
+            // Notification sent successfully
+        }
+        Err(e) => {
+            // Log the error but don't fail the hook
+            eprintln!("Failed to send system notification for hook '{hook_name}': {e}");
+        }
+    }
+}
+
+/// Reads and validates hook payload from stdin, reading and validating hook payload from stdin.
 ///
 /// # Errors
 ///
@@ -95,7 +163,7 @@ where
 ///
 /// # Errors
 ///
-/// Returns an error if payload validation fails, logger creation fails, or configuration loading fails.
+/// Returns an error if payload validation fails, configuration loading fails, or configuration loading fails.
 pub async fn handle_pre_tool_use() -> Result<HookResult> {
     let payload: PreToolUsePayload = read_payload_from_stdin()?;
 
@@ -105,12 +173,8 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: tool_name"));
     }
 
-    // Initialize logger
-    let logging_config = LoggingConfig::default();
-    create_session_logger(&payload.base.session_id, Some(&logging_config))
-        .context("Failed to create session logger")?;
-
-    log::info!(
+    
+    println!(
         "Processing PreToolUse hook: session_id={}, tool_name={}",
         payload.base.session_id,
         payload.tool_name
@@ -118,6 +182,14 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
 
     // Check tool usage validation rules
     if let Some(result) = check_tool_usage_rules(&payload).await? {
+        send_notification(
+            "PreToolUse",
+            "failure",
+            Some(&format!(
+                "Tool '{}' blocked by validation rules",
+                payload.tool_name
+            )),
+        );
         return Ok(result);
     }
 
@@ -125,15 +197,37 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
 
     if file_modifying_tools.contains(&payload.tool_name.as_str()) {
         if let Some(result) = check_file_validation_rules(&payload).await? {
+            send_notification(
+                "PreToolUse",
+                "failure",
+                Some(&format!(
+                    "File validation failed for tool '{}'",
+                    payload.tool_name
+                )),
+            );
             return Ok(result);
         }
 
         // Check if file is auto-generated and should not be edited
         if let Some(result) = check_auto_generated_file(&payload).await? {
+            send_notification(
+                "PreToolUse",
+                "failure",
+                Some(&format!(
+                    "Auto-generated file protection blocked tool '{}'",
+                    payload.tool_name
+                )),
+            );
             return Ok(result);
         }
     }
 
+    // Send notification for successful pre-tool-use validation
+    send_notification(
+        "PreToolUse",
+        "success",
+        Some(&format!("Tool '{}' approved", payload.tool_name)),
+    );
     Ok(HookResult::success())
 }
 
@@ -169,7 +263,7 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
             payload.tool_name, file_path
         );
 
-        log::warn!(
+        eprintln!(
             "PreToolUse blocked by preventRootAdditions rule: tool_name={}, file_path={}",
             payload.tool_name,
             file_path
@@ -191,7 +285,7 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
                 payload.tool_name, pattern, file_path
             );
 
-            log::warn!(
+            eprintln!(
                 "PreToolUse blocked by uneditableFiles rule: tool_name={}, file_path={}, pattern={}",
                 payload.tool_name,
                 file_path,
@@ -242,8 +336,12 @@ pub fn is_root_addition(_file_path: &str, relative_path: &str, config_path: &Pat
     let file_parent_dir = resolved_file_path.parent().unwrap_or(&cwd);
 
     // Compare the canonical paths if possible, otherwise compare as-is
-    let config_dir_canonical = config_dir.canonicalize().unwrap_or_else(|_| config_dir.to_path_buf());
-    let file_dir_canonical = file_parent_dir.canonicalize().unwrap_or_else(|_| file_parent_dir.to_path_buf());
+    let config_dir_canonical = config_dir
+        .canonicalize()
+        .unwrap_or_else(|_| config_dir.to_path_buf());
+    let file_dir_canonical = file_parent_dir
+        .canonicalize()
+        .unwrap_or_else(|_| file_parent_dir.to_path_buf());
 
     // Block if the file is being created in the same directory as the config
     config_dir_canonical == file_dir_canonical
@@ -272,7 +370,7 @@ pub fn matches_uneditable_pattern(
 ///
 /// # Errors
 ///
-/// Returns an error if payload validation fails or logger creation fails.
+/// Returns an error if payload validation fails or configuration loading fails.
 #[allow(clippy::unused_async)]
 pub async fn handle_post_tool_use() -> Result<HookResult> {
     let payload: PostToolUsePayload = read_payload_from_stdin()?;
@@ -283,17 +381,19 @@ pub async fn handle_post_tool_use() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: tool_name"));
     }
 
-    // Initialize logger
-    let logging_config = LoggingConfig::default();
-    create_session_logger(&payload.base.session_id, Some(&logging_config))
-        .context("Failed to create session logger")?;
-
-    log::info!(
+    
+    println!(
         "Processing PostToolUse hook: session_id={}, tool_name={}",
         payload.base.session_id,
         payload.tool_name
     );
 
+    // Send notification for post tool use completion
+    send_notification(
+        "PostToolUse",
+        "success",
+        Some(&format!("Tool '{}' completed", payload.tool_name)),
+    );
     Ok(HookResult::success())
 }
 
@@ -301,7 +401,7 @@ pub async fn handle_post_tool_use() -> Result<HookResult> {
 ///
 /// # Errors
 ///
-/// Returns an error if payload validation fails or logger creation fails.
+/// Returns an error if payload validation fails or configuration loading fails.
 #[allow(clippy::unused_async)]
 pub async fn handle_notification() -> Result<HookResult> {
     let payload: NotificationPayload = read_payload_from_stdin()?;
@@ -312,17 +412,19 @@ pub async fn handle_notification() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: message"));
     }
 
-    // Initialize logger
-    let logging_config = LoggingConfig::default();
-    create_session_logger(&payload.base.session_id, Some(&logging_config))
-        .context("Failed to create session logger")?;
-
-    log::info!(
+    
+    println!(
         "Processing Notification hook: session_id={}, message={}",
         payload.base.session_id,
         payload.message
     );
 
+    // Send notification for notification hook processing
+    send_notification(
+        "Notification",
+        "success",
+        Some(&format!("Message: {}", payload.message)),
+    );
     Ok(HookResult::success())
 }
 
@@ -330,7 +432,7 @@ pub async fn handle_notification() -> Result<HookResult> {
 ///
 /// # Errors
 ///
-/// Returns an error if payload validation fails or logger creation fails.
+/// Returns an error if payload validation fails or configuration loading fails.
 #[allow(clippy::unused_async)]
 pub async fn handle_user_prompt_submit() -> Result<HookResult> {
     let payload: UserPromptSubmitPayload = read_payload_from_stdin()?;
@@ -341,16 +443,14 @@ pub async fn handle_user_prompt_submit() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: prompt"));
     }
 
-    // Initialize logger
-    let logging_config = LoggingConfig::default();
-    create_session_logger(&payload.base.session_id, Some(&logging_config))
-        .context("Failed to create session logger")?;
-
-    log::info!(
+    
+    println!(
         "Processing UserPromptSubmit hook: session_id={}",
         payload.base.session_id
     );
 
+    // Send notification for user prompt submission
+    send_notification("UserPromptSubmit", "success", Some("User input received"));
     Ok(HookResult::success())
 }
 
@@ -358,7 +458,7 @@ pub async fn handle_user_prompt_submit() -> Result<HookResult> {
 ///
 /// # Errors
 ///
-/// Returns an error if payload validation fails or logger creation fails.
+/// Returns an error if payload validation fails or configuration loading fails.
 #[allow(clippy::unused_async)]
 pub async fn handle_session_start() -> Result<HookResult> {
     let payload: SessionStartPayload = read_payload_from_stdin()?;
@@ -369,17 +469,19 @@ pub async fn handle_session_start() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: source"));
     }
 
-    // Initialize logger
-    let logging_config = LoggingConfig::default();
-    create_session_logger(&payload.base.session_id, Some(&logging_config))
-        .context("Failed to create session logger")?;
-
-    log::info!(
+    
+    println!(
         "Processing SessionStart hook: session_id={}, source={}",
         payload.base.session_id,
         payload.source
     );
 
+    // Send notification for session start
+    send_notification(
+        "SessionStart",
+        "success",
+        Some(&format!("Session started from {}", payload.source)),
+    );
     Ok(HookResult::success())
 }
 
@@ -387,7 +489,7 @@ pub async fn handle_session_start() -> Result<HookResult> {
 ///
 /// # Errors
 ///
-/// Returns an error if payload validation fails or logger creation fails.
+/// Returns an error if payload validation fails or configuration loading fails.
 #[allow(clippy::unused_async)]
 pub async fn handle_session_end() -> Result<HookResult> {
     let payload: SessionEndPayload = read_payload_from_stdin()?;
@@ -398,12 +500,8 @@ pub async fn handle_session_end() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: reason"));
     }
 
-    // Initialize logger
-    let logging_config = LoggingConfig::default();
-    create_session_logger(&payload.base.session_id, Some(&logging_config))
-        .context("Failed to create session logger")?;
-
-    log::info!(
+    
+    println!(
         "Processing SessionEnd hook: session_id={}, reason={}",
         payload.base.session_id,
         payload.reason
@@ -456,16 +554,11 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
 /// # Errors
 ///
 /// Returns an error if command execution fails or process spawning fails.
-async fn execute_stop_commands(
-    commands: &[StopCommandConfig],
-) -> Result<Option<HookResult>> {
-    log::info!(
-        "Executing {} stop hook commands",
-        commands.len()
-    );
+async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<HookResult>> {
+    println!("Executing {} stop hook commands", commands.len());
 
     for (index, cmd_config) in commands.iter().enumerate() {
-        log::info!(
+        println!(
             "Executing command {}/{}: {}",
             index + 1,
             commands.len(),
@@ -493,7 +586,7 @@ async fn execute_stop_commands(
             let exit_code = output.status.code().unwrap_or(1);
 
             // Log detailed failure information with command and outputs appended
-            log::error!(
+            eprintln!(
                 "Stop command failed:\n  Command: {}\n  Status: Failed (exit code: {})\n  Stdout:\n{}\n  Stderr:\n{}",
                 cmd_config.command,
                 exit_code,
@@ -546,7 +639,7 @@ async fn execute_stop_commands(
         // Successful individual commands produce no output
     }
 
-    log::info!("All stop hook commands completed successfully");
+    println!("All stop hook commands completed successfully");
     Ok(None)
 }
 
@@ -554,7 +647,7 @@ async fn execute_stop_commands(
 ///
 /// # Errors
 ///
-/// Returns an error if payload validation fails, logger creation fails, configuration loading fails,
+/// Returns an error if payload validation fails, configuration loading fails, configuration loading fails,
 /// command execution fails, or directory operations fail.
 pub async fn handle_stop() -> Result<HookResult> {
     // Track rounds for infinite alternative using atomic counter
@@ -564,12 +657,8 @@ pub async fn handle_stop() -> Result<HookResult> {
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
-    // Initialize logger
-    let logging_config = LoggingConfig::default();
-    create_session_logger(&payload.base.session_id, Some(&logging_config))
-        .context("Failed to create session logger")?;
-
-    log::info!(
+    
+    println!(
         "Processing Stop hook: session_id={}",
         payload.base.session_id
     );
@@ -588,12 +677,34 @@ pub async fn handle_stop() -> Result<HookResult> {
 
     // Execute commands
     if let Some(result) = execute_stop_commands(&commands_with_messages).await? {
+        // Send notification for blocked/failed stop hook
+        send_notification(
+            "Stop",
+            "failure",
+            Some(
+                &result
+                    .message
+                    .clone()
+                    .unwrap_or_else(|| "Hook blocked".to_string()),
+            ),
+        );
         return Ok(result);
     }
 
     // Check root additions if enabled
     if let Some(snapshot) = root_snapshot {
         if let Some(result) = check_root_additions(&snapshot)? {
+            // Send notification for blocked root additions
+            send_notification(
+                "Stop",
+                "failure",
+                Some(
+                    &result
+                        .message
+                        .clone()
+                        .unwrap_or_else(|| "Root additions blocked".to_string()),
+                ),
+            );
             return Ok(result);
         }
     }
@@ -603,7 +714,9 @@ pub async fn handle_stop() -> Result<HookResult> {
         let current_round = ROUND_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
         if current_round < max_rounds {
             let message = format!("Round {current_round}/{max_rounds} completed, continuing...");
-            log::info!("{message}");
+            println!("{message}");
+            // Send notification for round completion (not a failure, but continuing)
+            send_notification("Stop", "success", Some(&message));
             return Ok(HookResult::blocked(message));
         }
         ROUND_COUNT.store(0, Ordering::SeqCst); // Reset for next session
@@ -617,10 +730,18 @@ pub async fn handle_stop() -> Result<HookResult> {
             .as_deref()
             .unwrap_or("continue working on the task");
 
-        log::info!("Infinite mode enabled, sending continuation message: {infinite_message}");
+        println!("Infinite mode enabled, sending continuation message: {infinite_message}");
+        // Send notification for infinite mode continuation
+        send_notification(
+            "Stop",
+            "success",
+            Some(&format!("Continuing: {}", infinite_message)),
+        );
         return Ok(HookResult::blocked(infinite_message.to_string()));
     }
 
+    // Send notification for successful stop hook completion
+    send_notification("Stop", "success", None);
     Ok(HookResult::success())
 }
 
@@ -628,23 +749,21 @@ pub async fn handle_stop() -> Result<HookResult> {
 ///
 /// # Errors
 ///
-/// Returns an error if payload validation fails or logger creation fails.
+/// Returns an error if payload validation fails or configuration loading fails.
 #[allow(clippy::unused_async)]
 pub async fn handle_subagent_stop() -> Result<HookResult> {
     let payload: SubagentStopPayload = read_payload_from_stdin()?;
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
-    // Initialize logger
-    let logging_config = LoggingConfig::default();
-    create_session_logger(&payload.base.session_id, Some(&logging_config))
-        .context("Failed to create session logger")?;
-
-    log::info!(
+    
+    println!(
         "Processing SubagentStop hook: session_id={}",
         payload.base.session_id
     );
 
+    // Send notification for subagent stop
+    send_notification("SubagentStop", "success", Some("Subagent task completed"));
     Ok(HookResult::success())
 }
 
@@ -652,24 +771,26 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
 ///
 /// # Errors
 ///
-/// Returns an error if payload validation fails or logger creation fails.
+/// Returns an error if payload validation fails or configuration loading fails.
 #[allow(clippy::unused_async)]
 pub async fn handle_pre_compact() -> Result<HookResult> {
     let payload: PreCompactPayload = read_payload_from_stdin()?;
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
-    // Initialize logger
-    let logging_config = LoggingConfig::default();
-    create_session_logger(&payload.base.session_id, Some(&logging_config))
-        .context("Failed to create session logger")?;
-
-    log::info!(
+    
+    println!(
         "Processing PreCompact hook: session_id={}, trigger={:?}",
         payload.base.session_id,
         payload.trigger
     );
 
+    // Send notification for pre-compact hook
+    send_notification(
+        "PreCompact",
+        "success",
+        Some(&format!("Compaction triggered: {:?}", payload.trigger)),
+    );
     Ok(HookResult::success())
 }
 
@@ -790,7 +911,7 @@ pub async fn check_auto_generated_file(payload: &PreToolUsePayload) -> Result<Op
             )
         };
 
-        log::warn!(
+        eprintln!(
             "PreToolUse blocked auto-generated file edit: tool_name={}, file_path={}, marker={}",
             payload.tool_name,
             file_path,
@@ -870,36 +991,48 @@ mod tests {
         assert!(is_root_addition(".env", ".env", &config_path));
 
         // BREAKING CHANGE: Config files are now also blocked at root level
-        assert!(is_root_addition("package.json", "package.json", &config_path));
+        assert!(is_root_addition(
+            "package.json",
+            "package.json",
+            &config_path
+        ));
         assert!(is_root_addition("config.yaml", "config.yaml", &config_path));
 
         // Files in subdirectories should not be blocked
-        assert!(!is_root_addition("src/test.txt", "src/test.txt", &config_path));
-        assert!(!is_root_addition("tests/foo.rs", "tests/foo.rs", &config_path));
-        assert!(!is_root_addition("nested/deep/file.txt", "nested/deep/file.txt", &config_path));
+        assert!(!is_root_addition(
+            "src/test.txt",
+            "src/test.txt",
+            &config_path
+        ));
+        assert!(!is_root_addition(
+            "tests/foo.rs",
+            "tests/foo.rs",
+            &config_path
+        ));
+        assert!(!is_root_addition(
+            "nested/deep/file.txt",
+            "nested/deep/file.txt",
+            &config_path
+        ));
     }
 
     #[test]
     fn test_matches_uneditable_pattern() {
-        assert!(
-            matches_uneditable_pattern(
-                "package.json",
-                "package.json",
-                "/path/package.json",
-                "package.json"
-            )
-            .unwrap()
-        );
+        assert!(matches_uneditable_pattern(
+            "package.json",
+            "package.json",
+            "/path/package.json",
+            "package.json"
+        )
+        .unwrap());
         assert!(matches_uneditable_pattern("test.md", "test.md", "/path/test.md", "*.md").unwrap());
-        assert!(
-            matches_uneditable_pattern(
-                "src/index.ts",
-                "src/index.ts",
-                "/path/src/index.ts",
-                "src/**/*.ts"
-            )
-            .unwrap()
-        );
+        assert!(matches_uneditable_pattern(
+            "src/index.ts",
+            "src/index.ts",
+            "/path/src/index.ts",
+            "src/**/*.ts"
+        )
+        .unwrap());
         assert!(
             !matches_uneditable_pattern("other.txt", "other.txt", "/path/other.txt", "*.md")
                 .unwrap()
