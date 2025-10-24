@@ -110,7 +110,7 @@ fn send_notification(hook_name: &str, status: &str, context: Option<&str>) {
     }
 }
 
-/// Reads and validates hook payload from stdin, reading and validating hook payload from stdin.
+/// Reads and deserializes the hook payload from stdin.
 ///
 /// # Errors
 ///
@@ -163,7 +163,7 @@ where
 ///
 /// # Errors
 ///
-/// Returns an error if payload validation fails, configuration loading fails, or configuration loading fails.
+/// Returns an error if payload validation fails or configuration loading fails.
 pub async fn handle_pre_tool_use() -> Result<HookResult> {
     let payload: PreToolUsePayload = read_payload_from_stdin()?;
 
@@ -647,7 +647,7 @@ async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<
 ///
 /// # Errors
 ///
-/// Returns an error if payload validation fails, configuration loading fails, configuration loading fails,
+/// Returns an error if payload validation fails, configuration loading fails,
 /// command execution fails, or directory operations fail.
 pub async fn handle_stop() -> Result<HookResult> {
     // Track rounds for infinite alternative using atomic counter
