@@ -317,8 +317,54 @@ The complete configuration schema is defined as Rust structs with serde serializ
 - **stop**: Commands and settings for session termination hooks
 - **rules**: File protection and validation rules
 - **preToolUse**: Pre-execution validation and controls
+- **notifications**: System notification settings for hook events
 
 Generate a complete JSON schema with: `conclaude generate-schema`
+
+#### System Notifications
+
+conclaude can send system notifications when hooks execute, providing real-time feedback about what's happening in your Claude Code sessions. This is especially useful during long-running tasks or when working in multiple windows.
+
+```yaml
+# Enable notifications for specific hooks
+notifications:
+  enabled: true                    # Turn on notifications
+  hooks: ["Stop", "PreToolUse"]    # Which hooks trigger notifications
+```
+
+**Available hook names:**
+- `"Stop"` - When the stop hook runs (tests, linting, etc.)
+- `"PreToolUse"` - Before tools execute (file edits, commands, etc.)
+- `"PostToolUse"` - After tools complete successfully
+- `"SessionStart"` - When a new Claude session begins
+- `"UserPromptSubmit"` - When you submit input to Claude
+- `"Notification"` - When Claude sends internal notifications
+- `"SubagentStop"` - When Claude subagents complete tasks
+- `"PreCompact"` - Before transcript compaction
+
+**Wildcards:**
+Use `["*"]` to receive notifications for all hooks:
+
+```yaml
+notifications:
+  enabled: true
+  hooks: ["*"]  # All hooks will trigger notifications
+```
+
+**Notification content:**
+- **Title**: "Conclaude - [HookName]"
+- **Body**: Context-specific information about the hook execution
+- **Urgency**: Critical for failures, Normal for successes
+
+**Example:**
+```yaml
+# Get notified when tests run or when files are blocked
+notifications:
+  enabled: true
+  hooks:
+    - "Stop"           # Know when tests/linting complete
+    - "PreToolUse"     # Know when file operations are blocked
+```
 
 ## Understanding the Hook System
 

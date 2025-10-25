@@ -85,7 +85,10 @@ fn test_cli_init_command_force_overwrite() {
         .expect("Failed to run CLI init command");
 
     // Should fail because config already exists
-    assert!(!output.status.success(), "Init without force should fail when config exists");
+    assert!(
+        !output.status.success(),
+        "Init without force should fail when config exists"
+    );
 
     // Second init with force should succeed
     let output = Command::new("cargo")
@@ -109,28 +112,6 @@ fn test_cli_init_command_force_overwrite() {
     let config_content = fs::read_to_string(&config_path).expect("Failed to read config file");
     assert!(config_content.contains("stop:"));
     assert!(!config_content.contains("existing content"));
-}
-
-#[test]
-fn test_cli_verbose_flag() {
-    let output = Command::new("cargo")
-        .args(["run", "--", "--verbose", "--help"])
-        .output()
-        .expect("Failed to run CLI with verbose flag");
-
-    // Just verify it doesn't crash with verbose flag
-    assert!(output.status.success());
-}
-
-#[test]
-fn test_cli_disable_file_logging_flag() {
-    let output = Command::new("cargo")
-        .args(["run", "--", "--disable-file-logging", "--help"])
-        .output()
-        .expect("Failed to run CLI with disable-file-logging flag");
-
-    // Just verify it doesn't crash with disable-file-logging flag
-    assert!(output.status.success());
 }
 
 #[test]

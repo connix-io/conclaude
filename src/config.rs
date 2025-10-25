@@ -3,11 +3,12 @@ use anyhow::{Context, Result};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// Configuration for individual stop commands with optional messages
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct StopCommand {
     pub run: String,
     #[serde(default)]
@@ -20,6 +21,7 @@ pub struct StopCommand {
 
 /// Configuration interface for stop hook commands
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
 pub struct StopConfig {
     #[serde(default)]
     pub run: String,
@@ -35,6 +37,7 @@ pub struct StopConfig {
 
 /// Configuration interface for validation rules
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RulesConfig {
     #[serde(default, rename = "preventRootAdditions")]
     pub prevent_root_additions: bool,
@@ -46,6 +49,7 @@ pub struct RulesConfig {
 
 /// Tool usage validation rule
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ToolUsageRule {
     pub tool: String,
     pub pattern: String,
@@ -70,6 +74,7 @@ fn default_true() -> bool {
 
 /// Configuration for pre tool use hooks
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
 pub struct PreToolUseConfig {
     #[serde(default, rename = "preventAdditions")]
     pub prevent_additions: Vec<String>,
@@ -79,6 +84,48 @@ pub struct PreToolUseConfig {
     pub generated_file_message: Option<String>,
 }
 
+/// Configuration for system notifications
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
+pub struct NotificationsConfig {
+    /// Whether notifications are enabled
+    #[serde(default)]
+    pub enabled: bool,
+    /// List of hook names that should trigger notifications. Use ["*"] for all hooks
+    #[serde(default)]
+    pub hooks: Vec<String>,
+    /// Whether to show error notifications
+    #[serde(default, rename = "showErrors")]
+    pub show_errors: bool,
+    /// Whether to show success notifications
+    #[serde(default, rename = "showSuccess")]
+    pub show_success: bool,
+    /// Whether to show system event notifications
+    #[serde(default = "default_show_system_events", rename = "showSystemEvents")]
+    pub show_system_events: bool,
+}
+
+fn default_show_system_events() -> bool {
+    true
+}
+
+impl NotificationsConfig {
+    /// Check if notifications are enabled for a specific hook
+    #[must_use]
+    pub fn is_enabled_for(&self, hook_name: &str) -> bool {
+        if !self.enabled {
+            return false;
+        }
+
+        // Check for wildcard
+        if self.hooks.iter().any(|hook| hook == "*") {
+            return true;
+        }
+
+        // Check for specific hook name
+        self.hooks.iter().any(|hook| hook == hook_name)
+    }
+}
 
 /// Main configuration interface matching the TypeScript version
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
@@ -90,6 +137,81 @@ pub struct ConclaudeConfig {
     pub rules: RulesConfig,
     #[serde(default, rename = "preToolUse")]
     pub pre_tool_use: PreToolUseConfig,
+    #[serde(default)]
+    pub notifications: NotificationsConfig,
+}
+
+/// Format a descriptive error message for YAML parsing failures
+fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
+    let base_error = error.to_string();
+    let mut parts = vec![
+        format!(
+            "Failed to parse configuration file: {}",
+            config_path.display()
+        ),
+        String::new(),
+        format!("Error: {}", base_error),
+    ];
+
+    // Add specific guidance based on error type
+    if base_error.contains("unknown field") {
+        parts.push(String::new());
+        parts.push("Common causes:".to_string());
+        parts.push("  • Typo in field name (check spelling and capitalization)".to_string());
+        parts.push("  • Using a field that doesn't exist in this section".to_string());
+        parts.push("  • Using camelCase vs snake_case incorrectly".to_string());
+        parts.push(String::new());
+        parts.push("Valid field names:".to_string());
+        parts.push("  stop: run, commands, infinite, infiniteMessage, rounds".to_string());
+        parts.push(
+            "  rules: preventRootAdditions, uneditableFiles, toolUsageValidation".to_string(),
+        );
+        parts.push(
+            "  preToolUse: preventAdditions, preventGeneratedFileEdits, generatedFileMessage"
+                .to_string(),
+        );
+        parts.push(
+            "  notifications: enabled, hooks, showErrors, showSuccess, showSystemEvents"
+                .to_string(),
+        );
+    } else if base_error.contains("invalid type") {
+        parts.push(String::new());
+        parts.push("Common causes:".to_string());
+        parts.push(
+            "  • Using quotes around a boolean value (use true/false without quotes)".to_string(),
+        );
+        parts.push("  • Using a string where a number is expected".to_string());
+        parts.push("  • Using a single value where an array is expected (wrap in [])".to_string());
+        parts.push(String::new());
+        parts.push("Example valid types:".to_string());
+        parts.push("  infinite: true          # boolean (no quotes)".to_string());
+        parts.push("  rounds: 3               # number (no quotes)".to_string());
+        parts.push("  run: \"echo hello\"       # string (with quotes)".to_string());
+        parts.push("  hooks: [\"Stop\"]         # array".to_string());
+    } else if base_error.contains("expected") || base_error.contains("while parsing") {
+        parts.push(String::new());
+        parts.push("This is likely a YAML syntax error. Common causes:".to_string());
+        parts.push(
+            "  • Incorrect indentation (YAML requires consistent spaces, not tabs)".to_string(),
+        );
+        parts.push("  • Missing colon after a field name".to_string());
+        parts.push("  • Unmatched quotes or brackets".to_string());
+        parts.push("  • Using tabs instead of spaces for indentation".to_string());
+        parts.push(String::new());
+        parts.push(
+            "Tip: Use a YAML validator or ensure consistent 2-space indentation.".to_string(),
+        );
+    } else if base_error.contains("missing field") {
+        parts.push(String::new());
+        parts.push("A required field is missing from the configuration.".to_string());
+        parts.push("Check the default configuration with: conclaude init".to_string());
+    }
+
+    parts.push(String::new());
+    parts.push("For a valid configuration template, run:".to_string());
+    parts.push("  conclaude init".to_string());
+
+    parts.join("\n")
 }
 
 /// Load YAML configuration using native search strategies
@@ -106,8 +228,10 @@ pub async fn load_conclaude_config() -> Result<(ConclaudeConfig, PathBuf)> {
             let content = fs::read_to_string(path)
                 .with_context(|| format!("Failed to read config file: {}", path.display()))?;
 
-            let config: ConclaudeConfig = serde_yaml::from_str(&content)
-                .with_context(|| format!("Failed to parse config file: {}", path.display()))?;
+            let config: ConclaudeConfig = serde_yaml::from_str(&content).map_err(|e| {
+                let error_msg = format_parse_error(&e, path);
+                anyhow::anyhow!(error_msg)
+            })?;
 
             return Ok((config, path.clone()));
         }
@@ -212,7 +336,7 @@ EOF"#
     // Check for errors
     if !output.stderr.is_empty() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        log::warn!("Bash reported errors: {stderr}");
+        eprintln!("Bash reported errors: {stderr}");
     }
 
     Ok(commands)

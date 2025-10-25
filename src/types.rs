@@ -1,12 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Configuration options for controlling logger behavior.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct LoggingConfig {
-    /// Whether to enable file logging to temporary directory
-    pub file_logging: bool,
-}
 
 /// Response structure returned by hook handlers to control execution flow.
 #[derive(Debug, Clone, Serialize, Deserialize)]
