@@ -1,11 +1,13 @@
-use conclaude::config::{extract_bash_commands, generate_default_config, load_conclaude_config, ConclaudeConfig};
+use conclaude::config::{
+    extract_bash_commands, generate_default_config, load_conclaude_config, ConclaudeConfig,
+};
 use std::fs;
-use std::sync::Mutex;
 use tempfile::tempdir;
+use tokio::sync::Mutex;
 
 // Mutex to serialize tests that change the current directory
 // This prevents race conditions when tests run in parallel
-static DIR_CHANGE_LOCK: Mutex<()> = Mutex::new(());
+static DIR_CHANGE_LOCK: Mutex<()> = Mutex::const_new(());
 
 #[test]
 fn test_extract_bash_commands_single() {
@@ -102,10 +104,19 @@ rules:
 
 #[tokio::test]
 async fn test_load_config_not_found() {
-    let _lock = DIR_CHANGE_LOCK.lock().unwrap();
+    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
 
-    // Change to temp directory where no config exists
+    // Create a deep directory structure (15 levels deep) to ensure we're beyond
+    // the 12-level search limit, preventing the search from finding any config
+    // files in parent directories like /tmp/
+    let mut current_path = temp_dir.path().to_path_buf();
+    for i in 0..15 {
+        current_path = current_path.join(format!("level_{i}"));
+        fs::create_dir(&current_path).unwrap();
+    }
+
+    // Change to the deepest directory where no config exists within search limit
     let original_dir = match std::env::current_dir() {
         Ok(dir) => dir,
         Err(_) => {
@@ -114,7 +125,7 @@ async fn test_load_config_not_found() {
         }
     };
 
-    std::env::set_current_dir(&temp_dir).unwrap();
+    std::env::set_current_dir(&current_path).unwrap();
 
     let result = load_conclaude_config().await;
 
@@ -135,7 +146,6 @@ fn test_generate_default_config() {
     assert!(config.contains("uneditableFiles: []"));
     assert!(config.contains("infinite: false"));
 }
-
 
 #[test]
 fn test_default_config_can_be_parsed() {
@@ -167,11 +177,13 @@ fn test_local_conclaude_yaml_can_be_parsed() {
     let config_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".conclaude.yaml");
 
     if !config_path.exists() {
-        panic!("Expected .conclaude.yaml to exist at: {}", config_path.display());
+        panic!(
+            "Expected .conclaude.yaml to exist at: {}",
+            config_path.display()
+        );
     }
 
-    let content = std::fs::read_to_string(&config_path)
-        .expect("Failed to read .conclaude.yaml");
+    let content = std::fs::read_to_string(&config_path).expect("Failed to read .conclaude.yaml");
 
     let result = serde_yaml::from_str::<conclaude::config::ConclaudeConfig>(&content);
 
@@ -184,7 +196,10 @@ fn test_local_conclaude_yaml_can_be_parsed() {
         Err(e) => {
             println!("✗ Local .conclaude.yaml failed to parse:");
             println!("Error: {}", e);
-            panic!("Local .conclaude.yaml should be parseable, but failed with: {}", e);
+            panic!(
+                "Local .conclaude.yaml should be parseable, but failed with: {}",
+                e
+            );
         }
     }
 }
@@ -245,7 +260,10 @@ fn test_default_config_with_comments_removed_can_be_parsed() {
             assert!(config.rules.prevent_root_additions);
         }
         Err(e) => {
-            panic!("YAML-only content should be parseable, but failed with: {}\n\nYAML content:\n{}", e, yaml_only);
+            panic!(
+                "YAML-only content should be parseable, but failed with: {}\n\nYAML content:\n{}",
+                e, yaml_only
+            );
         }
     }
 }
@@ -277,7 +295,7 @@ fn test_default_config_without_uncommented_grep_rules_can_be_parsed() {
 
 #[tokio::test]
 async fn test_config_search_level_limit() {
-    let _lock = DIR_CHANGE_LOCK.lock().unwrap();
+    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
     let original_dir = std::env::current_dir().unwrap();
 
@@ -318,7 +336,7 @@ async fn test_config_search_level_limit() {
 
 #[tokio::test]
 async fn test_config_search_within_level_limit() {
-    let _lock = DIR_CHANGE_LOCK.lock().unwrap();
+    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
     let original_dir = std::env::current_dir().unwrap();
 
@@ -358,7 +376,7 @@ async fn test_config_search_within_level_limit() {
 
 #[tokio::test]
 async fn test_notification_config_default_disabled() {
-    let _lock = DIR_CHANGE_LOCK.lock().unwrap();
+    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
@@ -366,7 +384,7 @@ async fn test_notification_config_default_disabled() {
     // Create a config with default notification settings
     fs::write(&config_path, generate_default_config()).unwrap();
 
-    std::env::set_current_dir(&temp_dir.path()).unwrap();
+    std::env::set_current_dir(temp_dir.path()).unwrap();
 
     let result = load_conclaude_config().await;
 
@@ -389,7 +407,7 @@ async fn test_notification_config_default_disabled() {
 
 #[tokio::test]
 async fn test_notification_config_enabled_specific_hooks() {
-    let _lock = DIR_CHANGE_LOCK.lock().unwrap();
+    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
@@ -406,7 +424,7 @@ notifications:
 "#;
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_current_dir(&temp_dir.path()).unwrap();
+    std::env::set_current_dir(temp_dir.path()).unwrap();
 
     let result = load_conclaude_config().await;
 
@@ -431,7 +449,7 @@ notifications:
 
 #[tokio::test]
 async fn test_notification_config_enabled_wildcard() {
-    let _lock = DIR_CHANGE_LOCK.lock().unwrap();
+    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
@@ -448,7 +466,7 @@ notifications:
 "#;
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_current_dir(&temp_dir.path()).unwrap();
+    std::env::set_current_dir(temp_dir.path()).unwrap();
 
     let result = load_conclaude_config().await;
 
@@ -474,7 +492,7 @@ notifications:
 
 #[tokio::test]
 async fn test_notification_config_enabled_empty_hooks() {
-    let _lock = DIR_CHANGE_LOCK.lock().unwrap();
+    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
@@ -491,7 +509,7 @@ notifications:
 "#;
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_current_dir(&temp_dir.path()).unwrap();
+    std::env::set_current_dir(temp_dir.path()).unwrap();
 
     let result = load_conclaude_config().await;
 
@@ -518,11 +536,13 @@ fn test_parse_actual_repo_config() {
     let config_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".conclaude.yaml");
 
     if !config_path.exists() {
-        panic!("Expected .conclaude.yaml to exist at: {}", config_path.display());
+        panic!(
+            "Expected .conclaude.yaml to exist at: {}",
+            config_path.display()
+        );
     }
 
-    let content = fs::read_to_string(&config_path)
-        .expect("Failed to read .conclaude.yaml");
+    let content = fs::read_to_string(&config_path).expect("Failed to read .conclaude.yaml");
 
     let result = serde_yaml::from_str::<conclaude::config::ConclaudeConfig>(&content);
 
@@ -531,11 +551,17 @@ fn test_parse_actual_repo_config() {
             // Config parsed successfully
         }
         Err(e) => {
-            panic!("Failed to parse .conclaude.yaml: {}\n\nFile content:\n{}", e, content);
+            panic!(
+                "Failed to parse .conclaude.yaml: {}\n\nFile content:\n{}",
+                e, content
+            );
         }
     }
 
-    assert!(result.is_ok(), "The .conclaude.yaml file should parse successfully");
+    assert!(
+        result.is_ok(),
+        "The .conclaude.yaml file should parse successfully"
+    );
 }
 
 #[test]
@@ -620,7 +646,7 @@ preToolUse:
 
 #[tokio::test]
 async fn test_descriptive_error_for_unknown_field() {
-    let _lock = DIR_CHANGE_LOCK.lock().unwrap();
+    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
@@ -635,7 +661,7 @@ rules:
 "#;
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_current_dir(&temp_dir.path()).unwrap();
+    std::env::set_current_dir(temp_dir.path()).unwrap();
 
     let result = load_conclaude_config().await;
 
@@ -646,14 +672,23 @@ rules:
     let error_message = result.unwrap_err().to_string();
 
     // Verify the error message contains helpful information
-    assert!(error_message.contains("unknown field"), "Error should mention 'unknown field'");
-    assert!(error_message.contains("Common causes"), "Error should provide common causes");
-    assert!(error_message.contains("Valid field names"), "Error should list valid field names");
+    assert!(
+        error_message.contains("unknown field"),
+        "Error should mention 'unknown field'"
+    );
+    assert!(
+        error_message.contains("Common causes"),
+        "Error should provide common causes"
+    );
+    assert!(
+        error_message.contains("Valid field names"),
+        "Error should list valid field names"
+    );
 }
 
 #[tokio::test]
 async fn test_descriptive_error_for_invalid_type() {
-    let _lock = DIR_CHANGE_LOCK.lock().unwrap();
+    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
@@ -668,7 +703,7 @@ rules:
 "#;
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_current_dir(&temp_dir.path()).unwrap();
+    std::env::set_current_dir(temp_dir.path()).unwrap();
 
     let result = load_conclaude_config().await;
 
@@ -684,12 +719,15 @@ rules:
         "Error should mention type mismatch: {}",
         error_message
     );
-    assert!(error_message.contains("Common causes"), "Error should provide common causes");
+    assert!(
+        error_message.contains("Common causes"),
+        "Error should provide common causes"
+    );
 }
 
 #[tokio::test]
 async fn test_descriptive_error_for_yaml_syntax() {
-    let _lock = DIR_CHANGE_LOCK.lock().unwrap();
+    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
     let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
@@ -703,7 +741,7 @@ preventRootAdditions: true
 "#;
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_current_dir(&temp_dir.path()).unwrap();
+    std::env::set_current_dir(temp_dir.path()).unwrap();
 
     let result = load_conclaude_config().await;
 
@@ -715,7 +753,9 @@ preventRootAdditions: true
 
     // Verify the error message contains helpful information
     assert!(
-        error_message.contains("syntax error") || error_message.contains("indentation") || error_message.contains("expected"),
+        error_message.contains("syntax error")
+            || error_message.contains("indentation")
+            || error_message.contains("expected"),
         "Error should mention syntax or parsing issue: {}",
         error_message
     );
@@ -734,13 +774,16 @@ notifications:
 "#;
 
     let result = serde_yaml::from_str::<ConclaudeConfig>(config_content);
-    assert!(result.is_ok(), "Config with camelCase field names should parse successfully");
+    assert!(
+        result.is_ok(),
+        "Config with camelCase field names should parse successfully"
+    );
 
     let config = result.unwrap();
-    assert_eq!(config.notifications.enabled, true);
-    assert_eq!(config.notifications.show_errors, false);
-    assert_eq!(config.notifications.show_success, false);
-    assert_eq!(config.notifications.show_system_events, true);
+    assert!(config.notifications.enabled);
+    assert!(!config.notifications.show_errors);
+    assert!(!config.notifications.show_success);
+    assert!(config.notifications.show_system_events);
 }
 
 #[test]
@@ -756,10 +799,22 @@ notifications:
 "#;
 
     let result = serde_yaml::from_str::<ConclaudeConfig>(config_content);
-    assert!(result.is_err(), "Config with snake_case field names should fail to parse");
+    assert!(
+        result.is_err(),
+        "Config with snake_case field names should fail to parse"
+    );
 
     let error = result.unwrap_err().to_string();
-    assert!(error.contains("showErrors"), "Error should mention showErrors field name");
-    assert!(error.contains("showSuccess"), "Error should mention showSuccess field name");
-    assert!(error.contains("showSystemEvents"), "Error should mention showSystemEvents field name");
+    assert!(
+        error.contains("showErrors"),
+        "Error should mention showErrors field name"
+    );
+    assert!(
+        error.contains("showSuccess"),
+        "Error should mention showSuccess field name"
+    );
+    assert!(
+        error.contains("showSystemEvents"),
+        "Error should mention showSystemEvents field name"
+    );
 }
