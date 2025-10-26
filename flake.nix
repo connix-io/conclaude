@@ -28,7 +28,8 @@
         src = ./.;
         filter = path: type:
           (craneLib.filterCargoSources path type)
-          || (builtins.match ".*default-config\\.yaml$" path != null);
+          || (builtins.match ".*default-config\\.yaml$" path != null)
+          || (builtins.match ".*\\.conclaude\\.yaml$" path != null);
       };
 
       conclaude = craneLib.buildPackage {
