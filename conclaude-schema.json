@@ -3,6 +3,40 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "definitions": {
+    "NotificationsConfig": {
+      "description": "Configuration for system notifications",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "Whether notifications are enabled",
+          "type": "boolean"
+        },
+        "hooks": {
+          "default": [],
+          "description": "List of hook names that should trigger notifications. Use [\"*\"] for all hooks",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "show_errors": {
+          "default": false,
+          "description": "Whether to show error notifications (hook failures, system errors)",
+          "type": "boolean"
+        },
+        "show_success": {
+          "default": false,
+          "description": "Whether to show success notifications (hook completion, successful operations)",
+          "type": "boolean"
+        },
+        "show_system_events": {
+          "default": true,
+          "description": "Whether to show system event notifications (session start/end, configuration loaded)",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
     "PreToolUseConfig": {
       "description": "Configuration for pre tool use hooks",
       "properties": {
@@ -150,6 +184,20 @@
   },
   "description": "Configuration schema for Conclaude - Claude Code hook handler",
   "properties": {
+    "notifications": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/NotificationsConfig"
+        }
+      ],
+      "default": {
+        "enabled": false,
+        "hooks": [],
+        "show_errors": false,
+        "show_success": false,
+        "show_system_events": true
+      }
+    },
     "preToolUse": {
       "allOf": [
         {

@@ -4,57 +4,24 @@
     "deny": []
   },
   "hooks": {
-    "UserPromptSubmit": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "conclaude UserPromptSubmit"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "conclaude Stop"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "conclaude PreToolUse"
-          }
-        ]
-      }
-    ],
     "SubagentStop": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "conclaude SubagentStop"
+            "command": "./target/release/conclaude SubagentStop"
           }
         ]
       }
     ],
-    "SessionEnd": [
+    "UserPromptSubmit": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "conclaude SessionEnd"
+            "command": "./target/release/conclaude UserPromptSubmit"
           }
         ]
       }
@@ -65,18 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "conclaude Notification"
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "conclaude PreCompact"
+            "command": "./target/release/conclaude Notification"
           }
         ]
       }
@@ -87,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "conclaude SessionStart"
+            "command": "./target/release/conclaude SessionStart"
           }
         ]
       }
@@ -98,7 +54,50 @@
         "hooks": [
           {
             "type": "command",
-            "command": "conclaude PostToolUse"
+            "command": "./target/release/conclaude PostToolUse"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./target/release/conclaude SessionEnd"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./target/release/conclaude PreToolUse"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./target/release/conclaude Stop"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./target/release/conclaude PreCompact"
           }
         ]
       }

@@ -7,11 +7,28 @@
 stop:
   # Commands to run during Stop hook
   # Each line is executed as a separate bash command
-  run: ""
+  # run: "echo 'Stop hook is not configured'"
 
   # Alternative structured command format with optional custom error messages
   # Each command can have its own error message, and control output display
-  commands: []
+  commands:
+    - run: "openspec validate --all --strict"
+      showStdout: true
+      showStderr: true
+      message: "OpenSpec validation failed - please fix errors before continuing"
+    - run: "nix develop -c 'lint'"
+      showStdout: true
+      showStderr: true
+      message: "Linter failed - please fix errors before continuing"
+    - run: "nix develop -c 'tests'"
+      showStdout: true
+      showStderr: true
+      message: "Tests failed - please fix errors before continuing"
+    - run: "nix build ."
+      showStdout: true
+      showStderr: true
+      message: "Build .#default failed - please fix errors before continuing"
+
   # Examples:
   # commands:
   #   - run: "echo 'Starting build...'"
@@ -38,15 +55,6 @@ stop:
   # When set, Claude will continue for the specified number of rounds
   rounds: null
   # Example: rounds: 3
-
-  # Grep rules for stop hook - scan files for forbidden patterns
-  # Files matching filePattern are checked for forbiddenPattern
-  grepRules: []
-  # Example:
-  # grepRules:
-  #   - filePattern: "**/*.js"
-  #     forbiddenPattern: "console\\.log"
-  #     description: "No console.log statements allowed in production code"
 
 # Validation rules for hook processing
 rules:
@@ -82,15 +90,6 @@ rules:
 
 # Pre-tool-use hook configuration - runs before tools are executed
 preToolUse:
-  # Grep rules that run before tools execute on files
-  # Checks file content for forbidden patterns before allowing modifications
-  grepRules: []
-  # Example:
-  # grepRules:
-  #   - filePattern: "**/*.py"
-  #     forbiddenPattern: "exec\\(|eval\\("
-  #     description: "Dangerous eval/exec functions not allowed"
-
   # Directories where file additions are prevented (in addition to root)
   # List of directory paths where new files cannot be created
   preventAdditions: []
@@ -110,3 +109,25 @@ preToolUse:
   # Example:
   # generatedFileMessage: "Cannot modify {file_path} - it contains '{marker}' indicating it's auto-generated"
 
+# System notifications configuration
+notifications:
+  # Enable system notifications for hook execution
+  enabled: true
+
+  # List of hook names that should trigger notifications
+  # Use ["*"] to receive notifications for all hooks
+  # Common hook names: "Stop", "PreToolUse", "PostToolUse", "SessionStart", "UserPromptSubmit", "Notification", "SubagentStop", "PreCompact"
+  hooks: ["*"]
+  # Examples:
+  # hooks: ["*"]                    # All hooks
+  # hooks: ["Stop", "PreToolUse"]   # Only specific hooks
+  # hooks: ["Stop"]                 # Only stop hook notifications
+
+  # Show error notifications (hook failures, system errors)
+  showErrors: false
+
+  # Show success notifications (hook completion, successful operations)
+  showSuccess: false
+
+  # Show system event notifications (session start/end, configuration loaded)
+  showSystemEvents: true
