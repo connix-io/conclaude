@@ -20,10 +20,12 @@ stop:
   #     showStdout: true    # Show test results to user/Claude
   #     showStderr: true    # Show test errors to user/Claude
   #     message: "Tests failed - please fix failing tests before continuing"
+  #     maxOutputLines: 100 # Limit output to last 100 lines (1-10000)
   #
   #   - run: "npm run build"
   #     showStderr: true    # Only show build errors to user/Claude, hide stdout
   #     message: "Build failed - please fix compilation errors"
+  #     maxOutputLines: 50  # Limit build output to last 50 lines
 
   # Infinite mode - allows Claude to continue automatically
   # When enabled, Claude receives the infiniteMessage to continue working
