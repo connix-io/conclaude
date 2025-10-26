@@ -16,18 +16,22 @@ stop:
       showStdout: true
       showStderr: true
       message: "OpenSpec validation failed - please fix errors before continuing"
+      maxOutputLines: 100
     - run: "nix develop -c 'lint'"
       showStdout: true
       showStderr: true
       message: "Linter failed - please fix errors before continuing"
+      maxOutputLines: 50
     - run: "nix develop -c 'tests'"
       showStdout: true
       showStderr: true
       message: "Tests failed - please fix errors before continuing"
+      maxOutputLines: 200
     - run: "nix build ."
       showStdout: true
       showStderr: true
       message: "Build .#default failed - please fix errors before continuing"
+      maxOutputLines: 100
 
   # Examples:
   # commands:
