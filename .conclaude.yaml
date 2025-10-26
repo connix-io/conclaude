@@ -24,6 +24,10 @@ stop:
       showStdout: true
       showStderr: true
       message: "Tests failed - please fix errors before continuing"
+    - run: "nix build ."
+      showStdout: true
+      showStderr: true
+      message: "Build .#default failed - please fix errors before continuing"
 
   # Examples:
   # commands:
