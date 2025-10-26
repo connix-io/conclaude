@@ -16,6 +16,10 @@ stop:
       showStdout: true
       showStderr: true
       message: "OpenSpec validation failed - please fix errors before continuing"
+    - run: "nix develop -c 'lint'"
+      showStdout: true
+      showStderr: true
+      message: "Linter failed - please fix errors before continuing"
   # Examples:
   # commands:
   #   - run: "echo 'Starting build...'"
