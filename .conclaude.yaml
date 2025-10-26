@@ -20,6 +20,11 @@ stop:
       showStdout: true
       showStderr: true
       message: "Linter failed - please fix errors before continuing"
+    - run: "nix develop -c 'tests'"
+      showStdout: true
+      showStderr: true
+      message: "Tests failed - please fix errors before continuing"
+
   # Examples:
   # commands:
   #   - run: "echo 'Starting build...'"
