@@ -17,6 +17,9 @@ pub struct StopCommand {
     pub show_stdout: Option<bool>,
     #[serde(default, rename = "showStderr")]
     pub show_stderr: Option<bool>,
+    #[serde(default, rename = "maxOutputLines")]
+    #[schemars(range(min = 1, max = 10000))]
+    pub max_output_lines: Option<u32>,
 }
 
 /// Configuration interface for stop hook commands
