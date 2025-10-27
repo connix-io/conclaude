@@ -344,7 +344,7 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
 
     println!("🔍 Visualizing configuration rules...");
 
-    let (config, _config_path) = config::load_conclaude_config()
+    let (config, _config_path) = config::load_conclaude_config(None)
         .await
         .context("Failed to load configuration")?;
 

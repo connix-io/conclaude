@@ -59,7 +59,7 @@ async fn get_config() -> Result<&'static (ConclaudeConfig, std::path::PathBuf)> 
     if let Some(config) = CACHED_CONFIG.get() {
         Ok(config)
     } else {
-        let config = load_conclaude_config().await?;
+        let config = load_conclaude_config(None).await?;
         Ok(CACHED_CONFIG.get_or_init(|| config))
     }
 }
