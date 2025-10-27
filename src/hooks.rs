@@ -23,6 +23,7 @@ struct StopCommandConfig {
     message: Option<String>,
     show_stdout: bool,
     show_stderr: bool,
+    max_output_lines: Option<u32>,
 }
 
 /// Cached configuration instance to avoid repeated loads
@@ -58,7 +59,7 @@ async fn get_config() -> Result<&'static (ConclaudeConfig, std::path::PathBuf)> 
     if let Some(config) = CACHED_CONFIG.get() {
         Ok(config)
     } else {
-        let config = load_conclaude_config().await?;
+        let config = load_conclaude_config(None).await?;
         Ok(CACHED_CONFIG.get_or_init(|| config))
     }
 }
@@ -548,6 +549,26 @@ pub async fn handle_session_end() -> Result<HookResult> {
     Ok(HookResult::success())
 }
 
+/// Truncate output to a maximum number of lines
+///
+/// Returns a tuple of (truncated_output, is_truncated, omitted_line_count)
+fn truncate_output(output: &str, max_lines: u32) -> (String, bool, usize) {
+    let lines: Vec<&str> = output.lines().collect();
+    let total_lines = lines.len();
+    let max_lines_usize = max_lines as usize;
+
+    if total_lines <= max_lines_usize {
+        // No truncation needed
+        (output.to_string(), false, 0)
+    } else {
+        // Take first N lines and calculate omitted count
+        let truncated_lines = &lines[..max_lines_usize];
+        let omitted_count = total_lines - max_lines_usize;
+        let truncated = truncated_lines.join("\n");
+        (truncated, true, omitted_count)
+    }
+}
+
 /// Collect stop commands from configuration
 ///
 /// # Errors
@@ -565,6 +586,7 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
                 message: None,
                 show_stdout: false,
                 show_stderr: false,
+                max_output_lines: None,
             });
         }
     }
@@ -574,12 +596,14 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
         let extracted = extract_bash_commands(&cmd_config.run)?;
         let show_stdout = cmd_config.show_stdout.unwrap_or(false);
         let show_stderr = cmd_config.show_stderr.unwrap_or(false);
+        let max_output_lines = cmd_config.max_output_lines;
         for cmd in extracted {
             commands.push(StopCommandConfig {
                 command: cmd,
                 message: cmd_config.message.clone(),
                 show_stdout,
                 show_stderr,
+                max_output_lines,
             });
         }
     }
@@ -651,13 +675,31 @@ async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<
             );
 
             let stdout_section = if cmd_config.show_stdout && !stdout.is_empty() {
-                format!("\nStdout: {stdout}")
+                if let Some(max_lines) = cmd_config.max_output_lines {
+                    let (truncated, is_truncated, omitted) = truncate_output(&stdout, max_lines);
+                    if is_truncated {
+                        format!("\nStdout: {}\n... ({} lines omitted)", truncated, omitted)
+                    } else {
+                        format!("\nStdout: {}", truncated)
+                    }
+                } else {
+                    format!("\nStdout: {}", stdout)
+                }
             } else {
                 String::new()
             };
 
             let stderr_section = if cmd_config.show_stderr && !stderr.is_empty() {
-                format!("\nStderr: {stderr}")
+                if let Some(max_lines) = cmd_config.max_output_lines {
+                    let (truncated, is_truncated, omitted) = truncate_output(&stderr, max_lines);
+                    if is_truncated {
+                        format!("\nStderr: {}\n... ({} lines omitted)", truncated, omitted)
+                    } else {
+                        format!("\nStderr: {}", truncated)
+                    }
+                } else {
+                    format!("\nStderr: {}", stderr)
+                }
             } else {
                 String::new()
             };
@@ -1168,5 +1210,220 @@ mod tests {
 
         tool_input.clear();
         assert_eq!(extract_file_path(&tool_input), None);
+    }
+
+    #[test]
+    fn test_truncate_output_no_truncation_needed() {
+        let output = "line1\nline2\nline3";
+        let (truncated, is_truncated, omitted) = truncate_output(output, 10);
+        assert_eq!(truncated, "line1\nline2\nline3");
+        assert!(!is_truncated);
+        assert_eq!(omitted, 0);
+    }
+
+    #[test]
+    fn test_truncate_output_exact_limit() {
+        let output = "line1\nline2\nline3";
+        let (truncated, is_truncated, omitted) = truncate_output(output, 3);
+        assert_eq!(truncated, "line1\nline2\nline3");
+        assert!(!is_truncated);
+        assert_eq!(omitted, 0);
+    }
+
+    #[test]
+    fn test_truncate_output_with_truncation() {
+        let output = "line1\nline2\nline3\nline4\nline5";
+        let (truncated, is_truncated, omitted) = truncate_output(output, 2);
+        assert_eq!(truncated, "line1\nline2");
+        assert!(is_truncated);
+        assert_eq!(omitted, 3);
+    }
+
+    #[test]
+    fn test_truncate_output_empty() {
+        let output = "";
+        let (truncated, is_truncated, omitted) = truncate_output(output, 10);
+        assert_eq!(truncated, "");
+        assert!(!is_truncated);
+        assert_eq!(omitted, 0);
+    }
+
+    #[test]
+    fn test_truncate_output_single_line() {
+        let output = "single line";
+        let (truncated, is_truncated, omitted) = truncate_output(output, 1);
+        assert_eq!(truncated, "single line");
+        assert!(!is_truncated);
+        assert_eq!(omitted, 0);
+    }
+
+    #[test]
+    fn test_truncate_output_large_limit() {
+        let output = "line1\nline2";
+        let (truncated, is_truncated, omitted) = truncate_output(output, 10000);
+        assert_eq!(truncated, "line1\nline2");
+        assert!(!is_truncated);
+        assert_eq!(omitted, 0);
+    }
+
+    #[test]
+    fn test_truncate_output_multiple_lines_exact_boundary() {
+        let output = "line1\nline2\nline3\nline4\nline5";
+        let (truncated, is_truncated, omitted) = truncate_output(output, 5);
+        assert_eq!(truncated, "line1\nline2\nline3\nline4\nline5");
+        assert!(!is_truncated);
+        assert_eq!(omitted, 0);
+    }
+
+    #[test]
+    fn test_truncate_output_multiple_lines_just_over_limit() {
+        let output = "line1\nline2\nline3\nline4\nline5\nline6";
+        let (truncated, is_truncated, omitted) = truncate_output(output, 5);
+        assert_eq!(truncated, "line1\nline2\nline3\nline4\nline5");
+        assert!(is_truncated);
+        assert_eq!(omitted, 1);
+    }
+
+    #[test]
+    fn test_truncate_output_preserves_content() {
+        let output = "Line with special chars: !@#$%^&*()\nAnother line\n\nEmpty line above";
+        let (truncated, is_truncated, omitted) = truncate_output(output, 2);
+        assert_eq!(truncated, "Line with special chars: !@#$%^&*()\nAnother line");
+        assert!(is_truncated);
+        assert_eq!(omitted, 2);
+    }
+
+    #[test]
+    fn test_collect_stop_commands_legacy_run() {
+        let config = ConclaudeConfig {
+            stop: crate::config::StopConfig {
+                run: "echo test\nls -la".to_string(),
+                commands: vec![],
+                infinite: false,
+                infinite_message: None,
+                rounds: None,
+            },
+            ..Default::default()
+        };
+
+        let commands = collect_stop_commands(&config).unwrap();
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[0].command, "echo test");
+        assert!(!commands[0].show_stdout);
+        assert!(!commands[0].show_stderr);
+        assert_eq!(commands[0].max_output_lines, None);
+    }
+
+    #[test]
+    fn test_collect_stop_commands_with_output_config() {
+        use crate::config::StopCommand;
+
+        let config = ConclaudeConfig {
+            stop: crate::config::StopConfig {
+                run: String::new(),
+                commands: vec![
+                    StopCommand {
+                        run: "echo hello".to_string(),
+                        message: Some("Custom message".to_string()),
+                        show_stdout: Some(true),
+                        show_stderr: Some(false),
+                        max_output_lines: Some(10),
+                    },
+                    StopCommand {
+                        run: "ls -la".to_string(),
+                        message: None,
+                        show_stdout: Some(false),
+                        show_stderr: Some(true),
+                        max_output_lines: Some(5),
+                    },
+                ],
+                infinite: false,
+                infinite_message: None,
+                rounds: None,
+            },
+            ..Default::default()
+        };
+
+        let commands = collect_stop_commands(&config).unwrap();
+        assert_eq!(commands.len(), 2);
+
+        assert_eq!(commands[0].command, "echo hello");
+        assert!(commands[0].show_stdout);
+        assert!(!commands[0].show_stderr);
+        assert_eq!(commands[0].max_output_lines, Some(10));
+        assert_eq!(commands[0].message, Some("Custom message".to_string()));
+
+        assert_eq!(commands[1].command, "ls -la");
+        assert!(!commands[1].show_stdout);
+        assert!(commands[1].show_stderr);
+        assert_eq!(commands[1].max_output_lines, Some(5));
+        assert_eq!(commands[1].message, None);
+    }
+
+    #[test]
+    fn test_collect_stop_commands_mixed_legacy_and_new() {
+        use crate::config::StopCommand;
+
+        let config = ConclaudeConfig {
+            stop: crate::config::StopConfig {
+                run: "echo legacy".to_string(),
+                commands: vec![StopCommand {
+                    run: "echo new".to_string(),
+                    message: Some("New style".to_string()),
+                    show_stdout: Some(true),
+                    show_stderr: Some(true),
+                    max_output_lines: Some(20),
+                }],
+                infinite: false,
+                infinite_message: None,
+                rounds: None,
+            },
+            ..Default::default()
+        };
+
+        let commands = collect_stop_commands(&config).unwrap();
+        assert_eq!(commands.len(), 2);
+
+        // Legacy command comes first
+        assert_eq!(commands[0].command, "echo legacy");
+        assert!(!commands[0].show_stdout);
+        assert!(!commands[0].show_stderr);
+        assert_eq!(commands[0].max_output_lines, None);
+
+        // New command comes second
+        assert_eq!(commands[1].command, "echo new");
+        assert!(commands[1].show_stdout);
+        assert!(commands[1].show_stderr);
+        assert_eq!(commands[1].max_output_lines, Some(20));
+    }
+
+    #[test]
+    fn test_collect_stop_commands_default_values() {
+        use crate::config::StopCommand;
+
+        let config = ConclaudeConfig {
+            stop: crate::config::StopConfig {
+                run: String::new(),
+                commands: vec![StopCommand {
+                    run: "echo test".to_string(),
+                    message: None,
+                    show_stdout: None,
+                    show_stderr: None,
+                    max_output_lines: None,
+                }],
+                infinite: false,
+                infinite_message: None,
+                rounds: None,
+            },
+            ..Default::default()
+        };
+
+        let commands = collect_stop_commands(&config).unwrap();
+        assert_eq!(commands.len(), 1);
+
+        // Defaults should be false for show flags and None for max_output_lines
+        assert!(!commands[0].show_stdout);
+        assert!(!commands[0].show_stderr);
+        assert_eq!(commands[0].max_output_lines, None);
     }
 }

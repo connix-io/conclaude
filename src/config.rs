@@ -17,6 +17,9 @@ pub struct StopCommand {
     pub show_stdout: Option<bool>,
     #[serde(default, rename = "showStderr")]
     pub show_stderr: Option<bool>,
+    #[serde(default, rename = "maxOutputLines")]
+    #[schemars(range(min = 1, max = 10000))]
+    pub max_output_lines: Option<u32>,
 }
 
 /// Configuration interface for stop hook commands
@@ -217,11 +220,15 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
 /// Load YAML configuration using native search strategies
 /// Search strategy: searches up directory tree until a config file is found
 ///
+/// # Arguments
+///
+/// * `start_dir` - Optional starting directory for config search. If None, uses current directory.
+///
 /// # Errors
 ///
 /// Returns an error if no configuration file is found, file reading fails, or YAML parsing fails.
-pub async fn load_conclaude_config() -> Result<(ConclaudeConfig, PathBuf)> {
-    let search_paths = get_config_search_paths()?;
+pub async fn load_conclaude_config(start_dir: Option<&Path>) -> Result<(ConclaudeConfig, PathBuf)> {
+    let search_paths = get_config_search_paths(start_dir)?;
 
     for path in &search_paths {
         if path.exists() {
@@ -251,9 +258,12 @@ pub async fn load_conclaude_config() -> Result<(ConclaudeConfig, PathBuf)> {
     Err(anyhow::anyhow!(error_message))
 }
 
-fn get_config_search_paths() -> Result<Vec<PathBuf>> {
+fn get_config_search_paths(start_dir: Option<&Path>) -> Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
-    let mut current_dir = std::env::current_dir()?;
+    let mut current_dir = match start_dir {
+        Some(dir) => dir.to_path_buf(),
+        None => std::env::current_dir()?,
+    };
     let mut levels_searched = 0;
     const MAX_SEARCH_LEVELS: u32 = 12;
 

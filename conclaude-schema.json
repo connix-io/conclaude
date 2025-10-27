@@ -4,6 +4,7 @@
   "additionalProperties": false,
   "definitions": {
     "NotificationsConfig": {
+      "additionalProperties": false,
       "description": "Configuration for system notifications",
       "properties": {
         "enabled": {
@@ -19,25 +20,26 @@
           },
           "type": "array"
         },
-        "show_errors": {
+        "showErrors": {
           "default": false,
-          "description": "Whether to show error notifications (hook failures, system errors)",
+          "description": "Whether to show error notifications",
           "type": "boolean"
         },
-        "show_success": {
+        "showSuccess": {
           "default": false,
-          "description": "Whether to show success notifications (hook completion, successful operations)",
+          "description": "Whether to show success notifications",
           "type": "boolean"
         },
-        "show_system_events": {
+        "showSystemEvents": {
           "default": true,
-          "description": "Whether to show system event notifications (session start/end, configuration loaded)",
+          "description": "Whether to show system event notifications",
           "type": "boolean"
         }
       },
       "type": "object"
     },
     "PreToolUseConfig": {
+      "additionalProperties": false,
       "description": "Configuration for pre tool use hooks",
       "properties": {
         "generatedFileMessage": {
@@ -62,6 +64,7 @@
       "type": "object"
     },
     "RulesConfig": {
+      "additionalProperties": false,
       "description": "Configuration interface for validation rules",
       "properties": {
         "preventRootAdditions": {
@@ -86,8 +89,19 @@
       "type": "object"
     },
     "StopCommand": {
+      "additionalProperties": false,
       "description": "Configuration for individual stop commands with optional messages",
       "properties": {
+        "maxOutputLines": {
+          "default": null,
+          "format": "uint32",
+          "maximum": 10000.0,
+          "minimum": 1.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "message": {
           "default": null,
           "type": [
@@ -119,6 +133,7 @@
       "type": "object"
     },
     "StopConfig": {
+      "additionalProperties": false,
       "description": "Configuration interface for stop hook commands",
       "properties": {
         "commands": {
@@ -156,6 +171,7 @@
       "type": "object"
     },
     "ToolUsageRule": {
+      "additionalProperties": false,
       "description": "Tool usage validation rule",
       "properties": {
         "action": {
@@ -193,9 +209,9 @@
       "default": {
         "enabled": false,
         "hooks": [],
-        "show_errors": false,
-        "show_success": false,
-        "show_system_events": true
+        "showErrors": false,
+        "showSuccess": false,
+        "showSystemEvents": false
       }
     },
     "preToolUse": {
