@@ -57,7 +57,7 @@ The system SHALL provide database-backed storage for numeric counters that persi
 
 #### Scenario: Counter increment atomicity
 - **WHEN** a counter needs to be incremented
-- **THEN** the system SHALL perform atomic database updates to prevent race conditions
+- **THEN** the system SHALL use SQLite transactions with SERIALIZABLE isolation to prevent race conditions
 - **AND** SHALL return the updated counter value
 - **AND** SHALL handle concurrent access safely
 
@@ -70,7 +70,7 @@ The system SHALL provide database-backed storage for numeric counters that persi
 - **WHEN** the rounds counter is incremented in the Stop hook
 - **THEN** the system SHALL store the value persistently in the database
 - **AND** SHALL maintain the counter across multiple CLI invocations
-- **AND** SHALL reset the counter when max rounds are reached
+- **AND** SHALL reset the counter when it reaches the config.stop.rounds limit
 
 ### Requirement: Hook Execution Audit Trail
 The system SHALL maintain an audit trail of hook executions in the database for debugging and analytics.
