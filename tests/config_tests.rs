@@ -3,11 +3,6 @@ use conclaude::config::{
 };
 use std::fs;
 use tempfile::tempdir;
-use tokio::sync::Mutex;
-
-// Mutex to serialize tests that change the current directory
-// This prevents race conditions when tests run in parallel
-static DIR_CHANGE_LOCK: Mutex<()> = Mutex::const_new(());
 
 #[test]
 fn test_extract_bash_commands_single() {
@@ -104,7 +99,6 @@ rules:
 
 #[tokio::test]
 async fn test_load_config_not_found() {
-    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
 
     // Create a deep directory structure (15 levels deep) to ensure we're beyond
@@ -116,21 +110,7 @@ async fn test_load_config_not_found() {
         fs::create_dir(&current_path).unwrap();
     }
 
-    // Change to the deepest directory where no config exists within search limit
-    let original_dir = match std::env::current_dir() {
-        Ok(dir) => dir,
-        Err(_) => {
-            // If we can't get current dir, skip the test
-            return;
-        }
-    };
-
-    std::env::set_current_dir(&current_path).unwrap();
-
-    let result = load_conclaude_config().await;
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
+    let result = load_conclaude_config(Some(&current_path)).await;
 
     assert!(result.is_err());
     let error_message = result.unwrap_err().to_string();
@@ -295,9 +275,7 @@ fn test_default_config_without_uncommented_grep_rules_can_be_parsed() {
 
 #[tokio::test]
 async fn test_config_search_level_limit() {
-    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
 
     // Create a deep directory structure (15 levels deep)
     let mut current_path = temp_dir.path().to_path_buf();
@@ -319,14 +297,8 @@ async fn test_config_search_level_limit() {
     )
     .unwrap();
 
-    // Change to the deepest directory
-    std::env::set_current_dir(&current_path).unwrap();
-
     // Attempt to load config - should not find the deep config due to level limit
-    let result = load_conclaude_config().await;
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
+    let result = load_conclaude_config(Some(&current_path)).await;
 
     // Should fail to find config due to level limit
     assert!(result.is_err());
@@ -336,9 +308,7 @@ async fn test_config_search_level_limit() {
 
 #[tokio::test]
 async fn test_config_search_within_level_limit() {
-    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
 
     // Create a directory structure within the 12 level limit (10 levels)
     let mut current_path = temp_dir.path().to_path_buf();
@@ -357,14 +327,8 @@ async fn test_config_search_within_level_limit() {
     )
     .unwrap();
 
-    // Change to the deepest directory
-    std::env::set_current_dir(&current_path).unwrap();
-
     // Attempt to load config - should find the config within level limit
-    let result = load_conclaude_config().await;
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
+    let result = load_conclaude_config(Some(&current_path)).await;
 
     // Should successfully find and parse config
     assert!(result.is_ok());
@@ -376,20 +340,13 @@ async fn test_config_search_within_level_limit() {
 
 #[tokio::test]
 async fn test_notification_config_default_disabled() {
-    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
 
     // Create a config with default notification settings
     fs::write(&config_path, generate_default_config()).unwrap();
 
-    std::env::set_current_dir(temp_dir.path()).unwrap();
-
-    let result = load_conclaude_config().await;
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
+    let result = load_conclaude_config(Some(temp_dir.path())).await;
 
     assert!(result.is_ok());
 
@@ -407,9 +364,7 @@ async fn test_notification_config_default_disabled() {
 
 #[tokio::test]
 async fn test_notification_config_enabled_specific_hooks() {
-    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
 
     // Create config with specific hooks enabled
@@ -424,12 +379,8 @@ notifications:
 "#;
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
 
-    let result = load_conclaude_config().await;
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
+    let result = load_conclaude_config(Some(temp_dir.path())).await;
 
     assert!(result.is_ok());
 
@@ -449,9 +400,7 @@ notifications:
 
 #[tokio::test]
 async fn test_notification_config_enabled_wildcard() {
-    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
 
     // Create config with wildcard enabled
@@ -466,12 +415,8 @@ notifications:
 "#;
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
 
-    let result = load_conclaude_config().await;
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
+    let result = load_conclaude_config(Some(temp_dir.path())).await;
 
     assert!(result.is_ok());
 
@@ -492,9 +437,7 @@ notifications:
 
 #[tokio::test]
 async fn test_notification_config_enabled_empty_hooks() {
-    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
 
     // Create config with enabled but empty hooks list
@@ -509,12 +452,8 @@ notifications:
 "#;
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
 
-    let result = load_conclaude_config().await;
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
+    let result = load_conclaude_config(Some(temp_dir.path())).await;
 
     assert!(result.is_ok());
 
@@ -646,9 +585,7 @@ preToolUse:
 
 #[tokio::test]
 async fn test_descriptive_error_for_unknown_field() {
-    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
 
     // Create config with an unknown field
@@ -661,12 +598,8 @@ rules:
 "#;
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
 
-    let result = load_conclaude_config().await;
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
+    let result = load_conclaude_config(Some(temp_dir.path())).await;
 
     assert!(result.is_err());
     let error_message = result.unwrap_err().to_string();
@@ -688,9 +621,7 @@ rules:
 
 #[tokio::test]
 async fn test_descriptive_error_for_invalid_type() {
-    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
 
     // Create config with an invalid type (string instead of boolean)
@@ -703,12 +634,8 @@ rules:
 "#;
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
 
-    let result = load_conclaude_config().await;
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
+    let result = load_conclaude_config(Some(temp_dir.path())).await;
 
     assert!(result.is_err());
     let error_message = result.unwrap_err().to_string();
@@ -727,9 +654,7 @@ rules:
 
 #[tokio::test]
 async fn test_descriptive_error_for_yaml_syntax() {
-    let _lock = DIR_CHANGE_LOCK.lock().await;
     let temp_dir = tempdir().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");
 
     // Create config with YAML syntax error (bad indentation)
@@ -741,12 +666,8 @@ preventRootAdditions: true
 "#;
 
     fs::write(&config_path, config_content).unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
 
-    let result = load_conclaude_config().await;
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
+    let result = load_conclaude_config(Some(temp_dir.path())).await;
 
     assert!(result.is_err());
     let error_message = result.unwrap_err().to_string();
