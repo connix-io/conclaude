@@ -1,5 +1,4 @@
 use conclaude::config::{ConclaudeConfig, StopCommand, StopConfig};
-use serde_yaml;
 use std::fs;
 use tempfile::tempdir;
 
