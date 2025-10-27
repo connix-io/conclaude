@@ -562,15 +562,8 @@ rules:
 
     fs::write(&config_path, config_content).unwrap();
 
-    // Change to temp dir
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
-
-    // Load config using the actual config loading function
-    let result = conclaude::config::load_conclaude_config().await;
-
-    // Restore directory
-    std::env::set_current_dir(original_dir).unwrap();
+    // Load config using the actual config loading function with explicit path
+    let result = conclaude::config::load_conclaude_config(Some(temp_dir.path())).await;
 
     assert!(
         result.is_ok(),
