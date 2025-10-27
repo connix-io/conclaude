@@ -9,7 +9,6 @@ For clarity and to prevent implementation ambiguity, the following terms are exp
 - **Maximum rounds limit**: The numeric value of `config.stop.rounds: Option<u32>` as configured in the user's `.conclaude.yaml` file (defined in `src/config.rs:38`). This is a user-configurable positive integer (u32) that determines how many Stop hook invocations will occur before allowing the session to terminate.
 
 - **Atomic database operations**: Database operations that use SQLite transactions with SERIALIZABLE isolation level to ensure thread-safe, race-condition-free counter increments. Implementation SHALL use SQLx's transaction API with explicit transaction boundaries to guarantee that concurrent database access from multiple CLI invocations maintains data integrity and prevents lost updates.
-
 ### Requirement: Rounds Counter Persistence
 The system SHALL provide persistent rounds counter storage that maintains state across CLI invocations using a SQLite database.
 
