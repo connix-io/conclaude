@@ -6,7 +6,7 @@ use tempfile::tempdir;
 #[test]
 fn test_max_output_lines_valid_values() {
     // Test valid values: 1, 100, 10000
-    let valid_configs = vec![
+    let valid_configs = [
         r#"
 stop:
   commands:
