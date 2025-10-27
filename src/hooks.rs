@@ -1309,8 +1309,8 @@ mod tests {
         let commands = collect_stop_commands(&config).unwrap();
         assert_eq!(commands.len(), 2);
         assert_eq!(commands[0].command, "echo test");
-        assert_eq!(commands[0].show_stdout, false);
-        assert_eq!(commands[0].show_stderr, false);
+        assert!(!commands[0].show_stdout);
+        assert!(!commands[0].show_stderr);
         assert_eq!(commands[0].max_output_lines, None);
     }
 
