@@ -1,0 +1,161 @@
+# Design: Remove generate-schema Subcommand
+
+## Context
+
+The current implementation includes `generate-schema` as a subcommand in the main `conclaude` CLI. This command generates a JSON Schema file for the `.conclaude.yaml` configuration format. While useful during development and releases, it doesn't belong in the user-facing CLI for several reasons:
+
+1. **User Confusion**: End users don't need to generate schemas; they consume them via IDE tooling
+2. **Build Complexity**: Schema generation requires the `schemars` dependency which increases binary size
+3. **Release Coupling**: Schema updates should be automatic during releases, not manual user actions
+4. **Maintenance Burden**: The command requires ongoing documentation and support despite limited utility
+
+## Solution Architecture
+
+### External Script Approach
+
+Move schema generation to a standalone Rust binary (`scripts/generate-schema.rs`) that:
+- Lives outside the main CLI codebase
+- Can be compiled and run as part of the build/release process
+- Reuses the existing `schema` module functions
+- Has no impact on the main binary size or dependencies
+
+### Build-Time Integration
+
+Integrate the script into the GitHub Actions release workflow:
+1. Before creating release artifacts, run the schema generation script
+2. Generate `conclaude-schema.json` in the workspace root
+3. Include the schema file in the release artifacts uploaded to GitHub
+4. Ensure the schema URL (`https://github.com/conneroisu/conclaude/releases/latest/download/conclaude-schema.json`) remains stable
+
+### Dependency Management
+
+The `schemars` dependency is already required for the `ConclaudeConfig` derive macros, so:
+- The schema module (`src/schema.rs`) remains in the library
+- The external script depends on `conclaude` as a library dependency
+- No changes to dependencies in `Cargo.toml` are needed
+- Binary size is unaffected since schema generation was already compiled in
+
+## Technical Decisions
+
+### Why a Rust Script vs Shell Script?
+
+**Decision**: Use a Rust binary in `scripts/` directory
+
+**Rationale**:
+- Type safety: Reuse existing schema generation functions directly
+- Cross-platform: Works on Windows, macOS, and Linux without bash
+- Maintainability: Same language as the main codebase
+- CI simplicity: No additional tooling needed beyond cargo
+
+**Alternatives Considered**:
+- Shell script calling `conclaude generate-schema`: Requires keeping the subcommand
+- Python/Node script: Adds new language dependencies to the build process
+- Build.rs script: Schema generation is release-time, not compile-time
+
+### Why Not Keep the Subcommand?
+
+**Decision**: Completely remove `generate-schema` from the CLI
+
+**Rationale**:
+- **Principle of Least Surprise**: Users don't expect schema generation in a hook handler CLI
+- **Maintenance**: Every subcommand requires documentation, testing, and support
+- **Clarity**: Release automation should not rely on user-facing commands
+
+**Alternatives Considered**:
+- Mark as hidden command: Still increases binary complexity
+- Document as "internal only": Confusing for users who discover it
+- Keep for backward compatibility: Unnecessary since usage is minimal
+
+### Script Location
+
+**Decision**: Place in `scripts/generate-schema.rs` (not `bin/`)
+
+**Rationale**:
+- `bin/` typically contains user-facing binaries that get installed
+- `scripts/` clearly indicates build/development tooling
+- Follows common Rust project conventions (see cargo itself)
+
+**Implementation**:
+```rust
+// scripts/generate-schema.rs
+fn main() -> anyhow::Result<()> {
+    let schema = conclaude::schema::generate_config_schema()?;
+    let output_path = PathBuf::from("conclaude-schema.json");
+    conclaude::schema::write_schema_to_file(&schema, &output_path)?;
+    println!("✅ Schema generated: {}", output_path.display());
+    Ok(())
+}
+```
+
+### GitHub Actions Integration
+
+**Decision**: Add schema generation step before dist runs
+
+**Workflow Update** (`.github/workflows/release.yml`):
+```yaml
+- name: Generate JSON Schema
+  run: |
+    cargo run --manifest-path scripts/Cargo.toml --bin generate-schema
+    ls -lh conclaude-schema.json
+```
+
+**Placement**: After checkout, before `dist` creates release artifacts
+
+**Rationale**:
+- Schema is generated once per release, not per platform
+- dist will automatically include `conclaude-schema.json` in release assets
+- Simple, explicit, and easy to debug
+
+## Migration Strategy
+
+### For End Users
+
+No action required:
+- The schema URL remains the same
+- IDE autocomplete continues to work
+- No workflows depend on `conclaude generate-schema`
+
+### For Contributors
+
+Update local workflows:
+- Instead of `conclaude generate-schema`, use `cargo run --bin generate-schema`
+- Schema validation during development: `cargo test` (existing tests validate schema)
+- Pre-commit: No changes needed (schema is not committed)
+
+### For CI/CD
+
+- Release workflow automatically generates schema
+- No manual steps required
+- Schema is uploaded to GitHub releases as before
+
+## Testing Strategy
+
+1. **Unit Tests**: Existing tests in `src/schema.rs` remain unchanged
+2. **Integration Test**: Add test to verify the external script works:
+   ```rust
+   #[test]
+   fn test_generate_schema_script() {
+       let output = std::process::Command::new("cargo")
+           .args(&["run", "--bin", "generate-schema"])
+           .output()
+           .expect("Failed to run script");
+       assert!(output.status.success());
+       assert!(PathBuf::from("conclaude-schema.json").exists());
+   }
+   ```
+3. **Release Workflow Test**: Verify schema is included in release assets
+4. **Documentation Audit**: Ensure all references to `generate-schema` are updated
+
+## Rollback Plan
+
+If issues arise after deployment:
+
+1. **Immediate**: The schema file is already in the release, users are unaffected
+2. **Short-term**: Revert the PR that removed the subcommand
+3. **Long-term**: If the external script approach doesn't work, we can:
+   - Restore the subcommand as hidden
+   - Keep both approaches temporarily during transition
+
+## Open Questions
+
+None - this is a straightforward refactoring with minimal risk.
