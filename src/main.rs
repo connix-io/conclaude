@@ -408,12 +408,6 @@ async fn handle_validate(config_path: Option<String>) -> Result<()> {
         // If it's a specific file, load it directly
         if path.is_file() || path.extension().is_some() {
             // Load the specific file
-            if !path.exists() {
-                eprintln!("❌ Configuration validation failed:\n");
-                eprintln!("Configuration file not found: {}", path.display());
-                std::process::exit(1);
-            }
-
             let content = fs::read_to_string(&path)
                 .with_context(|| format!("Failed to read config file: {}", path.display()))?;
 

@@ -615,10 +615,10 @@ fn test_validate_with_nonexistent_custom_config_file() {
         exit_code
     );
 
-    // Verify error message mentions file not found
+    // Verify error message mentions file error
     assert!(
-        stderr.contains("not found"),
-        "Error message should mention file not found. stderr: {stderr}"
+        stderr.contains("No such file or directory") || stderr.contains("not found"),
+        "Error message should mention file error. stderr: {stderr}"
     );
 }
 
