@@ -1,8 +1,8 @@
 use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig};
 use crate::types::{
-    validate_base_payload, HookResult, NotificationPayload, PostToolUsePayload,
-    PreCompactPayload, PreToolUsePayload, SessionEndPayload, SessionStartPayload, StopPayload,
-    SubagentStopPayload, UserPromptSubmitPayload,
+    validate_base_payload, HookResult, NotificationPayload, PostToolUsePayload, PreCompactPayload,
+    PreToolUsePayload, SessionEndPayload, SessionStartPayload, StopPayload, SubagentStopPayload,
+    UserPromptSubmitPayload,
 };
 use anyhow::{Context, Result};
 use glob::Pattern;
@@ -24,6 +24,7 @@ struct StopCommandConfig {
     show_stdout: bool,
     show_stderr: bool,
     max_output_lines: Option<u32>,
+    timeout: Option<u64>,
 }
 
 /// Cached configuration instance to avoid repeated loads
@@ -48,7 +49,6 @@ fn is_system_event_hook(hook_name: &str) -> bool {
         "SessionStart" | "SessionEnd" | "UserPromptSubmit" | "SubagentStop" | "PreCompact"
     )
 }
-
 
 /// Load configuration with caching to avoid repeated file system operations
 ///
@@ -212,11 +212,9 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: tool_name"));
     }
 
-    
     println!(
         "Processing PreToolUse hook: session_id={}, tool_name={}",
-        payload.base.session_id,
-        payload.tool_name
+        payload.base.session_id, payload.tool_name
     );
 
     // Check tool usage validation rules
@@ -304,8 +302,7 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
 
         eprintln!(
             "PreToolUse blocked by preventRootAdditions rule: tool_name={}, file_path={}",
-            payload.tool_name,
-            file_path
+            payload.tool_name, file_path
         );
 
         return Ok(Some(HookResult::blocked(error_message)));
@@ -420,11 +417,9 @@ pub async fn handle_post_tool_use() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: tool_name"));
     }
 
-    
     println!(
         "Processing PostToolUse hook: session_id={}, tool_name={}",
-        payload.base.session_id,
-        payload.tool_name
+        payload.base.session_id, payload.tool_name
     );
 
     // Send notification for post tool use completion
@@ -451,11 +446,9 @@ pub async fn handle_notification() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: message"));
     }
 
-    
     println!(
         "Processing Notification hook: session_id={}, message={}",
-        payload.base.session_id,
-        payload.message
+        payload.base.session_id, payload.message
     );
 
     // Send notification for notification hook processing
@@ -482,7 +475,6 @@ pub async fn handle_user_prompt_submit() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: prompt"));
     }
 
-    
     println!(
         "Processing UserPromptSubmit hook: session_id={}",
         payload.base.session_id
@@ -508,11 +500,9 @@ pub async fn handle_session_start() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: source"));
     }
 
-    
     println!(
         "Processing SessionStart hook: session_id={}, source={}",
-        payload.base.session_id,
-        payload.source
+        payload.base.session_id, payload.source
     );
 
     // Send notification for session start
@@ -539,11 +529,9 @@ pub async fn handle_session_end() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: reason"));
     }
 
-    
     println!(
         "Processing SessionEnd hook: session_id={}, reason={}",
-        payload.base.session_id,
-        payload.reason
+        payload.base.session_id, payload.reason
     );
 
     Ok(HookResult::success())
@@ -587,6 +575,7 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
                 show_stdout: false,
                 show_stderr: false,
                 max_output_lines: None,
+                timeout: None,
             });
         }
     }
@@ -597,6 +586,7 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
         let show_stdout = cmd_config.show_stdout.unwrap_or(false);
         let show_stderr = cmd_config.show_stderr.unwrap_or(false);
         let max_output_lines = cmd_config.max_output_lines;
+        let timeout = cmd_config.timeout;
         for cmd in extracted {
             commands.push(StopCommandConfig {
                 command: cmd,
@@ -604,6 +594,7 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
                 show_stdout,
                 show_stderr,
                 max_output_lines,
+                timeout,
             });
         }
     }
@@ -636,10 +627,46 @@ async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<
             .spawn()
             .with_context(|| format!("Failed to spawn command: {}", cmd_config.command))?;
 
-        let output = child
-            .wait_with_output()
-            .await
-            .with_context(|| format!("Failed to wait for command: {}", cmd_config.command))?;
+        // Apply timeout if configured
+        let output_result = if let Some(timeout_secs) = cmd_config.timeout {
+            let timeout_duration = std::time::Duration::from_secs(timeout_secs);
+            tokio::time::timeout(timeout_duration, child.wait_with_output()).await
+        } else {
+            // No timeout, wait indefinitely
+            Ok(child.wait_with_output().await)
+        };
+
+        // Handle timeout or execution errors
+        let output = match output_result {
+            Ok(Ok(output)) => output,
+            Ok(Err(e)) => {
+                return Err(e).with_context(|| {
+                    format!("Failed to wait for command: {}", cmd_config.command)
+                });
+            }
+            Err(_) => {
+                // Timeout occurred
+                let timeout_secs = cmd_config.timeout.unwrap(); // Safe because we're in the timeout branch
+                let error_message = if let Some(custom_msg) = &cmd_config.message {
+                    format!(
+                        "{} (command timed out after {} seconds)",
+                        custom_msg, timeout_secs
+                    )
+                } else {
+                    format!(
+                        "Command timed out after {} seconds: {}",
+                        timeout_secs, cmd_config.command
+                    )
+                };
+
+                eprintln!(
+                    "Stop command timed out:\n  Command: {}\n  Timeout: {} seconds",
+                    cmd_config.command, timeout_secs
+                );
+
+                return Ok(Some(HookResult::blocked(error_message)));
+            }
+        };
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -737,7 +764,6 @@ pub async fn handle_stop() -> Result<HookResult> {
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
-    
     println!(
         "Processing Stop hook: session_id={}",
         payload.base.session_id
@@ -836,7 +862,6 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
-    
     println!(
         "Processing SubagentStop hook: session_id={}",
         payload.base.session_id
@@ -858,11 +883,9 @@ pub async fn handle_pre_compact() -> Result<HookResult> {
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
-    
     println!(
         "Processing PreCompact hook: session_id={}, trigger={:?}",
-        payload.base.session_id,
-        payload.trigger
+        payload.base.session_id, payload.trigger
     );
 
     // Send notification for pre-compact hook
@@ -993,9 +1016,7 @@ pub async fn check_auto_generated_file(payload: &PreToolUsePayload) -> Result<Op
 
         eprintln!(
             "PreToolUse blocked auto-generated file edit: tool_name={}, file_path={}, marker={}",
-            payload.tool_name,
-            file_path,
-            marker
+            payload.tool_name, file_path, marker
         );
 
         return Ok(Some(HookResult::blocked(message)));
@@ -1288,7 +1309,10 @@ mod tests {
     fn test_truncate_output_preserves_content() {
         let output = "Line with special chars: !@#$%^&*()\nAnother line\n\nEmpty line above";
         let (truncated, is_truncated, omitted) = truncate_output(output, 2);
-        assert_eq!(truncated, "Line with special chars: !@#$%^&*()\nAnother line");
+        assert_eq!(
+            truncated,
+            "Line with special chars: !@#$%^&*()\nAnother line"
+        );
         assert!(is_truncated);
         assert_eq!(omitted, 2);
     }
@@ -1328,6 +1352,7 @@ mod tests {
                         show_stdout: Some(true),
                         show_stderr: Some(false),
                         max_output_lines: Some(10),
+                        timeout: None,
                     },
                     StopCommand {
                         run: "ls -la".to_string(),
@@ -1335,6 +1360,7 @@ mod tests {
                         show_stdout: Some(false),
                         show_stderr: Some(true),
                         max_output_lines: Some(5),
+                        timeout: None,
                     },
                 ],
                 infinite: false,
@@ -1373,6 +1399,7 @@ mod tests {
                     show_stdout: Some(true),
                     show_stderr: Some(true),
                     max_output_lines: Some(20),
+                    timeout: None,
                 }],
                 infinite: false,
                 infinite_message: None,
@@ -1410,6 +1437,7 @@ mod tests {
                     show_stdout: None,
                     show_stderr: None,
                     max_output_lines: None,
+                    timeout: None,
                 }],
                 infinite: false,
                 infinite_message: None,

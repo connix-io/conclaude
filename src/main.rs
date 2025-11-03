@@ -403,9 +403,7 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                     for rule in &config.rules.tool_usage_validation {
                         println!(
                             "   Tool: {} | Pattern: {} | Action: {}",
-                            rule.tool,
-                            rule.pattern,
-                            rule.action
+                            rule.tool, rule.pattern, rule.action
                         );
                         if let Some(msg) = &rule.message {
                             println!("      Message: {msg}");

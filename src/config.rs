@@ -20,6 +20,9 @@ pub struct StopCommand {
     #[serde(default, rename = "maxOutputLines")]
     #[schemars(range(min = 1, max = 10000))]
     pub max_output_lines: Option<u32>,
+    #[serde(default)]
+    #[schemars(range(min = 1))]
+    pub timeout: Option<u64>,
 }
 
 /// Configuration interface for stop hook commands
@@ -166,6 +169,10 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
         parts.push(String::new());
         parts.push("Valid field names:".to_string());
         parts.push("  stop: run, commands, infinite, infiniteMessage, rounds".to_string());
+        parts.push(
+            "  stop.commands[]: run, message, showStdout, showStderr, maxOutputLines, timeout"
+                .to_string(),
+        );
         parts.push(
             "  rules: preventRootAdditions, uneditableFiles, toolUsageValidation".to_string(),
         );

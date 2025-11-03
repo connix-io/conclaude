@@ -243,10 +243,7 @@ rules:
 "#;
 
     let result = serde_yaml::from_str::<ConclaudeConfig>(config_content);
-    assert!(
-        result.is_ok(),
-        "Legacy run field should parse successfully"
-    );
+    assert!(result.is_ok(), "Legacy run field should parse successfully");
 
     let config = result.unwrap();
     assert_eq!(config.stop.run, "echo legacy");
@@ -337,6 +334,7 @@ fn test_stop_command_struct_serialization() {
         show_stdout: Some(true),
         show_stderr: Some(false),
         max_output_lines: Some(50),
+        timeout: None,
     };
 
     let yaml = serde_yaml::to_string(&cmd).unwrap();
@@ -347,6 +345,7 @@ fn test_stop_command_struct_serialization() {
     assert_eq!(deserialized.show_stdout, Some(true));
     assert_eq!(deserialized.show_stderr, Some(false));
     assert_eq!(deserialized.max_output_lines, Some(50));
+    assert_eq!(deserialized.timeout, None);
 }
 
 /// Test that the schema properly defined the range constraint
@@ -526,6 +525,7 @@ fn test_stop_config_round_trip() {
             show_stdout: Some(true),
             show_stderr: Some(true),
             max_output_lines: Some(25),
+            timeout: None,
         }],
         infinite: false,
         infinite_message: None,
