@@ -52,18 +52,11 @@ async fn test_command_succeeds_without_timeout() {
     let temp_dir = TempDir::new().unwrap();
     let _config_path = create_config_without_timeout(&temp_dir);
 
-    // Change to temp directory so config is found
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
-
-    // Load config and verify timeout is None
-    let (config, _) = conclaude::config::load_conclaude_config(None)
+    // Load config directly from temp dir path
+    let (config, _) = conclaude::config::load_conclaude_config(Some(temp_dir.path()))
         .await
         .unwrap();
     assert_eq!(config.stop.commands[0].timeout, None);
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
 }
 
 /// Test that config with timeout can be loaded
@@ -72,19 +65,12 @@ async fn test_load_config_with_timeout() {
     let temp_dir = TempDir::new().unwrap();
     let _config_path = create_config_with_timeout(&temp_dir, 30);
 
-    // Change to temp directory so config is found
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
-
-    // Load config and verify timeout is set
-    let (config, _) = conclaude::config::load_conclaude_config(None)
+    // Load config directly from temp dir path
+    let (config, _) = conclaude::config::load_conclaude_config(Some(temp_dir.path()))
         .await
         .unwrap();
     assert_eq!(config.stop.commands.len(), 1);
     assert_eq!(config.stop.commands[0].timeout, Some(30));
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
 }
 
 /// Test that schema generation includes timeout field with proper constraints

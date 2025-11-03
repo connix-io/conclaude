@@ -646,7 +646,9 @@ async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<
             }
             Err(_) => {
                 // Timeout occurred
-                let timeout_secs = cmd_config.timeout.unwrap(); // Safe because we're in the timeout branch
+                let timeout_secs = cmd_config
+                    .timeout
+                    .expect("Timeout should be Some when timeout occurs");
                 let error_message = if let Some(custom_msg) = &cmd_config.message {
                     format!(
                         "{} (command timed out after {} seconds)",
