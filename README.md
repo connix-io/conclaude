@@ -4,7 +4,7 @@
 
 A high-performance Rust CLI tool that provides essential guardrails for Claude Code sessions through a comprehensive hook system. Conclaude ensures your AI coding sessions maintain code quality, follow project standards, and respect your development workflows.
 
-[![Crates.io](https://img.shields.io/crates/v/conclaude)](https://crates.io/crates/conclaude)
+<!-- [![Crates.io](https://img.shields.io/crates/v/conclaude)](https://crates.io/crates/conclaude) -->
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org)
 [![CI](https://github.com/connix-io/conclaude/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/connix-io/conclaude/actions/workflows/ci.yml)
@@ -567,6 +567,49 @@ conclaude init --force
 conclaude init --config-path ./custom.yaml --claude-path ./.claude-custom
 ```
 
+### Validate Configuration
+
+The `validate` command checks your conclaude configuration file for syntax errors and schema compliance without running any hooks. This is especially useful for:
+
+- Verifying configuration changes before committing
+- CI/CD pipeline validation
+- Pre-deployment configuration checks
+- Troubleshooting configuration issues
+
+```bash
+# Validate default configuration file (.conclaude.yaml)
+conclaude validate
+
+# Validate a specific configuration file
+conclaude validate --config-path ./config/production.yaml
+
+# Use in scripts with exit code checking
+conclaude validate && echo "Config is valid" || echo "Config has errors"
+```
+
+**Exit Codes:**
+- **0**: Configuration is valid and can be loaded successfully
+- **Non-zero**: Configuration has syntax errors, schema violations, or cannot be found
+
+**What gets validated:**
+- YAML syntax correctness
+- Configuration schema compliance
+- File path references (checks if uneditable files patterns are valid)
+- Command syntax in stop hooks
+- Glob pattern validity in rules
+
+**Example output for valid configuration:**
+```
+Configuration validation successful
+Configuration file: /path/to/project/.conclaude.yaml
+```
+
+**Example output for invalid configuration:**
+```
+Error: Configuration validation failed
+Reason: Invalid YAML syntax at line 15: unexpected key 'invalid_field'
+```
+
 ### Manual Testing
 
 ```bash
@@ -744,6 +787,9 @@ config.stop.run → extract_bash_commands() → tokio::process::Command → sequ
 # Initialize configuration
 conclaude init [--force] [--config-path <path>] [--claude-path <path>]
 
+# Validate configuration
+conclaude validate [--config-path <path>]
+
 # Hook handlers (called by Claude Code)
 conclaude PreToolUse
 conclaude PostToolUse
@@ -837,6 +883,152 @@ preToolUse:
 
 - `CONCLAUDE_LOG_LEVEL`: Set logging level (debug, info, warn, error)
 - `CONCLAUDE_DISABLE_FILE_LOGGING`: Disable logging to temporary files
+
+## CI/CD Integration
+
+conclaude's `validate` command is designed to integrate seamlessly into your CI/CD pipelines, ensuring configuration quality before deployment or during pull request validation.
+
+### GitHub Actions
+
+Add configuration validation to your GitHub Actions workflow:
+
+```yaml
+name: Validate conclaude Config
+
+on:
+  pull_request:
+    paths:
+      - '.conclaude.yaml'
+      - '.conclaude.yml'
+  push:
+    branches:
+      - main
+
+jobs:
+  validate-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install conclaude
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            https://github.com/connix-io/conclaude/releases/latest/download/conclaude-installer.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Validate conclaude configuration
+        run: conclaude validate
+
+      - name: Validate production config (if exists)
+        if: hashFiles('config/production.yaml') != ''
+        run: conclaude validate --config-path config/production.yaml
+```
+
+### GitLab CI
+
+Add to your `.gitlab-ci.yml`:
+
+```yaml
+validate-conclaude:
+  stage: test
+  image: rust:latest
+  before_script:
+    - curl --proto '=https' --tlsv1.2 -LsSf
+      https://github.com/connix-io/conclaude/releases/latest/download/conclaude-installer.sh | sh
+    - export PATH="$HOME/.cargo/bin:$PATH"
+  script:
+    - conclaude validate
+  only:
+    changes:
+      - .conclaude.yaml
+      - .conclaude.yml
+```
+
+### CircleCI
+
+Add to your `.circleci/config.yml`:
+
+```yaml
+version: 2.1
+
+jobs:
+  validate-config:
+    docker:
+      - image: cimg/rust:1.70
+    steps:
+      - checkout
+      - run:
+          name: Install conclaude
+          command: |
+            curl --proto '=https' --tlsv1.2 -LsSf \
+              https://github.com/connix-io/conclaude/releases/latest/download/conclaude-installer.sh | sh
+            echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $BASH_ENV
+      - run:
+          name: Validate configuration
+          command: conclaude validate
+
+workflows:
+  version: 2
+  validate:
+    jobs:
+      - validate-config
+```
+
+### Pre-commit Hook
+
+Use conclaude validation as a git pre-commit hook:
+
+```bash
+#!/bin/sh
+# .git/hooks/pre-commit
+
+# Check if .conclaude.yaml was modified
+if git diff --cached --name-only | grep -q "\.conclaude\.ya\?ml"; then
+    echo "Validating conclaude configuration..."
+    if ! conclaude validate; then
+        echo "Error: conclaude configuration is invalid"
+        echo "Please fix the configuration before committing"
+        exit 1
+    fi
+    echo "conclaude configuration is valid"
+fi
+```
+
+### Docker Container Validation
+
+Validate configuration in a containerized environment:
+
+```dockerfile
+FROM rust:1.70-slim as validator
+
+# Install conclaude
+RUN curl --proto '=https' --tlsv1.2 -LsSf \
+    https://github.com/connix-io/conclaude/releases/latest/download/conclaude-installer.sh | sh
+
+# Copy configuration
+COPY .conclaude.yaml /app/.conclaude.yaml
+WORKDIR /app
+
+# Validate configuration
+RUN /root/.cargo/bin/conclaude validate
+```
+
+### Make Integration
+
+Add validation to your Makefile:
+
+```makefile
+.PHONY: validate-config
+validate-config:
+	@echo "Validating conclaude configuration..."
+	@conclaude validate || (echo "Configuration validation failed" && exit 1)
+
+.PHONY: test
+test: validate-config
+	@echo "Running tests..."
+	@cargo test
+```
 
 ## Contributing
 

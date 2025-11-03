@@ -141,10 +141,7 @@ fn send_notification(hook_name: &str, status: &str, context: Option<&str>) {
         .show();
 
     #[cfg(not(target_os = "linux"))]
-    let result = Notification::new()
-        .summary(&title)
-        .body(&body)
-        .show();
+    let result = Notification::new().summary(&title).body(&body).show();
 
     match result {
         Ok(_) => {
