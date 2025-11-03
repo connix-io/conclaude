@@ -59,6 +59,10 @@ pub struct ToolUsageRule {
     pub pattern: String,
     pub action: String, // "block" or "allow"
     pub message: Option<String>,
+    #[serde(rename = "commandPattern")]
+    pub command_pattern: Option<String>,
+    #[serde(rename = "matchMode")]
+    pub match_mode: Option<String>,
 }
 
 impl Default for RulesConfig {

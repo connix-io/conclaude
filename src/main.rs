@@ -405,9 +405,14 @@ async fn handle_validate(config_path: Option<String>) -> Result<()> {
     let result = if let Some(custom_path) = config_path {
         let path = PathBuf::from(&custom_path);
 
-        // If it's a specific file, load it directly
-        if path.is_file() || path.extension().is_some() {
-            // Load the specific file
+        // First, check if the path exists
+        if !path.exists() {
+            anyhow::bail!("Path not found: {}", path.display());
+        }
+
+        // Determine path type using filesystem queries
+        if path.is_file() {
+            // It's a regular file - load it directly
             let content = fs::read_to_string(&path)
                 .with_context(|| format!("Failed to read config file: {}", path.display()))?;
 
@@ -415,9 +420,12 @@ async fn handle_validate(config_path: Option<String>) -> Result<()> {
             let config = config::parse_and_validate_config(&content, &path)?;
 
             Ok((config, path))
-        } else {
-            // It's a directory, use the standard search from that directory
+        } else if path.is_dir() {
+            // It's a directory - use the standard search from that directory
             config::load_conclaude_config(Some(&path)).await
+        } else {
+            // Not a regular file or directory
+            anyhow::bail!("Path is not a regular file or directory: {}", path.display());
         }
     } else {
         // No custom path, use standard search from current directory
