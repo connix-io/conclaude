@@ -1,5 +1,6 @@
 // Final test - expecting both workflows to succeed
 use anyhow::{Context, Result};
+use conclaude_field_derive::FieldList;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -7,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// Configuration for individual stop commands with optional messages
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, FieldList)]
 #[serde(deny_unknown_fields)]
 pub struct StopCommand {
     pub run: String,
@@ -23,7 +24,7 @@ pub struct StopCommand {
 }
 
 /// Configuration interface for stop hook commands
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, FieldList)]
 #[serde(deny_unknown_fields)]
 pub struct StopConfig {
     #[serde(default)]
@@ -39,7 +40,7 @@ pub struct StopConfig {
 }
 
 /// Configuration interface for validation rules
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, FieldList)]
 #[serde(deny_unknown_fields)]
 pub struct RulesConfig {
     #[serde(default, rename = "preventRootAdditions")]
@@ -76,7 +77,7 @@ fn default_true() -> bool {
 }
 
 /// Configuration for pre tool use hooks
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, FieldList)]
 #[serde(deny_unknown_fields)]
 pub struct PreToolUseConfig {
     #[serde(default, rename = "preventAdditions")]
@@ -88,7 +89,7 @@ pub struct PreToolUseConfig {
 }
 
 /// Configuration for system notifications
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, FieldList)]
 #[serde(deny_unknown_fields)]
 pub struct NotificationsConfig {
     /// Whether notifications are enabled
@@ -159,46 +160,11 @@ fn extract_unknown_field(error_msg: &str) -> Option<String> {
 /// Suggest similar field names based on the unknown field
 fn suggest_similar_fields(unknown_field: &str, section: &str) -> Vec<String> {
     let all_fields: Vec<(&str, Vec<&str>)> = vec![
-        (
-            "stop",
-            vec!["run", "commands", "infinite", "infiniteMessage", "rounds"],
-        ),
-        (
-            "rules",
-            vec![
-                "preventRootAdditions",
-                "uneditableFiles",
-                "toolUsageValidation",
-            ],
-        ),
-        (
-            "preToolUse",
-            vec![
-                "preventAdditions",
-                "preventGeneratedFileEdits",
-                "generatedFileMessage",
-            ],
-        ),
-        (
-            "notifications",
-            vec![
-                "enabled",
-                "hooks",
-                "showErrors",
-                "showSuccess",
-                "showSystemEvents",
-            ],
-        ),
-        (
-            "commands",
-            vec![
-                "run",
-                "message",
-                "showStdout",
-                "showStderr",
-                "maxOutputLines",
-            ],
-        ),
+        ("stop", StopConfig::field_names()),
+        ("rules", RulesConfig::field_names()),
+        ("preToolUse", PreToolUseConfig::field_names()),
+        ("notifications", NotificationsConfig::field_names()),
+        ("commands", StopCommand::field_names()),
     ];
 
     // Find the section's valid fields
@@ -618,6 +584,55 @@ cd /tmp && echo "test""#;
                 r#"nix develop -c "lint""#,
                 "bun x tsc --noEmit",
                 r#"cd /tmp && echo "test""#
+            ]
+        );
+    }
+
+    #[test]
+    fn test_field_list_generation() {
+        // Verify that the generated field_names() methods return the correct field names
+        assert_eq!(
+            StopConfig::field_names(),
+            vec!["run", "commands", "infinite", "infiniteMessage", "rounds"]
+        );
+
+        assert_eq!(
+            RulesConfig::field_names(),
+            vec![
+                "preventRootAdditions",
+                "uneditableFiles",
+                "toolUsageValidation"
+            ]
+        );
+
+        assert_eq!(
+            PreToolUseConfig::field_names(),
+            vec![
+                "preventAdditions",
+                "preventGeneratedFileEdits",
+                "generatedFileMessage"
+            ]
+        );
+
+        assert_eq!(
+            NotificationsConfig::field_names(),
+            vec![
+                "enabled",
+                "hooks",
+                "showErrors",
+                "showSuccess",
+                "showSystemEvents"
+            ]
+        );
+
+        assert_eq!(
+            StopCommand::field_names(),
+            vec![
+                "run",
+                "message",
+                "showStdout",
+                "showStderr",
+                "maxOutputLines"
             ]
         );
     }
