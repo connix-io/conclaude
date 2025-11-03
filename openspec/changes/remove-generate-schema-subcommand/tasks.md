@@ -27,21 +27,23 @@
 - [ ] 3.3 Verify external script can import `conclaude::schema` functions
 - [ ] 3.4 Run `cargo doc` to ensure module documentation is correct
 
-## 4. Update GitHub Actions Workflow
-- [ ] 4.1 Open `.github/workflows/release.yml`
-- [ ] 4.2 Add schema generation step in the `plan` job after checkout
-- [ ] 4.3 Use `cargo run --manifest-path scripts/Cargo.toml --bin generate-schema`
-- [ ] 4.4 Add `ls -lh conclaude-schema.json` to verify file creation
-- [ ] 4.5 Ensure step runs before `dist` creates release artifacts
-- [ ] 4.6 Test workflow on a feature branch with a test tag
-- [ ] 4.7 Verify schema file appears in release artifacts
+## 4. Create Schema Upload Workflow
+- [ ] 4.1 Create `.github/workflows/upload-schema.yml` file
+- [ ] 4.2 Configure trigger: `on: release: types: [published]`
+- [ ] 4.3 Add `permissions: contents: write` for release uploads
+- [ ] 4.4 Add checkout step with `actions/checkout@v4`
+- [ ] 4.5 Add Rust installation step with `dtolnay/rust-toolchain@stable`
+- [ ] 4.6 Add schema generation step: `cargo build --release --bin generate-schema`
+- [ ] 4.7 Add schema execution step: `./target/release/generate-schema`
+- [ ] 4.8 Add upload step: `gh release upload $TAG conclaude-schema.json --clobber`
+- [ ] 4.9 Test workflow on a draft/test release to verify it works
 
 ## 5. Update Documentation
 - [ ] 5.1 Open `README.md` and remove all `generate-schema` command references
 - [ ] 5.2 Update "Available Commands" section to remove generate-schema
 - [ ] 5.3 Update "Configuration Reference" section (remove manual generation instructions)
 - [ ] 5.4 Verify schema URL documentation remains correct
-- [ ] 5.5 Add note that schema is auto-generated during releases
+- [ ] 5.5 Add note that schema is uploaded automatically via GitHub Actions
 - [ ] 5.6 Search README for any other `generate-schema` mentions and update
 - [ ] 5.7 Update `CLAUDE.md` if it references schema generation
 - [ ] 5.8 Update any OpenSpec documentation referencing the subcommand
@@ -54,10 +56,10 @@
 - [ ] 6.5 Remove any tests specifically for the CLI subcommand
 
 ## 7. Update Root Cargo.toml
-- [ ] 7.1 Add `scripts/` directory to workspace members if using workspace
-- [ ] 7.2 OR ensure scripts/Cargo.toml correctly references parent conclaude crate
-- [ ] 7.3 Verify `cargo build --workspace` works correctly
-- [ ] 7.4 Verify `cargo test --workspace` works correctly
+- [ ] 7.1 Add `[[bin]]` entry for generate-schema binary
+- [ ] 7.2 Set name = "generate-schema" and path = "scripts/generate-schema.rs"
+- [ ] 7.3 Verify `cargo build --bin generate-schema` works correctly
+- [ ] 7.4 Verify `cargo test` still works correctly
 
 ## 8. Cleanup and Verification
 - [ ] 8.1 Run `cargo fmt` to format all code
@@ -70,7 +72,7 @@
 
 ## 9. Release Verification (Post-Merge)
 - [ ] 9.1 Monitor release workflow when PR is merged
-- [ ] 9.2 Verify schema generation step succeeds in CI
+- [ ] 9.2 Verify upload-schema workflow triggers and completes successfully
 - [ ] 9.3 Verify `conclaude-schema.json` is in release assets
 - [ ] 9.4 Verify schema URL is accessible after release
 - [ ] 9.5 Test YAML language server integration with new schema

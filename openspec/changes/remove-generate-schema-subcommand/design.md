@@ -21,11 +21,11 @@ Move schema generation to a standalone Rust binary (`scripts/generate-schema.rs`
 
 ### Build-Time Integration
 
-Integrate the script into the GitHub Actions release workflow:
-1. Before creating release artifacts, run the schema generation script
-2. Generate `conclaude-schema.json` in the workspace root
-3. Include the schema file in the release artifacts uploaded to GitHub
-4. Ensure the schema URL (`https://github.com/conneroisu/conclaude/releases/latest/download/conclaude-schema.json`) remains stable
+The schema generation script will be integrated into the release process:
+1. The script will generate `conclaude-schema.json` in the workspace root
+2. `cargo-dist` will automatically include the schema file in release artifacts
+3. The schema URL (`https://github.com/conneroisu/conclaude/releases/latest/download/conclaude-schema.json`) will remain stable
+4. **Note**: The GitHub Actions workflow is managed by `cargo-dist` and should not be manually edited
 
 ### Dependency Management
 
@@ -89,22 +89,24 @@ fn main() -> anyhow::Result<()> {
 
 ### GitHub Actions Integration
 
-**Decision**: Add schema generation step before dist runs
+**Decision**: Create a separate workflow for schema upload
 
-**Workflow Update** (`.github/workflows/release.yml`):
-```yaml
-- name: Generate JSON Schema
-  run: |
-    cargo run --manifest-path scripts/Cargo.toml --bin generate-schema
-    ls -lh conclaude-schema.json
-```
-
-**Placement**: After checkout, before `dist` creates release artifacts
+**Implementation**:
+Create `.github/workflows/upload-schema.yml` that:
+- Triggers on `release: types: [published]` (runs AFTER cargo-dist creates the release)
+- Checks out the repository
+- Installs Rust toolchain using `dtolnay/rust-toolchain@stable`
+- Builds the schema generator: `cargo build --release --bin generate-schema`
+- Runs the generator: `./target/release/generate-schema`
+- Derives the release tag from the GitHub event context: `TAG="${{ github.event.release.tag_name }}"` (or `TAG="$GITHUB_REF_NAME"`)
+- Uploads to release: `gh release upload $TAG conclaude-schema.json --clobber`
 
 **Rationale**:
-- Schema is generated once per release, not per platform
-- dist will automatically include `conclaude-schema.json` in release assets
-- Simple, explicit, and easy to debug
+- Completely separate from cargo-dist's managed workflow (no conflicts)
+- Runs as a post-release step, adding schema as an additional asset
+- Clean separation of concerns: cargo-dist handles binaries, separate workflow handles schema
+- Can be tested independently and won't break if cargo-dist updates its workflow
+- Follows GitHub Actions best practices for adding assets to existing releases
 
 ## Migration Strategy
 
@@ -124,9 +126,10 @@ Update local workflows:
 
 ### For CI/CD
 
-- Release workflow automatically generates schema
-- No manual steps required
-- Schema is uploaded to GitHub releases as before
+- The `generate-schema` script is available for local use: `cargo run --bin generate-schema`
+- New workflow `.github/workflows/upload-schema.yml` handles schema upload to releases
+- Workflow runs automatically after cargo-dist creates a release
+- No changes needed to cargo-dist's managed `release.yml` workflow
 
 ## Testing Strategy
 

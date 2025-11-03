@@ -31,16 +31,56 @@ The system SHALL provide a standalone Rust script for generating the JSON Schema
 - **AND** success SHALL be indicated with a clear message
 
 #### Scenario: Schema generation during CI/CD
-- **WHEN** the release workflow executes the schema generation step
-- **THEN** `conclaude-schema.json` SHALL be created in the workspace root
-- **AND** the file SHALL be included in release artifacts by cargo-dist
-- **AND** the schema SHALL be uploaded to GitHub releases at the stable URL
+- **WHEN** a release is published and the upload-schema workflow triggers
+- **THEN** the workflow SHALL build and run the generate-schema binary
+- **AND** `conclaude-schema.json` SHALL be created in the workspace root
+- **AND** the schema SHALL be uploaded to the GitHub release as an additional asset
+- **AND** the schema SHALL be accessible at the stable URL
 
 #### Scenario: Schema generation failure
 - **WHEN** schema generation fails for any reason
 - **THEN** the script SHALL exit with a non-zero status code
 - **AND** a clear error message SHALL be displayed
-- **AND** the CI/CD workflow SHALL fail, preventing incomplete releases
+- **AND** the upload-schema workflow SHALL fail
+- **AND** the failure SHALL not affect the main release created by cargo-dist
+
+### Requirement: Schema Upload Workflow
+The system SHALL provide a GitHub Actions workflow that automatically uploads the schema to releases.
+
+#### Scenario: Workflow triggers on release publication
+- **WHEN** a new release is published by cargo-dist
+- **THEN** the upload-schema workflow SHALL trigger automatically
+- **AND** the workflow SHALL run independently of the main release workflow
+- **AND** the workflow SHALL not block or interfere with the release process
+
+#### Scenario: Workflow uploads schema successfully
+- **WHEN** the upload-schema workflow completes successfully
+- **THEN** `conclaude-schema.json` SHALL be present in the release assets
+- **AND** the file SHALL be downloadable at the stable URL
+- **AND** the schema SHALL be identical to locally generated schemas
+
+### Requirement: Schema URL Specification
+The system SHALL provide stable, publicly accessible URLs for the JSON Schema to support IDE autocomplete and validation.
+
+#### URL Format
+- **Latest schema**: `https://github.com/connerohnesorge/conclaude/releases/latest/download/conclaude-schema.json`
+  - **Purpose**: Always points to the most recent release schema
+  - **Routing**: GitHub automatically resolves `latest` to the newest release asset
+- **Versioned schema**: `https://github.com/connerohnesorge/conclaude/releases/download/<tag>/conclaude-schema.json`
+  - **Purpose**: Pin to specific schema version (e.g., `v0.1.0`)
+  - **Routing**: GitHub serves release assets directly from the releases/<tag> path
+
+#### Hosting and Routing
+- **Platform**: GitHub Releases asset storage
+- **CDN**: Served via GitHub's global CDN (no additional configuration required)
+- **DNS**: Uses github.com domain (no custom domain or redirect setup needed)
+- **Maintenance**: Automatic per-release by upload-schema workflow
+
+#### Access Requirements
+- **Authentication**: None required (public repository release assets)
+- **Headers**: Standard HTTP GET requests (no special headers or tokens)
+- **Rate Limits**: Subject to GitHub's standard CDN rate limits (typically sufficient for IDE usage)
+- **Availability**: Available immediately after upload-schema workflow completes
 
 ### Requirement: Schema Module Library Exposure
 The schema generation functions SHALL remain available as library functions for use by the external script and tests.

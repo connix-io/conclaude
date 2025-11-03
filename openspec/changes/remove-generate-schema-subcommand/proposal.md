@@ -8,9 +8,9 @@ The `generate-schema` subcommand is currently tightly coupled to the main CLI bi
 
 - **BREAKING**: Remove the `GenerateSchema` subcommand from the main CLI
 - Create a standalone Rust script (`scripts/generate-schema.rs`) for schema generation
-- Update GitHub Actions release workflow to run the schema generation script
-- Update documentation to reflect that schema is auto-generated during releases
-- Ensure the schema file (`conclaude-schema.json`) is still published to GitHub releases
+- Create new GitHub Actions workflow (`.github/workflows/upload-schema.yml`) to upload schema to releases
+- Update documentation to reflect that schema is uploaded automatically during releases
+- Ensure the schema file (`conclaude-schema.json`) is still published to GitHub releases at the same URL
 
 ## Impact
 
@@ -20,9 +20,10 @@ The `generate-schema` subcommand is currently tightly coupled to the main CLI bi
 ### Affected Code
 - `src/main.rs` - Remove `GenerateSchema` command enum variant and handler
 - `src/schema.rs` - Module remains but is used only by the external script
-- `.github/workflows/release.yml` - Add schema generation step
 - `README.md` - Update documentation to remove `generate-schema` command references
 - New file: `scripts/generate-schema.rs` - Standalone schema generation script
+- New file: `.github/workflows/upload-schema.yml` - Workflow to upload schema to releases
+- Note: `.github/workflows/release.yml` remains unchanged (managed by cargo-dist)
 
 ### User Impact
 - **BREAKING**: Users can no longer run `conclaude generate-schema` manually
