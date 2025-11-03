@@ -864,6 +864,122 @@ rules:
       action: "block"
       message: "Environment files cannot be modified"
 
+### Bash Command Validation
+
+Conclaude can validate Bash commands before execution using glob pattern matching. This allows you to block dangerous commands or create whitelists of allowed commands.
+
+#### Configuration
+
+```yaml
+rules:
+  toolUsageValidation:
+    - tool: "Bash"
+      pattern: ""                       # Leave empty when using commandPattern
+      commandPattern: "rm -rf /*"       # Glob pattern to match
+      matchMode: "full"                 # "full" or "prefix" (defaults to "full")
+      action: "block"                   # "block" or "allow"
+      message: "Dangerous command blocked"
+```
+
+#### Match Modes
+
+**Full Mode** (`matchMode: "full"`)
+- The pattern must match the entire command string
+- Use for blocking exact dangerous commands
+- Default when `matchMode` is omitted
+
+```yaml
+commandPattern: "rm -rf /*"
+matchMode: "full"
+# ✅ Matches: rm -rf /
+# ✅ Matches: rm -rf /tmp
+# ❌ Does NOT match: sudo rm -rf /     (prefix doesn't match)
+# ❌ Does NOT match: rm -rf / && echo  (suffix doesn't match)
+```
+
+**Prefix Mode** (`matchMode: "prefix"`)
+- The pattern must match the beginning of the command
+- Use for blocking entire command families
+- Matches command start only, not commands in the middle
+
+```yaml
+commandPattern: "curl *"
+matchMode: "prefix"
+# ✅ Matches: curl https://example.com
+# ✅ Matches: curl -X POST https://api.com && echo done
+# ❌ Does NOT match: echo start && curl https://example.com
+```
+
+#### Actions
+
+**Block Action** - Prevents matching commands from executing
+
+```yaml
+- tool: "Bash"
+  commandPattern: "rm -rf*"
+  matchMode: "prefix"
+  action: "block"
+  message: "Recursive rm commands are not allowed"
+```
+
+**Allow Action** - Creates a whitelist where only matching commands are allowed
+
+```yaml
+- tool: "Bash"
+  commandPattern: "cargo *"
+  matchMode: "prefix"
+  action: "allow"
+  message: "Only cargo commands are permitted"
+```
+
+#### Examples
+
+**Block dangerous file operations**
+```yaml
+- tool: "Bash"
+  commandPattern: "rm -rf*"
+  matchMode: "prefix"
+  action: "block"
+  message: "Recursive deletion blocked for safety"
+```
+
+**Block force push operations**
+```yaml
+- tool: "Bash"
+  commandPattern: "git push --force*"
+  matchMode: "prefix"
+  action: "block"
+  message: "Force push is not allowed"
+```
+
+**Whitelist only safe commands**
+```yaml
+- tool: "Bash"
+  commandPattern: "cargo test*"
+  matchMode: "prefix"
+  action: "allow"
+  message: "Only cargo test commands are allowed in this workflow"
+
+- tool: "Bash"
+  commandPattern: "cargo build*"
+  matchMode: "prefix"
+  action: "allow"
+  message: "Only cargo build commands are allowed in this workflow"
+```
+
+**Block network requests**
+```yaml
+- tool: "Bash"
+  commandPattern: "curl *"
+  matchMode: "prefix"
+  action: "block"
+
+- tool: "Bash"
+  commandPattern: "wget *"
+  matchMode: "prefix"
+  action: "block"
+```
+
 # Pre-tool-use hook configuration
 preToolUse:
   # Content validation before tool execution

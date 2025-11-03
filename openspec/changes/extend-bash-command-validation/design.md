@@ -151,10 +151,8 @@ async fn check_tool_usage_rules(payload: &PreToolUsePayload) -> Result<Option<Ho
                         });
                         return Ok(Some(HookResult::blocked(message)));
                     } else if rule.action == "allow" && matches {
-                        let message = rule.message.clone().unwrap_or_else(|| {
-                            format!("Bash command allowed by validation rule: {}", pattern)
-                        });
-                        return Ok(Some(HookResult::allowed(message)));
+                        // Allow action matched - allow and stop checking other rules
+                        return Ok(None);
                     } else if rule.action == "allow" && !matches {
                         let message = rule.message.clone().unwrap_or_else(|| {
                             format!("Bash command blocked: does not match allow rule pattern: {}", pattern)

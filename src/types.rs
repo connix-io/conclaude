@@ -25,14 +25,6 @@ impl HookResult {
             blocked: Some(true),
         }
     }
-
-    #[must_use]
-    pub fn allowed(message: impl Into<String>) -> Self {
-        Self {
-            message: Some(message.into()),
-            blocked: Some(false),
-        }
-    }
 }
 
 /// Base fields present in all hook payloads
