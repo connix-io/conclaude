@@ -49,16 +49,6 @@ enum Commands {
         #[arg(long)]
         schema_url: Option<String>,
     },
-    /// Generate JSON Schema for conclaude configuration
-    GenerateSchema {
-        /// Output file path for the schema
-        #[arg(short, long, default_value = "conclaude-schema.json")]
-        output: String,
-
-        /// Validate the generated schema
-        #[arg(long)]
-        validate: bool,
-    },
     /// Process `PreToolUse` hook - fired before tool execution
     #[clap(name = "PreToolUse")]
     PreToolUse,
@@ -109,9 +99,6 @@ async fn main() -> Result<()> {
             force,
             schema_url,
         } => handle_init(config_path, claude_path, force, schema_url).await,
-        Commands::GenerateSchema { output, validate } => {
-            handle_generate_schema(output, validate).await
-        }
         Commands::PreToolUse => handle_hook_result(handle_pre_tool_use).await,
         Commands::PostToolUse => handle_hook_result(handle_post_tool_use).await,
         Commands::Notification => handle_hook_result(handle_notification).await,
@@ -283,54 +270,6 @@ async fn handle_init(
     Ok(())
 }
 
-/// Handles `GenerateSchema` command to generate JSON Schema for conclaude configuration.
-///
-/// # Errors
-///
-/// Returns an error if schema generation fails, file writing fails, or validation fails.
-#[allow(clippy::unused_async)]
-async fn handle_generate_schema(output: String, validate: bool) -> Result<()> {
-    let output_path = PathBuf::from(output);
-
-    println!("🔧 Generating JSON Schema for conclaude configuration...");
-
-    // Generate the schema
-    let schema = schema::generate_config_schema().context("Failed to generate JSON schema")?;
-
-    // Write schema to file
-    schema::write_schema_to_file(&schema, &output_path)
-        .context("Failed to write schema to file")?;
-
-    println!(
-        "✅ Schema generated successfully: {}",
-        output_path.display()
-    );
-
-    // Optionally validate the schema
-    if validate {
-        println!("🔍 Validating generated schema...");
-
-        // Test with the default configuration
-        let default_config = config::generate_default_config();
-        schema::validate_config_against_schema(&default_config)
-            .context("Default configuration failed schema validation")?;
-
-        println!("✅ Schema validation passed!");
-        println!("   Default configuration is valid against the generated schema.");
-    }
-
-    // Display schema URL info
-    let schema_url = schema::get_schema_url();
-    println!("📋 Schema URL for YAML language server: {schema_url}");
-
-    println!(
-        "💡 Add this header to your .conclaude.yaml files for IDE support: {}",
-        schema::generate_yaml_language_server_header(None).trim()
-    );
-
-    Ok(())
-}
-
 /// Handles Visualize command to display file/directory settings from configuration.
 ///
 /// # Errors
@@ -403,9 +342,7 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                     for rule in &config.rules.tool_usage_validation {
                         println!(
                             "   Tool: {} | Pattern: {} | Action: {}",
-                            rule.tool,
-                            rule.pattern,
-                            rule.action
+                            rule.tool, rule.pattern, rule.action
                         );
                         if let Some(msg) = &rule.message {
                             println!("      Message: {msg}");

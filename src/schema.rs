@@ -1,3 +1,48 @@
+//! Schema generation and validation for Conclaude configuration files.
+//!
+//! This module provides utilities for generating JSON Schema definitions from the
+//! `ConclaudeConfig` structure, writing schemas to files, and validating YAML
+//! configuration files against the schema.
+//!
+//! # Primary Use Cases
+//!
+//! 1. **Build/Release Automation**: The `generate-schema` binary uses these functions
+//!    to create schema files during the build process
+//! 2. **GitHub Releases**: Generated schemas are automatically uploaded to GitHub
+//!    releases for public consumption
+//! 3. **IDE Integration**: YAML language server headers reference the published schema
+//!    for autocompletion and validation in editors
+//!
+//! # Schema Distribution
+//!
+//! The generated schema is published at:
+//! `https://github.com/conneroisu/conclaude/releases/latest/download/conclaude-schema.json`
+//!
+//! This URL is embedded in configuration files via the `yaml-language-server` comment
+//! header, enabling IDE support for `.conclaude.yml` files.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use conclaude::schema::{generate_config_schema, write_schema_to_file, validate_config_against_schema};
+//! use std::path::PathBuf;
+//!
+//! // Generate a schema
+//! let schema = generate_config_schema().unwrap();
+//!
+//! // Write to file
+//! let path = PathBuf::from("schema.json");
+//! write_schema_to_file(&schema, &path).unwrap();
+//!
+//! // Validate configuration
+//! let config_yaml = r#"
+//! stop:
+//!   run: "cargo test"
+//!   infinite: false
+//! "#;
+//! validate_config_against_schema(config_yaml).unwrap();
+//! ```
+
 use anyhow::{Context, Result};
 use schemars::schema_for;
 use serde_json::{json, Value};
@@ -11,6 +56,7 @@ use crate::config::ConclaudeConfig;
 /// # Errors
 ///
 /// Returns an error if JSON schema generation or value serialization fails.
+#[allow(dead_code)]
 pub fn generate_config_schema() -> Result<Value> {
     let schema = schema_for!(ConclaudeConfig);
 
@@ -39,6 +85,7 @@ pub fn generate_config_schema() -> Result<Value> {
 /// # Errors
 ///
 /// Returns an error if JSON serialization fails, directory creation fails, or file writing fails.
+#[allow(dead_code)]
 pub fn write_schema_to_file(schema: &Value, output_path: &PathBuf) -> Result<()> {
     let schema_json =
         serde_json::to_string_pretty(schema).context("Failed to serialize schema to JSON")?;
@@ -60,32 +107,32 @@ pub fn write_schema_to_file(schema: &Value, output_path: &PathBuf) -> Result<()>
 /// # Errors
 ///
 /// Returns an error if the YAML content is invalid or does not match the expected structure.
+#[allow(dead_code)]
 pub fn validate_config_against_schema(config_content: &str) -> Result<()> {
     // Parse the YAML to ensure it's valid
-    let _: ConclaudeConfig = serde_yaml::from_str(config_content)
-        .map_err(|e| {
-            let base_error = e.to_string();
-            let mut parts = vec![
-                "Configuration validation failed".to_string(),
-                String::new(),
-                format!("Error: {}", base_error),
-            ];
+    let _: ConclaudeConfig = serde_yaml::from_str(config_content).map_err(|e| {
+        let base_error = e.to_string();
+        let mut parts = vec![
+            "Configuration validation failed".to_string(),
+            String::new(),
+            format!("Error: {}", base_error),
+        ];
 
-            // Add specific guidance based on error type
-            if base_error.contains("unknown field") {
-                parts.push(String::new());
-                parts.push("The configuration contains an unknown field.".to_string());
-                parts.push("Check the field name for typos or incorrect casing.".to_string());
-            } else if base_error.contains("invalid type") {
-                parts.push(String::new());
-                parts.push("A field has the wrong type (e.g., string instead of boolean).".to_string());
-            } else if base_error.contains("expected") || base_error.contains("while parsing") {
-                parts.push(String::new());
-                parts.push("YAML syntax error detected. Check indentation and formatting.".to_string());
-            }
+        // Add specific guidance based on error type
+        if base_error.contains("unknown field") {
+            parts.push(String::new());
+            parts.push("The configuration contains an unknown field.".to_string());
+            parts.push("Check the field name for typos or incorrect casing.".to_string());
+        } else if base_error.contains("invalid type") {
+            parts.push(String::new());
+            parts.push("A field has the wrong type (e.g., string instead of boolean).".to_string());
+        } else if base_error.contains("expected") || base_error.contains("while parsing") {
+            parts.push(String::new());
+            parts.push("YAML syntax error detected. Check indentation and formatting.".to_string());
+        }
 
-            anyhow::anyhow!(parts.join("\n"))
-        })?;
+        anyhow::anyhow!(parts.join("\n"))
+    })?;
 
     Ok(())
 }

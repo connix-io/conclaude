@@ -319,7 +319,10 @@ The complete configuration schema is defined as Rust structs with serde serializ
 - **preToolUse**: Pre-execution validation and controls
 - **notifications**: System notification settings for hook events
 
-Generate a complete JSON schema with: `conclaude generate-schema`
+The JSON schema for IDE autocomplete and validation is automatically published with each release at:
+`https://github.com/conneroisu/conclaude/releases/latest/download/conclaude-schema.json`
+
+Developers can regenerate the schema locally using: `cargo run --bin generate-schema`
 
 #### System Notifications
 
@@ -740,9 +743,6 @@ config.stop.run → extract_bash_commands() → tokio::process::Command → sequ
 ```bash
 # Initialize configuration
 conclaude init [--force] [--config-path <path>] [--claude-path <path>]
-
-# Generate JSON Schema
-conclaude generate-schema [--output <path>] [--validate]
 
 # Hook handlers (called by Claude Code)
 conclaude PreToolUse

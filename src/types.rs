@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-
 /// Response structure returned by hook handlers to control execution flow.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HookResult {

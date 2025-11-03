@@ -1,0 +1,31 @@
+name: Upload Schema to Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  upload-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build schema generator
+        run: cargo build --release --bin generate-schema
+
+      - name: Generate schema
+        run: ./target/release/generate-schema
+
+      - name: Upload schema to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          gh release upload "$TAG" conclaude-schema.json --clobber

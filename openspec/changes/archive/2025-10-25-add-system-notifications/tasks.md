@@ -48,7 +48,7 @@
 - [x] 6.1 Update README.md with notifications configuration section
 - [x] 6.2 Add example configuration showing notification setup
 - [x] 6.3 Document supported hook names for `notifications.hooks` array
-- [x] 6.4 Regenerate JSON schema with `conclaude generate-schema`
+- [x] 6.4 Regenerate JSON schema with `cargo run --bin generate-schema` (schema now uploaded automatically via CI)
 
 ## 7. Validation
 
