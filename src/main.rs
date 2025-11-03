@@ -96,6 +96,12 @@ enum Commands {
         #[arg(long)]
         show_matches: bool,
     },
+    /// Validate conclaude configuration file
+    Validate {
+        /// Path to configuration file (optional, uses search strategy if not provided)
+        #[arg(long, name = "config-path")]
+        config_path: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -122,6 +128,7 @@ async fn main() -> Result<()> {
         Commands::SubagentStop => handle_hook_result(handle_subagent_stop).await,
         Commands::PreCompact => handle_hook_result(handle_pre_compact).await,
         Commands::Visualize { rule, show_matches } => handle_visualize(rule, show_matches).await,
+        Commands::Validate { config_path } => handle_validate(config_path).await,
     }
 }
 
@@ -446,4 +453,65 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
     }
 
     Ok(())
+}
+
+/// Handles Validate command to validate conclaude configuration file.
+///
+/// # Errors
+///
+/// Returns an error if configuration loading fails or validation fails.
+#[allow(clippy::unused_async)]
+async fn handle_validate(config_path: Option<String>) -> Result<()> {
+    println!("🔍 Validating conclaude configuration...");
+
+    let result = if let Some(custom_path) = config_path {
+        // Load from specific file path
+        let path = PathBuf::from(custom_path);
+        
+        if !path.exists() {
+            Err(anyhow::anyhow!(
+                "Configuration file not found: {}\n\nCreate a .conclaude.yaml or .conclaude.yml file with stop and rules sections.\nRun 'conclaude init' to generate a template configuration.",
+                path.display()
+            ))
+        } else {
+            match fs::read_to_string(&path) {
+                Ok(content) => {
+                    match serde_yaml::from_str::<config::ConclaudeConfig>(&content) {
+                        Ok(config) => Ok((config, path)),
+                        Err(e) => {
+                            let error_msg = config::format_parse_error(&e, &path);
+                            Err(anyhow::anyhow!(error_msg))
+                        }
+                    }
+                }
+                Err(e) => Err(anyhow::Error::from(e).context(format!("Failed to read config file: {}", path.display())))
+            }
+        }
+    } else {
+        // Use search strategy
+        config::load_conclaude_config(None).await
+    };
+
+    match result {
+        Ok((config, path)) => {
+            // Validate by attempting to serialize back to YAML
+            let yaml_content = serde_yaml::to_string(&config)
+                .context("Failed to serialize configuration for validation")?;
+            
+            // Validate against schema
+            if let Err(e) = schema::validate_config_against_schema(&yaml_content) {
+                println!("❌ Configuration validation failed");
+                eprintln!("{e:?}");
+                std::process::exit(1);
+            }
+
+            println!("✅ Configuration is valid: {}", path.display());
+            Ok(())
+        }
+        Err(e) => {
+            println!("❌ Configuration validation failed");
+            eprintln!("{e:?}");
+            std::process::exit(1);
+        }
+    }
 }

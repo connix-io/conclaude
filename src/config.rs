@@ -145,7 +145,7 @@ pub struct ConclaudeConfig {
 }
 
 /// Format a descriptive error message for YAML parsing failures
-fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
+pub fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
     let base_error = error.to_string();
     let mut parts = vec![
         format!(
