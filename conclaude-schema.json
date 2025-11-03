@@ -125,6 +125,15 @@
             "boolean",
             "null"
           ]
+        },
+        "timeout": {
+          "default": null,
+          "format": "uint64",
+          "minimum": 1.0,
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       },
       "required": [
