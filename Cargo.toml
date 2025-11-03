@@ -1,3 +1,6 @@
+[workspace]
+members = [".", "conclaude-field-derive"]
+
 [package]
 name = "conclaude"
 version = "0.1.7"
@@ -40,6 +43,7 @@ schemars = { version = "0.8", features = ["derive"] }
 regex = "1.10"
 walkdir = "2.4"
 notify-rust = "4.10"
+conclaude-field-derive = { path = "conclaude-field-derive" }
 
 [dev-dependencies]
 tempfile = "3.8"
