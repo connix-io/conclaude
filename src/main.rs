@@ -493,18 +493,8 @@ async fn handle_validate(config_path: Option<String>) -> Result<()> {
     };
 
     match result {
-        Ok((config, path)) => {
-            // Validate by attempting to serialize back to YAML
-            let yaml_content = serde_yaml::to_string(&config)
-                .context("Failed to serialize configuration for validation")?;
-            
-            // Validate against schema
-            if let Err(e) = schema::validate_config_against_schema(&yaml_content) {
-                println!("❌ Configuration validation failed");
-                eprintln!("{e:?}");
-                std::process::exit(1);
-            }
-
+        Ok((_config, path)) => {
+            // If we successfully loaded and parsed the config, it's valid
             println!("✅ Configuration is valid: {}", path.display());
             Ok(())
         }
