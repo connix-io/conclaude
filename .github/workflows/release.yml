@@ -60,6 +60,10 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
+      - name: Generate JSON Schema
+        run: |
+          cargo run --manifest-path scripts/Cargo.toml --bin generate-schema
+          ls -lh conclaude-schema.json
       - name: Install dist
         # we specify bash to get pipefail; it guards against the `curl` command
         # failing. otherwise `sh` won't catch that `curl` returned non-0

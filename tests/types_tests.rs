@@ -69,7 +69,6 @@ fn test_validate_base_payload_missing_hook_event_name() {
     assert!(result.unwrap_err().contains("hook_event_name"));
 }
 
-
 #[test]
 fn test_compact_trigger_serialization() {
     let trigger = CompactTrigger::Manual;

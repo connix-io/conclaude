@@ -243,10 +243,7 @@ rules:
 "#;
 
     let result = serde_yaml::from_str::<ConclaudeConfig>(config_content);
-    assert!(
-        result.is_ok(),
-        "Legacy run field should parse successfully"
-    );
+    assert!(result.is_ok(), "Legacy run field should parse successfully");
 
     let config = result.unwrap();
     assert_eq!(config.stop.run, "echo legacy");

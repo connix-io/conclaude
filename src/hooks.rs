@@ -1,8 +1,8 @@
 use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig};
 use crate::types::{
-    validate_base_payload, HookResult, NotificationPayload, PostToolUsePayload,
-    PreCompactPayload, PreToolUsePayload, SessionEndPayload, SessionStartPayload, StopPayload,
-    SubagentStopPayload, UserPromptSubmitPayload,
+    validate_base_payload, HookResult, NotificationPayload, PostToolUsePayload, PreCompactPayload,
+    PreToolUsePayload, SessionEndPayload, SessionStartPayload, StopPayload, SubagentStopPayload,
+    UserPromptSubmitPayload,
 };
 use anyhow::{Context, Result};
 use glob::Pattern;
@@ -48,7 +48,6 @@ fn is_system_event_hook(hook_name: &str) -> bool {
         "SessionStart" | "SessionEnd" | "UserPromptSubmit" | "SubagentStop" | "PreCompact"
     )
 }
-
 
 /// Load configuration with caching to avoid repeated file system operations
 ///
@@ -212,11 +211,9 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: tool_name"));
     }
 
-    
     println!(
         "Processing PreToolUse hook: session_id={}, tool_name={}",
-        payload.base.session_id,
-        payload.tool_name
+        payload.base.session_id, payload.tool_name
     );
 
     // Check tool usage validation rules
@@ -304,8 +301,7 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
 
         eprintln!(
             "PreToolUse blocked by preventRootAdditions rule: tool_name={}, file_path={}",
-            payload.tool_name,
-            file_path
+            payload.tool_name, file_path
         );
 
         return Ok(Some(HookResult::blocked(error_message)));
@@ -420,11 +416,9 @@ pub async fn handle_post_tool_use() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: tool_name"));
     }
 
-    
     println!(
         "Processing PostToolUse hook: session_id={}, tool_name={}",
-        payload.base.session_id,
-        payload.tool_name
+        payload.base.session_id, payload.tool_name
     );
 
     // Send notification for post tool use completion
@@ -451,11 +445,9 @@ pub async fn handle_notification() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: message"));
     }
 
-    
     println!(
         "Processing Notification hook: session_id={}, message={}",
-        payload.base.session_id,
-        payload.message
+        payload.base.session_id, payload.message
     );
 
     // Send notification for notification hook processing
@@ -482,7 +474,6 @@ pub async fn handle_user_prompt_submit() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: prompt"));
     }
 
-    
     println!(
         "Processing UserPromptSubmit hook: session_id={}",
         payload.base.session_id
@@ -508,11 +499,9 @@ pub async fn handle_session_start() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: source"));
     }
 
-    
     println!(
         "Processing SessionStart hook: session_id={}, source={}",
-        payload.base.session_id,
-        payload.source
+        payload.base.session_id, payload.source
     );
 
     // Send notification for session start
@@ -539,11 +528,9 @@ pub async fn handle_session_end() -> Result<HookResult> {
         return Err(anyhow::anyhow!("Missing required field: reason"));
     }
 
-    
     println!(
         "Processing SessionEnd hook: session_id={}, reason={}",
-        payload.base.session_id,
-        payload.reason
+        payload.base.session_id, payload.reason
     );
 
     Ok(HookResult::success())
@@ -737,7 +724,6 @@ pub async fn handle_stop() -> Result<HookResult> {
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
-    
     println!(
         "Processing Stop hook: session_id={}",
         payload.base.session_id
@@ -836,7 +822,6 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
-    
     println!(
         "Processing SubagentStop hook: session_id={}",
         payload.base.session_id
@@ -858,11 +843,9 @@ pub async fn handle_pre_compact() -> Result<HookResult> {
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
 
-    
     println!(
         "Processing PreCompact hook: session_id={}, trigger={:?}",
-        payload.base.session_id,
-        payload.trigger
+        payload.base.session_id, payload.trigger
     );
 
     // Send notification for pre-compact hook
@@ -993,9 +976,7 @@ pub async fn check_auto_generated_file(payload: &PreToolUsePayload) -> Result<Op
 
         eprintln!(
             "PreToolUse blocked auto-generated file edit: tool_name={}, file_path={}, marker={}",
-            payload.tool_name,
-            file_path,
-            marker
+            payload.tool_name, file_path, marker
         );
 
         return Ok(Some(HookResult::blocked(message)));
@@ -1288,7 +1269,10 @@ mod tests {
     fn test_truncate_output_preserves_content() {
         let output = "Line with special chars: !@#$%^&*()\nAnother line\n\nEmpty line above";
         let (truncated, is_truncated, omitted) = truncate_output(output, 2);
-        assert_eq!(truncated, "Line with special chars: !@#$%^&*()\nAnother line");
+        assert_eq!(
+            truncated,
+            "Line with special chars: !@#$%^&*()\nAnother line"
+        );
         assert!(is_truncated);
         assert_eq!(omitted, 2);
     }
