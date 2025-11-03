@@ -124,7 +124,8 @@ fn send_notification(hook_name: &str, status: &str, context: Option<&str>) {
         },
     };
 
-    // Set urgency based on status
+    // Set urgency based on status (Linux only)
+    #[cfg(target_os = "linux")]
     let urgency = if status == "failure" {
         Urgency::Critical
     } else {
@@ -132,12 +133,20 @@ fn send_notification(hook_name: &str, status: &str, context: Option<&str>) {
     };
 
     // Send notification with error handling
-    match Notification::new()
+    #[cfg(target_os = "linux")]
+    let result = Notification::new()
         .summary(&title)
         .body(&body)
         .urgency(urgency)
-        .show()
-    {
+        .show();
+
+    #[cfg(not(target_os = "linux"))]
+    let result = Notification::new()
+        .summary(&title)
+        .body(&body)
+        .show();
+
+    match result {
         Ok(_) => {
             // Notification sent successfully
         }
