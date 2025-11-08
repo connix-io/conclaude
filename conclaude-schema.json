@@ -177,6 +177,18 @@
         "action": {
           "type": "string"
         },
+        "commandPattern": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "matchMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "message": {
           "type": [
             "string",

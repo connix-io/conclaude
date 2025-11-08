@@ -426,6 +426,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "conclaude-field-derive",
  "config",
  "dirs",
  "glob",
@@ -439,6 +440,15 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "walkdir",
+]
+
+[[package]]
+name = "conclaude-field-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

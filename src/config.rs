@@ -1,5 +1,6 @@
 // Final test - expecting both workflows to succeed
 use anyhow::{Context, Result};
+use conclaude_field_derive::FieldList;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -7,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// Configuration for individual stop commands with optional messages
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, FieldList)]
 #[serde(deny_unknown_fields)]
 pub struct StopCommand {
     pub run: String,
@@ -23,7 +24,7 @@ pub struct StopCommand {
 }
 
 /// Configuration interface for stop hook commands
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, FieldList)]
 #[serde(deny_unknown_fields)]
 pub struct StopConfig {
     #[serde(default)]
@@ -39,7 +40,7 @@ pub struct StopConfig {
 }
 
 /// Configuration interface for validation rules
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, FieldList)]
 #[serde(deny_unknown_fields)]
 pub struct RulesConfig {
     #[serde(default, rename = "preventRootAdditions")]
@@ -58,6 +59,10 @@ pub struct ToolUsageRule {
     pub pattern: String,
     pub action: String, // "block" or "allow"
     pub message: Option<String>,
+    #[serde(rename = "commandPattern")]
+    pub command_pattern: Option<String>,
+    #[serde(rename = "matchMode")]
+    pub match_mode: Option<String>,
 }
 
 impl Default for RulesConfig {
@@ -76,7 +81,7 @@ fn default_true() -> bool {
 }
 
 /// Configuration for pre tool use hooks
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, FieldList)]
 #[serde(deny_unknown_fields)]
 pub struct PreToolUseConfig {
     #[serde(default, rename = "preventAdditions")]
@@ -88,7 +93,7 @@ pub struct PreToolUseConfig {
 }
 
 /// Configuration for system notifications
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, FieldList)]
 #[serde(deny_unknown_fields)]
 pub struct NotificationsConfig {
     /// Whether notifications are enabled
@@ -144,6 +149,94 @@ pub struct ConclaudeConfig {
     pub notifications: NotificationsConfig,
 }
 
+/// Extract the field name from an unknown field error message
+fn extract_unknown_field(error_msg: &str) -> Option<String> {
+    // Try to extract the field name from "unknown field `fieldName`"
+    if let Some(start) = error_msg.find("unknown field `") {
+        let start_idx = start + "unknown field `".len();
+        if let Some(end_idx) = error_msg[start_idx..].find('`') {
+            return Some(error_msg[start_idx..start_idx + end_idx].to_string());
+        }
+    }
+    None
+}
+
+/// Suggest similar field names based on the unknown field
+fn suggest_similar_fields(unknown_field: &str, section: &str) -> Vec<String> {
+    let all_fields: Vec<(&str, Vec<&str>)> = vec![
+        ("stop", StopConfig::field_names()),
+        ("rules", RulesConfig::field_names()),
+        ("preToolUse", PreToolUseConfig::field_names()),
+        ("notifications", NotificationsConfig::field_names()),
+        ("commands", StopCommand::field_names()),
+    ];
+
+    // Find the section's valid fields
+    let empty_fields: Vec<&str> = vec![];
+    let valid_fields = all_fields
+        .iter()
+        .find(|(s, _)| *s == section)
+        .map(|(_, fields)| fields)
+        .unwrap_or(&empty_fields);
+
+    // Calculate Levenshtein distance and suggest close matches
+    let mut suggestions: Vec<(usize, &str)> = valid_fields
+        .iter()
+        .map(|field| {
+            let distance = levenshtein_distance(unknown_field, field);
+            (distance, *field)
+        })
+        .filter(|(dist, _)| *dist <= 3) // Only suggest if distance is 3 or less
+        .collect();
+
+    suggestions.sort_by_key(|(dist, _)| *dist);
+    suggestions
+        .into_iter()
+        .map(|(_, field)| field.to_string())
+        .take(3)
+        .collect()
+}
+
+/// Calculate Levenshtein distance between two strings
+fn levenshtein_distance(s1: &str, s2: &str) -> usize {
+    let len1 = s1.chars().count();
+    let len2 = s2.chars().count();
+    let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
+
+    for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
+        row[0] = i;
+    }
+    for j in 0..=len2 {
+        matrix[0][j] = j;
+    }
+
+    for (i, c1) in s1.chars().enumerate() {
+        for (j, c2) in s2.chars().enumerate() {
+            let cost = if c1.eq_ignore_ascii_case(&c2) { 0 } else { 1 };
+            matrix[i + 1][j + 1] = std::cmp::min(
+                std::cmp::min(matrix[i][j + 1] + 1, matrix[i + 1][j] + 1),
+                matrix[i][j] + cost,
+            );
+        }
+    }
+
+    matrix[len1][len2]
+}
+
+/// Extract section name from error message (e.g., "stop.infinite" -> "stop")
+fn extract_section_from_error(error_msg: &str) -> Option<String> {
+    // Look for patterns like "stop:", "rules.", "notifications:"
+    if let Some(colon_idx) = error_msg.find(':') {
+        let before_colon = &error_msg[..colon_idx];
+        if let Some(last_word) = before_colon.split_whitespace().last() {
+            if let Some(section) = last_word.split('.').next() {
+                return Some(section.to_string());
+            }
+        }
+    }
+    None
+}
+
 /// Format a descriptive error message for YAML parsing failures
 fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
     let base_error = error.to_string();
@@ -156,15 +249,34 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
         format!("Error: {}", base_error),
     ];
 
+    // Extract line number if present
+    let has_line_number = base_error.contains("at line");
+
     // Add specific guidance based on error type
     if base_error.contains("unknown field") {
         parts.push(String::new());
+
+        // Try to extract the unknown field and suggest alternatives
+        let unknown_field = extract_unknown_field(&base_error);
+        let section = extract_section_from_error(&base_error);
+
+        if let (Some(field), Some(sec)) = (unknown_field, section) {
+            let suggestions = suggest_similar_fields(&field, &sec);
+            if !suggestions.is_empty() {
+                parts.push("💡 Did you mean one of these?".to_string());
+                for suggestion in &suggestions {
+                    parts.push(format!("   • {suggestion}"));
+                }
+                parts.push(String::new());
+            }
+        }
+
         parts.push("Common causes:".to_string());
         parts.push("  • Typo in field name (check spelling and capitalization)".to_string());
         parts.push("  • Using a field that doesn't exist in this section".to_string());
-        parts.push("  • Using camelCase vs snake_case incorrectly".to_string());
+        parts.push("  • Using camelCase vs snake_case incorrectly (use camelCase)".to_string());
         parts.push(String::new());
-        parts.push("Valid field names:".to_string());
+        parts.push("Valid field names by section:".to_string());
         parts.push("  stop: run, commands, infinite, infiniteMessage, rounds".to_string());
         parts.push(
             "  rules: preventRootAdditions, uneditableFiles, toolUsageValidation".to_string(),
@@ -177,33 +289,44 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
             "  notifications: enabled, hooks, showErrors, showSuccess, showSystemEvents"
                 .to_string(),
         );
+        parts.push("  commands: run, message, showStdout, showStderr, maxOutputLines".to_string());
     } else if base_error.contains("invalid type") {
         parts.push(String::new());
-        parts.push("Common causes:".to_string());
+        parts.push("Type mismatch detected. Common causes:".to_string());
         parts.push(
             "  • Using quotes around a boolean value (use true/false without quotes)".to_string(),
         );
-        parts.push("  • Using a string where a number is expected".to_string());
+        parts.push("  • Using a string where a number is expected (remove quotes)".to_string());
         parts.push("  • Using a single value where an array is expected (wrap in [])".to_string());
         parts.push(String::new());
-        parts.push("Example valid types:".to_string());
-        parts.push("  infinite: true          # boolean (no quotes)".to_string());
-        parts.push("  rounds: 3               # number (no quotes)".to_string());
-        parts.push("  run: \"echo hello\"       # string (with quotes)".to_string());
-        parts.push("  hooks: [\"Stop\"]         # array".to_string());
+        parts.push("✅ Examples of correct formatting:".to_string());
+        parts.push("   Boolean:  infinite: true             # no quotes".to_string());
+        parts.push("   Number:   rounds: 3                  # no quotes".to_string());
+        parts.push("   Number:   maxOutputLines: 100        # no quotes".to_string());
+        parts.push("   String:   run: \"cargo test\"          # with quotes".to_string());
+        parts.push("   Array:    hooks: [\"Stop\"]            # square brackets".to_string());
+        parts.push("   Array:    uneditableFiles: []        # empty array".to_string());
     } else if base_error.contains("expected") || base_error.contains("while parsing") {
         parts.push(String::new());
-        parts.push("This is likely a YAML syntax error. Common causes:".to_string());
+        parts.push("YAML syntax error detected. Common causes:".to_string());
         parts.push(
             "  • Incorrect indentation (YAML requires consistent spaces, not tabs)".to_string(),
         );
-        parts.push("  • Missing colon after a field name".to_string());
+        parts.push("  • Missing colon (:) after a field name".to_string());
         parts.push("  • Unmatched quotes or brackets".to_string());
         parts.push("  • Using tabs instead of spaces for indentation".to_string());
+
+        if has_line_number {
+            parts.push(String::new());
+            parts.push("💡 Check the line number above and the lines around it.".to_string());
+        }
+
         parts.push(String::new());
-        parts.push(
-            "Tip: Use a YAML validator or ensure consistent 2-space indentation.".to_string(),
-        );
+        parts.push("✅ YAML formatting tips:".to_string());
+        parts.push("   • Use 2 spaces for each indentation level".to_string());
+        parts.push("   • Always put a space after the colon: 'key: value'".to_string());
+        parts.push("   • Use quotes for strings with special characters".to_string());
+        parts.push("   • Arrays can be: [item1, item2] or on separate lines with -".to_string());
     } else if base_error.contains("missing field") {
         parts.push(String::new());
         parts.push("A required field is missing from the configuration.".to_string());
@@ -215,6 +338,71 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
     parts.push("  conclaude init".to_string());
 
     parts.join("\n")
+}
+
+/// Parse and validate configuration content from a string
+///
+/// # Errors
+///
+/// Returns an error if YAML parsing fails or validation constraints are violated.
+pub fn parse_and_validate_config(content: &str, config_path: &Path) -> Result<ConclaudeConfig> {
+    let config: ConclaudeConfig = serde_yaml::from_str(content).map_err(|e| {
+        let error_msg = format_parse_error(&e, config_path);
+        anyhow::anyhow!(error_msg)
+    })?;
+
+    validate_config_constraints(&config)?;
+
+    Ok(config)
+}
+
+/// Validate configuration values against constraints
+fn validate_config_constraints(config: &ConclaudeConfig) -> Result<()> {
+    // Validate maxOutputLines range (1-10000)
+    for (idx, command) in config.stop.commands.iter().enumerate() {
+        if let Some(max_lines) = command.max_output_lines {
+            if !(1..=10000).contains(&max_lines) {
+                let error_msg = format!(
+                    "Range validation failed for stop.commands[{idx}].maxOutputLines\n\n\
+                     Error: Value {max_lines} is out of valid range\n\n\
+                     ✅ Valid range: 1 to 10000\n\n\
+                     Common causes:\n\
+                       • Value is too large (maximum is 10000)\n\
+                       • Value is too small (minimum is 1)\n\
+                       • Using a negative number\n\n\
+                     Example valid configurations:\n\
+                       maxOutputLines: 100      # default, good for most cases\n\
+                       maxOutputLines: 1000     # for verbose output\n\
+                       maxOutputLines: 10000    # maximum allowed\n\n\
+                     For a valid configuration template, run:\n\
+                       conclaude init"
+                );
+                return Err(anyhow::anyhow!(error_msg));
+            }
+        }
+    }
+
+    // Validate rounds if specified
+    if let Some(rounds) = config.stop.rounds {
+        if rounds == 0 {
+            let error_msg = "Range validation failed for stop.rounds\n\n\
+                 Error: Value must be at least 1\n\n\
+                 ✅ Valid range: 1 or greater (or omit for no limit)\n\n\
+                 Common causes:\n\
+                   • Using 0 (use infinite: true instead for unlimited rounds)\n\
+                   • Negative values are not allowed\n\n\
+                 Example valid configurations:\n\
+                   rounds: 1        # run once\n\
+                   rounds: 3        # run three times\n\
+                   infinite: true   # unlimited (don't use rounds)\n\n\
+                 For a valid configuration template, run:\n\
+                   conclaude init"
+                .to_string();
+            return Err(anyhow::anyhow!(error_msg));
+        }
+    }
+
+    Ok(())
 }
 
 /// Load YAML configuration using native search strategies
@@ -235,10 +423,7 @@ pub async fn load_conclaude_config(start_dir: Option<&Path>) -> Result<(Conclaud
             let content = fs::read_to_string(path)
                 .with_context(|| format!("Failed to read config file: {}", path.display()))?;
 
-            let config: ConclaudeConfig = serde_yaml::from_str(&content).map_err(|e| {
-                let error_msg = format_parse_error(&e, path);
-                anyhow::anyhow!(error_msg)
-            })?;
+            let config = parse_and_validate_config(&content, path)?;
 
             return Ok((config, path.clone()));
         }
@@ -404,6 +589,172 @@ cd /tmp && echo "test""#;
                 "bun x tsc --noEmit",
                 r#"cd /tmp && echo "test""#
             ]
+        );
+    }
+
+    #[test]
+    fn test_field_list_generation() {
+        // Verify that the generated field_names() methods return the correct field names
+        assert_eq!(
+            StopConfig::field_names(),
+            vec!["run", "commands", "infinite", "infiniteMessage", "rounds"]
+        );
+
+        assert_eq!(
+            RulesConfig::field_names(),
+            vec![
+                "preventRootAdditions",
+                "uneditableFiles",
+                "toolUsageValidation"
+            ]
+        );
+
+        assert_eq!(
+            PreToolUseConfig::field_names(),
+            vec![
+                "preventAdditions",
+                "preventGeneratedFileEdits",
+                "generatedFileMessage"
+            ]
+        );
+
+        assert_eq!(
+            NotificationsConfig::field_names(),
+            vec![
+                "enabled",
+                "hooks",
+                "showErrors",
+                "showSuccess",
+                "showSystemEvents"
+            ]
+        );
+
+        assert_eq!(
+            StopCommand::field_names(),
+            vec![
+                "run",
+                "message",
+                "showStdout",
+                "showStderr",
+                "maxOutputLines"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_common_typo() {
+        // Test common typo: "showStdOut" should suggest "showStdout"
+        let suggestions = suggest_similar_fields("showStdOut", "commands");
+        assert!(!suggestions.is_empty(), "Should suggest fields for common typo");
+        assert_eq!(
+            suggestions[0], "showStdout",
+            "First suggestion should be 'showStdout'"
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_case_insensitive() {
+        // Test case-insensitive matching: "INFINITE" should suggest "infinite"
+        let suggestions = suggest_similar_fields("INFINITE", "stop");
+        assert!(!suggestions.is_empty(), "Should suggest fields ignoring case");
+        assert!(
+            suggestions.contains(&"infinite".to_string()),
+            "Should suggest 'infinite' for 'INFINITE'"
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_distance_threshold() {
+        // Test that only suggestions within distance 3 are returned
+        // "infinit" (distance 1) should be suggested
+        let suggestions = suggest_similar_fields("infinit", "stop");
+        assert!(
+            suggestions.contains(&"infinite".to_string()),
+            "Should suggest 'infinite' for 'infinit' (distance 1)"
+        );
+
+        // "infinte" (distance 1, missing 'i') should be suggested
+        let suggestions = suggest_similar_fields("infinte", "stop");
+        assert!(
+            suggestions.contains(&"infinite".to_string()),
+            "Should suggest 'infinite' for 'infinte' (distance 1)"
+        );
+
+        // "wxyz" has distance > 3 from all stop fields, should not suggest anything
+        let suggestions = suggest_similar_fields("wxyz", "stop");
+        assert!(
+            suggestions.is_empty(),
+            "Should not suggest anything for 'wxyz' (distance > 3 from all fields)"
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_no_close_matches() {
+        // Test that empty results are returned when no close matches exist
+        let suggestions = suggest_similar_fields("completelywrongfield", "stop");
+        assert!(
+            suggestions.is_empty(),
+            "Should return empty for field with no close matches"
+        );
+
+        let suggestions = suggest_similar_fields("abcdefgh", "rules");
+        assert!(
+            suggestions.is_empty(),
+            "Should return empty when distance exceeds threshold"
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_sorted_by_distance() {
+        // Test that suggestions are sorted by distance (closest first)
+        // "messag" (distance 1 from "message") should come before anything with higher distance
+        let suggestions = suggest_similar_fields("messag", "commands");
+        if !suggestions.is_empty() {
+            assert_eq!(
+                suggestions[0], "message",
+                "Closest match should be first in suggestions"
+            );
+        }
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_max_three_suggestions() {
+        // Test that at most 3 suggestions are returned
+        let suggestions = suggest_similar_fields("sho", "commands");
+        assert!(
+            suggestions.len() <= 3,
+            "Should return at most 3 suggestions, got {}",
+            suggestions.len()
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_invalid_section() {
+        // Test that empty results are returned for invalid section
+        let suggestions = suggest_similar_fields("infinite", "invalid_section");
+        assert!(
+            suggestions.is_empty(),
+            "Should return empty for invalid section"
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_notifications_section() {
+        // Test suggestions for notifications section
+        let suggestions = suggest_similar_fields("enable", "notifications");
+        assert!(
+            suggestions.contains(&"enabled".to_string()),
+            "Should suggest 'enabled' for 'enable' in notifications section"
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_rules_section() {
+        // Test suggestions for rules section with camelCase field
+        let suggestions = suggest_similar_fields("preventRootAddition", "rules");
+        assert!(
+            suggestions.contains(&"preventRootAdditions".to_string()),
+            "Should suggest 'preventRootAdditions' for 'preventRootAddition'"
         );
     }
 }

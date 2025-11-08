@@ -86,6 +86,12 @@ enum Commands {
         #[arg(long)]
         show_matches: bool,
     },
+    /// Validate conclaude configuration file
+    Validate {
+        /// Path to configuration file to validate
+        #[arg(long)]
+        config_path: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -109,6 +115,7 @@ async fn main() -> Result<()> {
         Commands::SubagentStop => handle_hook_result(handle_subagent_stop).await,
         Commands::PreCompact => handle_hook_result(handle_pre_compact).await,
         Commands::Visualize { rule, show_matches } => handle_visualize(rule, show_matches).await,
+        Commands::Validate { config_path } => handle_validate(config_path).await,
     }
 }
 
@@ -383,4 +390,77 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
     }
 
     Ok(())
+}
+
+/// Handles Validate command to validate conclaude configuration file.
+///
+/// # Errors
+///
+/// Returns an error if configuration loading or validation fails.
+#[allow(clippy::unused_async)]
+async fn handle_validate(config_path: Option<String>) -> Result<()> {
+    println!("🔍 Validating conclaude configuration...");
+
+    // Load and validate configuration
+    let result = if let Some(custom_path) = config_path {
+        let path = PathBuf::from(&custom_path);
+
+        // First, check if the path exists
+        if !path.exists() {
+            anyhow::bail!("Path not found: {}", path.display());
+        }
+
+        // Determine path type using filesystem queries
+        if path.is_file() {
+            // It's a regular file - load it directly
+            let content = fs::read_to_string(&path)
+                .with_context(|| format!("Failed to read config file: {}", path.display()))?;
+
+            // Parse and validate using shared logic with enhanced error messages
+            let config = config::parse_and_validate_config(&content, &path)?;
+
+            Ok((config, path))
+        } else if path.is_dir() {
+            // It's a directory - use the standard search from that directory
+            config::load_conclaude_config(Some(&path)).await
+        } else {
+            // Not a regular file or directory
+            anyhow::bail!("Path is not a regular file or directory: {}", path.display());
+        }
+    } else {
+        // No custom path, use standard search from current directory
+        config::load_conclaude_config(None).await
+    };
+
+    match result {
+        Ok((config, found_path)) => {
+            println!("✅ Configuration is valid!");
+            println!("   Config file: {}", found_path.display());
+            println!();
+            println!("Configuration summary:");
+            println!(
+                "   Prevent root additions: {}",
+                config.rules.prevent_root_additions
+            );
+            println!(
+                "   Uneditable files: {} pattern(s)",
+                config.rules.uneditable_files.len()
+            );
+            println!(
+                "   Tool usage validation: {} rule(s)",
+                config.rules.tool_usage_validation.len()
+            );
+            println!("   Infinite mode: {}", config.stop.infinite);
+            if let Some(rounds) = config.stop.rounds {
+                println!("   Rounds: {rounds}");
+            }
+            println!("   Notifications enabled: {}", config.notifications.enabled);
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("❌ Configuration validation failed:\n");
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+    }
 }

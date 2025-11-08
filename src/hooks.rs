@@ -141,10 +141,7 @@ fn send_notification(hook_name: &str, status: &str, context: Option<&str>) {
         .show();
 
     #[cfg(not(target_os = "linux"))]
-    let result = Notification::new()
-        .summary(&title)
-        .body(&body)
-        .show();
+    let result = Notification::new().summary(&title).body(&body).show();
 
     match result {
         Ok(_) => {
@@ -351,6 +348,19 @@ pub fn extract_file_path<S: std::hash::BuildHasher>(
         .get("file_path")
         .or_else(|| tool_input.get("notebook_path"))
         .and_then(|v| v.as_str())
+        .map(std::string::ToString::to_string)
+}
+
+/// Extracts the Bash command string from tool input payload
+/// Returns None if the command is missing, empty, or contains only whitespace
+pub fn extract_bash_command<S: std::hash::BuildHasher>(
+    tool_input: &std::collections::HashMap<String, Value, S>,
+) -> Option<String> {
+    tool_input
+        .get("command")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
         .map(std::string::ToString::to_string)
 }
 
@@ -876,6 +886,50 @@ async fn check_tool_usage_rules(payload: &PreToolUsePayload) -> Result<Option<Ho
 
     for rule in &config.rules.tool_usage_validation {
         if rule.tool == payload.tool_name || rule.tool == "*" {
+            // Check if this is a Bash command with a commandPattern rule
+            if payload.tool_name == "Bash" && rule.command_pattern.is_some() {
+                // Extract the command
+                if let Some(command) = extract_bash_command(&payload.tool_input) {
+                    let pattern = rule.command_pattern.as_ref().unwrap();
+                    let mode = rule.match_mode.as_deref().unwrap_or("full");
+
+                    // Perform pattern matching based on mode
+                    let matches = if mode == "prefix" {
+                        // Prefix mode: test progressively longer prefixes
+                        let glob = Pattern::new(pattern)?;
+                        let words: Vec<&str> = command.split_whitespace().collect();
+                        (1..=words.len()).any(|i| {
+                            let prefix = words[..i].join(" ");
+                            glob.matches(&prefix)
+                        })
+                    } else {
+                        // Full mode: match entire command
+                        Pattern::new(pattern)?.matches(&command)
+                    };
+
+                    // Handle actions based on match result
+                    if rule.action == "block" && matches {
+                        let message = rule.message.clone().unwrap_or_else(|| {
+                            format!("Bash command blocked by validation rule: {}", pattern)
+                        });
+                        return Ok(Some(HookResult::blocked(message)));
+                    } else if rule.action == "allow" && !matches {
+                        let message = rule.message.clone().unwrap_or_else(|| {
+                            format!(
+                                "Bash command blocked: does not match allow rule pattern: {}",
+                                pattern
+                            )
+                        });
+                        return Ok(Some(HookResult::blocked(message)));
+                    } else if rule.action == "allow" && matches {
+                        // Allow and stop checking further rules for this command
+                        return Ok(None);
+                    }
+                }
+                // Skip file-path validation for Bash command rules
+                continue;
+            }
+
             // Extract file path if available
             if let Some(file_path) = extract_file_path(&payload.tool_input) {
                 let matches = Pattern::new(&rule.pattern)?.matches(&file_path);
@@ -1418,5 +1472,132 @@ mod tests {
         assert!(!commands[0].show_stdout);
         assert!(!commands[0].show_stderr);
         assert_eq!(commands[0].max_output_lines, None);
+    }
+
+    #[test]
+    fn test_extract_bash_command_valid() {
+        let mut tool_input = std::collections::HashMap::new();
+        tool_input.insert("command".to_string(), Value::String("echo hello".to_string()));
+        assert_eq!(extract_bash_command(&tool_input), Some("echo hello".to_string()));
+    }
+
+    #[test]
+    fn test_extract_bash_command_missing() {
+        let tool_input: std::collections::HashMap<String, Value> = std::collections::HashMap::new();
+        assert_eq!(extract_bash_command(&tool_input), None);
+    }
+
+    #[test]
+    fn test_extract_bash_command_empty() {
+        let mut tool_input = std::collections::HashMap::new();
+        tool_input.insert("command".to_string(), Value::String("".to_string()));
+        assert_eq!(extract_bash_command(&tool_input), None);
+    }
+
+    #[test]
+    fn test_extract_bash_command_whitespace_only() {
+        let mut tool_input = std::collections::HashMap::new();
+        tool_input.insert("command".to_string(), Value::String("   \n\t   ".to_string()));
+        assert_eq!(extract_bash_command(&tool_input), None);
+    }
+
+    #[test]
+    fn test_extract_bash_command_trims_whitespace() {
+        let mut tool_input = std::collections::HashMap::new();
+        tool_input.insert("command".to_string(), Value::String("  echo test  ".to_string()));
+        assert_eq!(extract_bash_command(&tool_input), Some("echo test".to_string()));
+    }
+
+    #[test]
+    fn test_extract_bash_command_non_string_value() {
+        let mut tool_input = std::collections::HashMap::new();
+        tool_input.insert("command".to_string(), Value::Number(42.into()));
+        assert_eq!(extract_bash_command(&tool_input), None);
+    }
+
+    #[test]
+    fn test_bash_command_full_match_exact() {
+        use glob::Pattern;
+
+        // Exact match
+        let pattern = Pattern::new("rm -rf /").unwrap();
+        assert!(pattern.matches("rm -rf /"));
+
+        // With wildcard at end
+        let pattern2 = Pattern::new("rm -rf /*").unwrap();
+        assert!(pattern2.matches("rm -rf /"));
+        assert!(pattern2.matches("rm -rf /tmp"));
+
+        // Doesn't match with prefix
+        let pattern3 = Pattern::new("rm -rf /*").unwrap();
+        assert!(!pattern3.matches("sudo rm -rf /"));
+    }
+
+    #[test]
+    fn test_bash_command_full_match_wildcard() {
+        use glob::Pattern;
+
+        let pattern = Pattern::new("git push --force*").unwrap();
+        assert!(pattern.matches("git push --force"));
+        assert!(pattern.matches("git push --force origin main"));
+        assert!(!pattern.matches("git push origin main"));
+    }
+
+    #[test]
+    fn test_bash_command_prefix_match_at_start() {
+        use glob::Pattern;
+
+        let pattern = Pattern::new("curl *").unwrap();
+        let command = "curl https://example.com && echo done";
+
+        // Simulate prefix matching logic
+        let words: Vec<&str> = command.split_whitespace().collect();
+        let matches = (1..=words.len()).any(|i| {
+            let prefix = words[..i].join(" ");
+            pattern.matches(&prefix)
+        });
+
+        assert!(matches, "Should match 'curl https://example.com' at start");
+    }
+
+    #[test]
+    fn test_bash_command_prefix_no_match_middle() {
+        use glob::Pattern;
+
+        let pattern = Pattern::new("curl *").unwrap();
+        let command = "echo test && curl https://example.com";
+
+        let words: Vec<&str> = command.split_whitespace().collect();
+        let matches = (1..=words.len()).any(|i| {
+            let prefix = words[..i].join(" ");
+            pattern.matches(&prefix)
+        });
+
+        assert!(!matches, "Should not match 'curl' in middle of command");
+    }
+
+    #[test]
+    fn test_bash_command_wildcard_variations() {
+        use glob::Pattern;
+
+        let test_cases = vec![
+            ("rm -rf*", "rm -rf /", true),
+            ("rm -rf*", "rm -rf /tmp", true),
+            ("git push --force*", "git push --force", true),
+            ("git push --force*", "git push --force origin main", true),
+            ("docker run*", "docker start", false),
+            ("npm install*", "npm install", true),
+            ("npm install*", "npm ci", false),
+        ];
+
+        for (pattern_str, command, expected) in test_cases {
+            let pattern = Pattern::new(pattern_str).unwrap();
+            assert_eq!(
+                pattern.matches(command),
+                expected,
+                "Pattern: '{}', Command: '{}', Expected: {}",
+                pattern_str, command, expected
+            );
+        }
     }
 }
