@@ -640,4 +640,121 @@ cd /tmp && echo "test""#;
             ]
         );
     }
+
+    #[test]
+    fn test_suggest_similar_fields_common_typo() {
+        // Test common typo: "showStdOut" should suggest "showStdout"
+        let suggestions = suggest_similar_fields("showStdOut", "commands");
+        assert!(!suggestions.is_empty(), "Should suggest fields for common typo");
+        assert_eq!(
+            suggestions[0], "showStdout",
+            "First suggestion should be 'showStdout'"
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_case_insensitive() {
+        // Test case-insensitive matching: "INFINITE" should suggest "infinite"
+        let suggestions = suggest_similar_fields("INFINITE", "stop");
+        assert!(!suggestions.is_empty(), "Should suggest fields ignoring case");
+        assert!(
+            suggestions.contains(&"infinite".to_string()),
+            "Should suggest 'infinite' for 'INFINITE'"
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_distance_threshold() {
+        // Test that only suggestions within distance 3 are returned
+        // "infinit" (distance 1) should be suggested
+        let suggestions = suggest_similar_fields("infinit", "stop");
+        assert!(
+            suggestions.contains(&"infinite".to_string()),
+            "Should suggest 'infinite' for 'infinit' (distance 1)"
+        );
+
+        // "infinte" (distance 1, missing 'i') should be suggested
+        let suggestions = suggest_similar_fields("infinte", "stop");
+        assert!(
+            suggestions.contains(&"infinite".to_string()),
+            "Should suggest 'infinite' for 'infinte' (distance 1)"
+        );
+
+        // "wxyz" has distance > 3 from all stop fields, should not suggest anything
+        let suggestions = suggest_similar_fields("wxyz", "stop");
+        assert!(
+            suggestions.is_empty(),
+            "Should not suggest anything for 'wxyz' (distance > 3 from all fields)"
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_no_close_matches() {
+        // Test that empty results are returned when no close matches exist
+        let suggestions = suggest_similar_fields("completelywrongfield", "stop");
+        assert!(
+            suggestions.is_empty(),
+            "Should return empty for field with no close matches"
+        );
+
+        let suggestions = suggest_similar_fields("abcdefgh", "rules");
+        assert!(
+            suggestions.is_empty(),
+            "Should return empty when distance exceeds threshold"
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_sorted_by_distance() {
+        // Test that suggestions are sorted by distance (closest first)
+        // "messag" (distance 1 from "message") should come before anything with higher distance
+        let suggestions = suggest_similar_fields("messag", "commands");
+        if !suggestions.is_empty() {
+            assert_eq!(
+                suggestions[0], "message",
+                "Closest match should be first in suggestions"
+            );
+        }
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_max_three_suggestions() {
+        // Test that at most 3 suggestions are returned
+        let suggestions = suggest_similar_fields("sho", "commands");
+        assert!(
+            suggestions.len() <= 3,
+            "Should return at most 3 suggestions, got {}",
+            suggestions.len()
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_invalid_section() {
+        // Test that empty results are returned for invalid section
+        let suggestions = suggest_similar_fields("infinite", "invalid_section");
+        assert!(
+            suggestions.is_empty(),
+            "Should return empty for invalid section"
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_notifications_section() {
+        // Test suggestions for notifications section
+        let suggestions = suggest_similar_fields("enable", "notifications");
+        assert!(
+            suggestions.contains(&"enabled".to_string()),
+            "Should suggest 'enabled' for 'enable' in notifications section"
+        );
+    }
+
+    #[test]
+    fn test_suggest_similar_fields_rules_section() {
+        // Test suggestions for rules section with camelCase field
+        let suggestions = suggest_similar_fields("preventRootAddition", "rules");
+        assert!(
+            suggestions.contains(&"preventRootAdditions".to_string()),
+            "Should suggest 'preventRootAdditions' for 'preventRootAddition'"
+        );
+    }
 }
