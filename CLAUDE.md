@@ -211,6 +211,7 @@ Use `@/openspec/AGENTS.md` to learn:
 Keep this managed block so 'openspec update' can refresh the instructions.
 
 <!-- OPENSPEC:END -->
+
 <project>
 conclaude is a Rust-based guardrail CLI for Claude Code sessions, orchestrating configurable lifecycle hooks to enforce linting, testing, and workflow policies. It discovers human-readable YAML via cosmiconfig, validates configurations against a published schema, and runs project commands to keep repos consistent. The tool ships with session-aware logging, file protection rules, and multiple installation channels including shell scripts, npm, and platform-specific binaries.
 </project>
