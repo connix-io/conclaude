@@ -72,7 +72,8 @@ fn test_extract_bash_commands_handles_mixed_whitespace_and_comments() {
 fn test_yaml_parsing_directly() {
     let config_content = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
   infinite: true
   infiniteMessage: "continue"
 rules:
@@ -189,7 +190,8 @@ fn test_config_with_null_rounds_can_be_parsed() {
     // Test the specific case where rounds: null is used
     let config_content = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
   infinite: false
   infiniteMessage: "continue"
   rounds: null
@@ -293,7 +295,7 @@ async fn test_config_search_level_limit() {
     let deep_config_path = config_dir.join(".conclaude.yaml");
     fs::write(
         &deep_config_path,
-        "stop:\n  run: 'deep config'\nrules:\n  preventRootAdditions: true",
+        "stop:\n  commands:\n    - run: 'deep config'\nrules:\n  preventRootAdditions: true",
     )
     .unwrap();
 
@@ -323,7 +325,7 @@ async fn test_config_search_within_level_limit() {
         .join("level_0/level_1/level_2/level_3/level_4/.conclaude.yaml");
     fs::write(
         &config_path,
-        "stop:\n  run: 'found config'\n  infinite: false\nrules:\n  preventRootAdditions: true",
+        "stop:\n  commands:\n    - run: 'found config'\n  infinite: false\nrules:\n  preventRootAdditions: true",
     )
     .unwrap();
 
@@ -333,7 +335,7 @@ async fn test_config_search_within_level_limit() {
     // Should successfully find and parse config
     assert!(result.is_ok());
     let (config, _config_path) = result.unwrap();
-    assert_eq!(config.stop.run, "found config");
+    assert_eq!(config.stop.commands[0].run, "found config");
     assert!(!config.stop.infinite);
     assert!(config.rules.prevent_root_additions);
 }
@@ -370,7 +372,7 @@ async fn test_notification_config_enabled_specific_hooks() {
     // Create config with specific hooks enabled
     let config_content = r#"
 stop:
-  run: ""
+  commands: []
 rules:
   preventRootAdditions: true
 notifications:
@@ -406,7 +408,7 @@ async fn test_notification_config_enabled_wildcard() {
     // Create config with wildcard enabled
     let config_content = r#"
 stop:
-  run: ""
+  commands: []
 rules:
   preventRootAdditions: true
 notifications:
@@ -443,7 +445,7 @@ async fn test_notification_config_enabled_empty_hooks() {
     // Create config with enabled but empty hooks list
     let config_content = r#"
 stop:
-  run: ""
+  commands: []
 rules:
   preventRootAdditions: true
 notifications:
@@ -508,7 +510,8 @@ fn test_reject_unknown_fields_in_stop_config() {
     // Test that unknown fields in stop config are rejected
     let config_content = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
   unknownField: "should fail"
 rules:
   preventRootAdditions: true
@@ -527,7 +530,8 @@ fn test_reject_unknown_fields_in_pre_tool_use_config() {
     // Test that unknown fields in preToolUse config are rejected
     let config_content = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
 rules:
   preventRootAdditions: true
 preToolUse:
@@ -548,7 +552,8 @@ fn test_reject_grep_rules_in_stop_config() {
     // Test that grepRules field (which exists in .conclaude.yaml but not in StopConfig struct) is rejected
     let config_content = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
   grepRules: []
 rules:
   preventRootAdditions: true
@@ -567,7 +572,8 @@ fn test_reject_grep_rules_in_pre_tool_use_config() {
     // Test that grepRules field in preToolUse is rejected
     let config_content = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
 rules:
   preventRootAdditions: true
 preToolUse:
@@ -591,7 +597,8 @@ async fn test_descriptive_error_for_unknown_field() {
     // Create config with an unknown field
     let config_content = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
   invalidField: "this should fail"
 rules:
   preventRootAdditions: true
@@ -627,7 +634,8 @@ async fn test_descriptive_error_for_invalid_type() {
     // Create config with an invalid type (string instead of boolean)
     let config_content = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
   infinite: "true"
 rules:
   preventRootAdditions: true
@@ -660,7 +668,8 @@ async fn test_descriptive_error_for_yaml_syntax() {
     // Create config with YAML syntax error (bad indentation)
     let config_content = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
 rules:
 preventRootAdditions: true
 "#;

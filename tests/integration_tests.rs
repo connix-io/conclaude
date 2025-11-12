@@ -141,7 +141,8 @@ fn test_validate_with_valid_configuration() {
     // Create a valid configuration
     let valid_config = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
   infinite: false
   rounds: 5
 rules:
@@ -245,7 +246,8 @@ fn test_validate_with_invalid_yaml_syntax() {
     // Create a config with invalid YAML syntax (bad indentation)
     let invalid_yaml = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
 rules:
 preventRootAdditions: true
 "#;
@@ -295,7 +297,8 @@ fn test_validate_with_unknown_fields() {
     // Create a config with unknown fields
     let config_with_unknown_fields = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
   unknownField: "should fail"
   anotherBadField: 123
 rules:
@@ -351,7 +354,8 @@ fn test_validate_with_invalid_types() {
     // Create a config with invalid types (string instead of boolean)
     let config_with_invalid_types = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
   infinite: "true"
 rules:
   preventRootAdditions: "yes"
@@ -406,7 +410,6 @@ fn test_validate_with_out_of_range_values() {
     // Create a config with out-of-range values (maxOutputLines > 10000)
     let config_with_out_of_range = r#"
 stop:
-  run: "echo test"
   commands:
     - run: "test"
       maxOutputLines: 50000
@@ -463,7 +466,8 @@ fn test_validate_with_out_of_range_rounds() {
     // Create a config with out-of-range rounds value (0)
     let config_with_invalid_rounds = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
   rounds: 0
 rules:
   preventRootAdditions: true
@@ -512,7 +516,8 @@ fn test_validate_with_custom_config_path_file() {
     // Create a valid configuration with a custom filename
     let valid_config = r#"
 stop:
-  run: "echo custom"
+  commands:
+    - run: "echo custom"
 rules:
   preventRootAdditions: false
 "#;
@@ -553,7 +558,8 @@ fn test_validate_with_custom_config_path_directory() {
     // Create a valid configuration in a custom directory
     let valid_config = r#"
 stop:
-  run: "echo directory test"
+  commands:
+    - run: "echo directory test"
 rules:
   preventRootAdditions: true
 "#;
@@ -631,7 +637,8 @@ fn test_validate_displays_configuration_summary() {
     // Create a configuration with specific values to verify in summary
     let config_with_features = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
   infinite: true
   rounds: 10
 rules:

@@ -28,8 +28,6 @@ pub struct StopCommand {
 #[serde(deny_unknown_fields)]
 pub struct StopConfig {
     #[serde(default)]
-    pub run: String,
-    #[serde(default)]
     pub commands: Vec<StopCommand>,
     #[serde(default)]
     pub infinite: bool,
@@ -277,7 +275,7 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
         parts.push("  • Using camelCase vs snake_case incorrectly (use camelCase)".to_string());
         parts.push(String::new());
         parts.push("Valid field names by section:".to_string());
-        parts.push("  stop: run, commands, infinite, infiniteMessage, rounds".to_string());
+        parts.push("  stop: commands, infinite, infiniteMessage, rounds".to_string());
         parts.push(
             "  rules: preventRootAdditions, uneditableFiles, toolUsageValidation".to_string(),
         );
@@ -597,7 +595,7 @@ cd /tmp && echo "test""#;
         // Verify that the generated field_names() methods return the correct field names
         assert_eq!(
             StopConfig::field_names(),
-            vec!["run", "commands", "infinite", "infiniteMessage", "rounds"]
+            vec!["commands", "infinite", "infiniteMessage", "rounds"]
         );
 
         assert_eq!(

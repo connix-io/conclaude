@@ -4,11 +4,7 @@
 
 # Stop hook configuration - runs when Claude is about to stop
 stop:
-  # Commands to run during Stop hook
-  # Each line is executed as a separate bash command
-  run: ""
-
-  # Alternative structured command format with optional custom error messages
+  # Structured command format with optional custom error messages
   # Each command can have its own error message, and control output display
   commands: []
   # Examples:

@@ -232,32 +232,33 @@ rules:
     assert_eq!(config.stop.commands[2].max_output_lines, None);
 }
 
-/// Test that legacy run field still works without maxOutputLines
+/// Test that empty commands array works
 #[test]
-fn test_legacy_run_field_compatibility() {
+fn test_empty_commands_array() {
     let config_content = r#"
 stop:
-  run: "echo legacy"
+  commands: []
 rules:
   preventRootAdditions: true
 "#;
 
     let result = serde_yaml::from_str::<ConclaudeConfig>(config_content);
-    assert!(result.is_ok(), "Legacy run field should parse successfully");
+    assert!(result.is_ok(), "Empty commands array should parse successfully");
 
     let config = result.unwrap();
-    assert_eq!(config.stop.run, "echo legacy");
     assert!(config.stop.commands.is_empty());
 }
 
-/// Test mixed legacy and new commands
+/// Test multiple commands with maxOutputLines
 #[test]
-fn test_mixed_legacy_and_new_commands_with_max_output_lines() {
+fn test_multiple_commands_with_max_output_lines() {
     let config_content = r#"
 stop:
-  run: "echo legacy"
   commands:
-    - run: "echo new"
+    - run: "echo first"
+      showStdout: true
+      maxOutputLines: 50
+    - run: "echo second"
       showStdout: true
       maxOutputLines: 100
 rules:
@@ -267,13 +268,13 @@ rules:
     let result = serde_yaml::from_str::<ConclaudeConfig>(config_content);
     assert!(
         result.is_ok(),
-        "Mixed legacy and new commands should parse successfully"
+        "Multiple commands should parse successfully"
     );
 
     let config = result.unwrap();
-    assert_eq!(config.stop.run, "echo legacy");
-    assert_eq!(config.stop.commands.len(), 1);
-    assert_eq!(config.stop.commands[0].max_output_lines, Some(100));
+    assert_eq!(config.stop.commands.len(), 2);
+    assert_eq!(config.stop.commands[0].max_output_lines, Some(50));
+    assert_eq!(config.stop.commands[1].max_output_lines, Some(100));
 }
 
 /// Test that omitting all optional fields works
@@ -369,7 +370,6 @@ fn test_schema_generation_includes_range() {
 fn test_comprehensive_config_with_output_limiting() {
     let config_content = r#"
 stop:
-  run: "echo legacy command"
   commands:
     - run: "npm test"
       message: "Tests failed. Please fix before continuing."
@@ -408,9 +408,6 @@ notifications:
     );
 
     let config = result.unwrap();
-
-    // Verify legacy run field
-    assert_eq!(config.stop.run, "echo legacy command");
 
     // Verify commands
     assert_eq!(config.stop.commands.len(), 3);
@@ -516,7 +513,6 @@ rules:
 #[test]
 fn test_stop_config_round_trip() {
     let original = StopConfig {
-        run: "echo test".to_string(),
         commands: vec![StopCommand {
             run: "npm test".to_string(),
             message: Some("Failed".to_string()),
@@ -532,7 +528,6 @@ fn test_stop_config_round_trip() {
     let yaml = serde_yaml::to_string(&original).unwrap();
     let deserialized: StopConfig = serde_yaml::from_str(&yaml).unwrap();
 
-    assert_eq!(deserialized.run, original.run);
     assert_eq!(deserialized.commands.len(), original.commands.len());
     assert_eq!(
         deserialized.commands[0].max_output_lines,
