@@ -28,22 +28,26 @@ pub fn derive_field_list(input: TokenStream) -> TokenStream {
         Data::Struct(data) => {
             match &data.fields {
                 Fields::Named(fields) => {
-                    fields.named.iter().map(|f| {
-                        let field_name = f.ident.as_ref().unwrap();
+                    fields
+                        .named
+                        .iter()
+                        .map(|f| {
+                            let field_name = f.ident.as_ref().unwrap();
 
-                        // Check for serde rename attribute
-                        let renamed = extract_serde_rename(&f.attrs);
+                            // Check for serde rename attribute
+                            let renamed = extract_serde_rename(&f.attrs);
 
-                        match renamed {
-                            Some(rename) => rename,
-                            None => field_name.to_string(),
-                        }
-                    }).collect::<Vec<_>>()
+                            match renamed {
+                                Some(rename) => rename,
+                                None => field_name.to_string(),
+                            }
+                        })
+                        .collect::<Vec<_>>()
                 }
                 _ => {
                     return syn::Error::new_spanned(
                         &input.ident,
-                        "FieldList can only be derived for structs with named fields"
+                        "FieldList can only be derived for structs with named fields",
                     )
                     .to_compile_error()
                     .into();
@@ -53,7 +57,7 @@ pub fn derive_field_list(input: TokenStream) -> TokenStream {
         _ => {
             return syn::Error::new_spanned(
                 &input.ident,
-                "FieldList can only be derived for structs"
+                "FieldList can only be derived for structs",
             )
             .to_compile_error()
             .into();
@@ -85,8 +89,9 @@ fn extract_serde_rename(attrs: &[syn::Attribute]) -> Option<String> {
         // Parse the attribute meta
         if let Ok(meta_list) = attr.meta.require_list() {
             // Parse the tokens as a comma-separated list of meta items
-            let nested =
-                meta_list.parse_args_with(syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated);
+            let nested = meta_list.parse_args_with(
+                syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated,
+            );
 
             if let Ok(nested_metas) = nested {
                 for meta in nested_metas {

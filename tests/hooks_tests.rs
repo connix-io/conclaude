@@ -427,10 +427,7 @@ async fn test_bash_validation_block_exact_command() -> anyhow::Result<()> {
 
     // Create PreToolUsePayload with Bash command
     let mut tool_input = HashMap::new();
-    tool_input.insert(
-        "command".to_string(),
-        Value::String("rm -rf /".to_string()),
-    );
+    tool_input.insert("command".to_string(), Value::String("rm -rf /".to_string()));
 
     let payload = PreToolUsePayload {
         base: create_test_base_payload(),
@@ -459,10 +456,7 @@ async fn test_bash_validation_block_exact_command() -> anyhow::Result<()> {
 
     assert!(matches, "Exact command should match in full mode");
     assert_eq!(rule.action, "block");
-    assert_eq!(
-        rule.message.as_deref(),
-        Some("Dangerous command blocked!")
-    );
+    assert_eq!(rule.message.as_deref(), Some("Dangerous command blocked!"));
 
     Ok(())
 }

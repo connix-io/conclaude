@@ -654,11 +654,16 @@ async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<
             let exit_code = output.status.code().unwrap_or(1);
 
             // Log detailed failure information with command and outputs appended
-            eprintln!(
-                "Stop command failed:\n  Command: {}\n  Status: Failed (exit code: {})\n  Stdout:\n{}\n  Stderr:\n{}",
-                cmd_config.command,
-                exit_code,
-                if stdout.trim().is_empty() {
+            // Respect showStdout and showStderr flags when logging to console
+            // Build diagnostic output dynamically to omit sections when flags are false
+            let mut diagnostic = format!(
+                "Stop command failed:\n  Command: {}\n  Status: Failed (exit code: {})",
+                cmd_config.command, exit_code
+            );
+
+            // Only include Stdout section if showStdout is true
+            if cmd_config.show_stdout {
+                let stdout_display = if stdout.trim().is_empty() {
                     "    (no stdout)".to_string()
                 } else {
                     stdout
@@ -667,8 +672,13 @@ async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<
                         .map(|line| format!("    {}", line))
                         .collect::<Vec<_>>()
                         .join("\n")
-                },
-                if stderr.trim().is_empty() {
+                };
+                diagnostic.push_str(&format!("\n  Stdout:\n{}", stdout_display));
+            }
+
+            // Only include Stderr section if showStderr is true
+            if cmd_config.show_stderr {
+                let stderr_display = if stderr.trim().is_empty() {
                     "    (no stderr)".to_string()
                 } else {
                     stderr
@@ -677,8 +687,11 @@ async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<
                         .map(|line| format!("    {}", line))
                         .collect::<Vec<_>>()
                         .join("\n")
-                }
-            );
+                };
+                diagnostic.push_str(&format!("\n  Stderr:\n{}", stderr_display));
+            }
+
+            eprintln!("{}", diagnostic);
 
             let stdout_section = if cmd_config.show_stdout && !stdout.is_empty() {
                 if let Some(max_lines) = cmd_config.max_output_lines {
@@ -1477,8 +1490,14 @@ mod tests {
     #[test]
     fn test_extract_bash_command_valid() {
         let mut tool_input = std::collections::HashMap::new();
-        tool_input.insert("command".to_string(), Value::String("echo hello".to_string()));
-        assert_eq!(extract_bash_command(&tool_input), Some("echo hello".to_string()));
+        tool_input.insert(
+            "command".to_string(),
+            Value::String("echo hello".to_string()),
+        );
+        assert_eq!(
+            extract_bash_command(&tool_input),
+            Some("echo hello".to_string())
+        );
     }
 
     #[test]
@@ -1497,15 +1516,24 @@ mod tests {
     #[test]
     fn test_extract_bash_command_whitespace_only() {
         let mut tool_input = std::collections::HashMap::new();
-        tool_input.insert("command".to_string(), Value::String("   \n\t   ".to_string()));
+        tool_input.insert(
+            "command".to_string(),
+            Value::String("   \n\t   ".to_string()),
+        );
         assert_eq!(extract_bash_command(&tool_input), None);
     }
 
     #[test]
     fn test_extract_bash_command_trims_whitespace() {
         let mut tool_input = std::collections::HashMap::new();
-        tool_input.insert("command".to_string(), Value::String("  echo test  ".to_string()));
-        assert_eq!(extract_bash_command(&tool_input), Some("echo test".to_string()));
+        tool_input.insert(
+            "command".to_string(),
+            Value::String("  echo test  ".to_string()),
+        );
+        assert_eq!(
+            extract_bash_command(&tool_input),
+            Some("echo test".to_string())
+        );
     }
 
     #[test]
@@ -1596,7 +1624,9 @@ mod tests {
                 pattern.matches(command),
                 expected,
                 "Pattern: '{}', Command: '{}', Expected: {}",
-                pattern_str, command, expected
+                pattern_str,
+                command,
+                expected
             );
         }
     }
