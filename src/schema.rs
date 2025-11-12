@@ -37,7 +37,8 @@
 //! // Validate configuration
 //! let config_yaml = r#"
 //! stop:
-//!   run: "cargo test"
+//!   commands:
+//!     - run: "cargo test"
 //!   infinite: false
 //! "#;
 //! validate_config_against_schema(config_yaml).unwrap();
@@ -192,7 +193,8 @@ mod tests {
     fn test_validate_config_against_schema() {
         let valid_config = r#"
 stop:
-  run: "echo test"
+  commands:
+    - run: "echo test"
   infinite: false
 rules:
   preventRootAdditions: true

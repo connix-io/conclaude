@@ -162,10 +162,6 @@
             "integer",
             "null"
           ]
-        },
-        "run": {
-          "default": "",
-          "type": "string"
         }
       },
       "type": "object"
@@ -260,8 +256,7 @@
         "commands": [],
         "infinite": false,
         "infiniteMessage": null,
-        "rounds": null,
-        "run": ""
+        "rounds": null
       }
     }
   },

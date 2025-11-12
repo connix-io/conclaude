@@ -583,21 +583,7 @@ fn truncate_output(output: &str, max_lines: u32) -> (String, bool, usize) {
 fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConfig>> {
     let mut commands = Vec::new();
 
-    // Add legacy run commands
-    if !config.stop.run.is_empty() {
-        let extracted = extract_bash_commands(&config.stop.run)?;
-        for cmd in extracted {
-            commands.push(StopCommandConfig {
-                command: cmd,
-                message: None,
-                show_stdout: false,
-                show_stderr: false,
-                max_output_lines: None,
-            });
-        }
-    }
-
-    // Add new structured commands with messages
+    // Add structured commands with messages and output control
     for cmd_config in &config.stop.commands {
         let extracted = extract_bash_commands(&cmd_config.run)?;
         let show_stdout = cmd_config.show_stdout.unwrap_or(false);
@@ -770,7 +756,7 @@ pub async fn handle_stop() -> Result<HookResult> {
         None
     };
 
-    // Extract and execute commands from config.stop.run and config.stop.commands
+    // Extract and execute commands from config.stop.commands
     let commands_with_messages = collect_stop_commands(config)?;
 
     // Execute commands
@@ -1354,33 +1340,11 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_stop_commands_legacy_run() {
-        let config = ConclaudeConfig {
-            stop: crate::config::StopConfig {
-                run: "echo test\nls -la".to_string(),
-                commands: vec![],
-                infinite: false,
-                infinite_message: None,
-                rounds: None,
-            },
-            ..Default::default()
-        };
-
-        let commands = collect_stop_commands(&config).unwrap();
-        assert_eq!(commands.len(), 2);
-        assert_eq!(commands[0].command, "echo test");
-        assert!(!commands[0].show_stdout);
-        assert!(!commands[0].show_stderr);
-        assert_eq!(commands[0].max_output_lines, None);
-    }
-
-    #[test]
     fn test_collect_stop_commands_with_output_config() {
         use crate::config::StopCommand;
 
         let config = ConclaudeConfig {
             stop: crate::config::StopConfig {
-                run: String::new(),
                 commands: vec![
                     StopCommand {
                         run: "echo hello".to_string(),
@@ -1421,49 +1385,11 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_stop_commands_mixed_legacy_and_new() {
-        use crate::config::StopCommand;
-
-        let config = ConclaudeConfig {
-            stop: crate::config::StopConfig {
-                run: "echo legacy".to_string(),
-                commands: vec![StopCommand {
-                    run: "echo new".to_string(),
-                    message: Some("New style".to_string()),
-                    show_stdout: Some(true),
-                    show_stderr: Some(true),
-                    max_output_lines: Some(20),
-                }],
-                infinite: false,
-                infinite_message: None,
-                rounds: None,
-            },
-            ..Default::default()
-        };
-
-        let commands = collect_stop_commands(&config).unwrap();
-        assert_eq!(commands.len(), 2);
-
-        // Legacy command comes first
-        assert_eq!(commands[0].command, "echo legacy");
-        assert!(!commands[0].show_stdout);
-        assert!(!commands[0].show_stderr);
-        assert_eq!(commands[0].max_output_lines, None);
-
-        // New command comes second
-        assert_eq!(commands[1].command, "echo new");
-        assert!(commands[1].show_stdout);
-        assert!(commands[1].show_stderr);
-        assert_eq!(commands[1].max_output_lines, Some(20));
-    }
-
-    #[test]
     fn test_collect_stop_commands_default_values() {
         use crate::config::StopCommand;
 
         let config = ConclaudeConfig {
             stop: crate::config::StopConfig {
-                run: String::new(),
                 commands: vec![StopCommand {
                     run: "echo test".to_string(),
                     message: None,

@@ -140,9 +140,9 @@ You're pair programming with Claude for hours, making incremental improvements. 
 # .conclaude.yaml
 stop:
   infinite: true
-  run: |
-    bun x tsc --noEmit
-    bun test --silent
+  commands:
+    - run: bun x tsc --noEmit
+    - run: bun test --silent
   infiniteMessage: "🛡️ Monitoring active - your code stays clean!"
 ```
 
@@ -252,11 +252,15 @@ Here's what a real-world configuration looks like:
 
 # Commands that MUST pass before any session ends
 stop:
-  run: |
-    cargo fmt --check     # Code formatting check
-    cargo clippy -- -D warnings  # Linting with warnings as errors
-    cargo test            # All tests must pass
-    cargo build           # Successful compilation required
+  commands:
+    - run: cargo fmt --check
+      message: "Code formatting check"
+    - run: cargo clippy -- -D warnings
+      message: "Linting with warnings as errors"
+    - run: cargo test
+      message: "All tests must pass"
+    - run: cargo build
+      message: "Successful compilation required"
   
 # File protection rules
 rules:
@@ -281,9 +285,11 @@ rules:
 ```yaml
 # Perfect for refactoring sessions or long pair-programming
 stop:
-  run: |
-    cargo check --quiet   # Fast compilation check
-    cargo test --quiet     # Silent test execution
+  commands:
+    - run: cargo check --quiet
+      message: "Fast compilation check"
+    - run: cargo test --quiet
+      message: "Silent test execution"
   infinite: true           # Validate after every change
   infiniteMessage: "🔍 Watching your code quality..."
 ```
@@ -292,12 +298,17 @@ stop:
 ```yaml
 # Maximum security for production codebases
 stop:
-  run: |
-    cargo audit              # Security audit
-    cargo fmt --check        # Strict formatting
-    cargo clippy -- -D warnings  # All clippy warnings as errors
-    cargo test --all         # Test all packages
-    cargo build --release    # Release build
+  commands:
+    - run: cargo audit
+      message: "Security audit"
+    - run: cargo fmt --check
+      message: "Strict formatting"
+    - run: cargo clippy -- -D warnings
+      message: "All clippy warnings as errors"
+    - run: cargo test --all
+      message: "Test all packages"
+    - run: cargo build --release
+      message: "Release build"
 
 rules:
   preventRootAdditions: true
@@ -423,10 +434,10 @@ conclaude taps into Claude Code's lifecycle through strategic intervention point
 ```yaml
 # Commands to run during Stop hook
 stop:
-  run: |
-    cargo check
-    cargo test
-    cargo build
+  commands:
+    - run: cargo check
+    - run: cargo test
+    - run: cargo build
 
 # Validation rules
 rules:
@@ -446,9 +457,9 @@ rules:
 ```yaml
 # Minimal checks for development
 stop:
-  run: |
-    echo "Running development checks..."
-    cargo check
+  commands:
+    - run: echo "Running development checks..."
+    - run: cargo check
 
 rules:
   preventRootAdditions: false  # Allow root edits during development
@@ -461,12 +472,12 @@ rules:
 ```yaml
 # Comprehensive validation for production
 stop:
-  run: |
-    echo "Running production validation..."
-    cargo fmt --check
-    cargo clippy -- -D warnings
-    cargo test
-    cargo build --release
+  commands:
+    - run: echo "Running production validation..."
+    - run: cargo fmt --check
+    - run: cargo clippy -- -D warnings
+    - run: cargo test
+    - run: cargo build --release
 
 rules:
   preventRootAdditions: true
@@ -482,10 +493,10 @@ rules:
 ```yaml
 # Continuous monitoring with infinite mode
 stop:
-  run: |
-    echo "Starting continuous monitoring..."
-    cargo check
-    cargo test
+  commands:
+    - run: echo "Starting continuous monitoring..."
+    - run: cargo check
+    - run: cargo test
   infinite: true
   infiniteMessage: "Monitoring active - press Ctrl+C to stop"
 
@@ -636,14 +647,14 @@ conclaude Stop --help
 
 ### Stop Hook Command Execution
 
-The Stop hook executes commands from `config.stop.run` sequentially:
+The Stop hook executes commands from `config.stop.commands` sequentially:
 
 ```bash
 # Configuration
 stop:
-  run: |
-    cargo check
-    cargo test
+  commands:
+    - run: cargo check
+    - run: cargo test
 
 # Execution: If any command fails, the entire hook fails and blocks the session
 ✓ Command 1/2: cargo check
@@ -815,16 +826,14 @@ conclaude visualize [--rule <rule-name>] [--show-matches]
 ```yaml
 # Stop hook configuration
 stop:
-  # Simple command format
-  run: |
-    cargo check
-    cargo test
-    cargo build
-  
-  # Alternative: structured commands with custom messages
+  # Structured commands with custom messages and output control
   commands:
+    - run: "cargo check"
+      message: "Code compilation check"
     - run: "cargo test"
       message: "Tests failed - fix failing tests before continuing"
+      showStdout: true
+      maxOutputLines: 50
     - run: "cargo build"
       message: "Build failed - fix compilation errors"
   
