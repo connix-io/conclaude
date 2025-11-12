@@ -425,7 +425,10 @@ async fn handle_validate(config_path: Option<String>) -> Result<()> {
             config::load_conclaude_config(Some(&path)).await
         } else {
             // Not a regular file or directory
-            anyhow::bail!("Path is not a regular file or directory: {}", path.display());
+            anyhow::bail!(
+                "Path is not a regular file or directory: {}",
+                path.display()
+            );
         }
     } else {
         // No custom path, use standard search from current directory

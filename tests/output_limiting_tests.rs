@@ -1,5 +1,7 @@
 use conclaude::config::{ConclaudeConfig, StopCommand, StopConfig};
 use std::fs;
+use std::io::Write;
+use std::process::{Command, Stdio};
 use tempfile::tempdir;
 
 /// Test that maxOutputLines is properly validated by the schema
@@ -607,5 +609,421 @@ rules:
         result.is_ok(),
         "camelCase field name should be accepted: {:?}",
         result.err()
+    );
+}
+
+/// Integration test: Verify stdout is NOT printed to console when showStdout is false
+#[test]
+fn test_stop_hook_console_output_with_show_stdout_false() {
+    let temp_dir = tempdir().unwrap();
+    let temp_path = temp_dir.path();
+    let config_path = temp_path.join(".conclaude.yaml");
+
+    // Create a config with showStdout: false and a command that will fail
+    let config_content = r#"
+stop:
+  commands:
+    - run: "bash -c 'echo STDOUT_TEST_OUTPUT && echo STDERR_TEST_OUTPUT >&2 && exit 1'"
+      showStdout: false
+      showStderr: true
+rules:
+  preventRootAdditions: true
+"#;
+
+    fs::write(&config_path, config_content).unwrap();
+
+    // Build the project first to ensure the binary exists
+    let project_root = std::env::current_dir().unwrap();
+    let binary_path = project_root.join("target/debug/conclaude");
+
+    // Create JSON payload for Stop hook
+    let payload = serde_json::json!({
+        "session_id": "test_session",
+        "transcript_path": "/tmp/test.jsonl",
+        "hook_event_name": "Stop",
+        "cwd": temp_path.to_string_lossy(),
+        "permission_mode": "default",
+        "stop_hook_active": true
+    });
+
+    // Run the stop hook from temp directory so it picks up the config
+    let mut child = Command::new(&binary_path)
+        .arg("Stop")
+        .current_dir(temp_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn stop hook");
+
+    // Write JSON payload to stdin
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(serde_json::to_string(&payload).unwrap().as_bytes())
+            .expect("Failed to write to stdin");
+    }
+
+    let output = child.wait_with_output().expect("Failed to run stop hook");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Extract the eprintln diagnostic (the part before the error message)
+    let diagnostic_part = stderr
+        .split("Command failed with exit code")
+        .next()
+        .unwrap_or("");
+
+    // Verify the eprintln diagnostic does NOT contain Stdout section when showStdout is false
+    assert!(
+        !diagnostic_part.contains("  Stdout:"),
+        "Console diagnostic should completely omit Stdout section when showStdout is false. stderr was:\n{}",
+        stderr
+    );
+
+    // Verify stderr IS shown in the eprintln diagnostic (since showStderr is true)
+    assert!(
+        diagnostic_part.contains("  Stderr:\n    STDERR_TEST_OUTPUT"),
+        "Console diagnostic should show stderr when showStderr is true. stderr was:\n{}",
+        stderr
+    );
+
+    // Verify Command and Status are always shown
+    assert!(
+        diagnostic_part.contains("Stop command failed"),
+        "Should always show command failure message. stderr was:\n{}",
+        stderr
+    );
+    assert!(
+        diagnostic_part.contains("exit code"),
+        "Should always show exit code. stderr was:\n{}",
+        stderr
+    );
+
+    // Verify the error message does not include stdout section (showStdout: false)
+    let error_message_part = stderr
+        .split("Command failed with exit code")
+        .nth(1)
+        .unwrap_or("");
+    assert!(
+        !error_message_part.contains("\nStdout:"),
+        "Error message should not include Stdout section when showStdout is false. stderr was:\n{}",
+        stderr
+    );
+
+    // Verify the error message includes stderr section (showStderr: true)
+    assert!(
+        error_message_part.contains("\nStderr: STDERR_TEST_OUTPUT"),
+        "Error message should include Stderr section when showStderr is true. stderr was:\n{}",
+        stderr
+    );
+}
+
+/// Integration test: Verify stderr is NOT printed to console when showStderr is false
+#[test]
+fn test_stop_hook_console_output_with_show_stderr_false() {
+    let temp_dir = tempdir().unwrap();
+    let temp_path = temp_dir.path();
+    let config_path = temp_path.join(".conclaude.yaml");
+
+    // Create a config with showStderr: false and a command that will fail
+    let config_content = r#"
+stop:
+  commands:
+    - run: "bash -c 'echo STDOUT_TEST_OUTPUT && echo STDERR_TEST_OUTPUT >&2 && exit 1'"
+      showStdout: true
+      showStderr: false
+rules:
+  preventRootAdditions: true
+"#;
+
+    fs::write(&config_path, config_content).unwrap();
+
+    // Build the project first to ensure the binary exists
+    let project_root = std::env::current_dir().unwrap();
+    let binary_path = project_root.join("target/debug/conclaude");
+
+    // Create JSON payload for Stop hook
+    let payload = serde_json::json!({
+        "session_id": "test_session",
+        "transcript_path": "/tmp/test.jsonl",
+        "hook_event_name": "Stop",
+        "cwd": temp_path.to_string_lossy(),
+        "permission_mode": "default",
+        "stop_hook_active": true
+    });
+
+    // Run the stop hook from temp directory so it picks up the config
+    let mut child = Command::new(&binary_path)
+        .arg("Stop")
+        .current_dir(temp_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn stop hook");
+
+    // Write JSON payload to stdin
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(serde_json::to_string(&payload).unwrap().as_bytes())
+            .expect("Failed to write to stdin");
+    }
+
+    let output = child.wait_with_output().expect("Failed to run stop hook");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Extract the eprintln diagnostic (the part before the error message)
+    let diagnostic_part = stderr
+        .split("Command failed with exit code")
+        .next()
+        .unwrap_or("");
+
+    // Verify the eprintln diagnostic does NOT contain Stderr section when showStderr is false
+    assert!(
+        !diagnostic_part.contains("  Stderr:"),
+        "Console diagnostic should completely omit Stderr section when showStderr is false. stderr was:\n{}",
+        stderr
+    );
+
+    // Verify stdout IS shown in the eprintln diagnostic (since showStdout is true)
+    assert!(
+        diagnostic_part.contains("  Stdout:\n    STDOUT_TEST_OUTPUT"),
+        "Console diagnostic should show stdout when showStdout is true. stderr was:\n{}",
+        stderr
+    );
+
+    // Verify Command and Status are always shown
+    assert!(
+        diagnostic_part.contains("Stop command failed"),
+        "Should always show command failure message. stderr was:\n{}",
+        stderr
+    );
+    assert!(
+        diagnostic_part.contains("exit code"),
+        "Should always show exit code. stderr was:\n{}",
+        stderr
+    );
+
+    // Verify the error message does not include stderr section (showStderr: false)
+    let error_message_part = stderr
+        .split("Command failed with exit code")
+        .nth(1)
+        .unwrap_or("");
+    assert!(
+        !error_message_part.contains("\nStderr:"),
+        "Error message should not include Stderr section when showStderr is false. stderr was:\n{}",
+        stderr
+    );
+
+    // Verify the error message includes stdout section (showStdout: true)
+    assert!(
+        error_message_part.contains("\nStdout: STDOUT_TEST_OUTPUT"),
+        "Error message should include Stdout section when showStdout is true. stderr was:\n{}",
+        stderr
+    );
+}
+
+/// Integration test: Verify no output is leaked when both flags are false
+#[test]
+fn test_stop_hook_console_output_with_both_flags_false() {
+    let temp_dir = tempdir().unwrap();
+    let temp_path = temp_dir.path();
+    let config_path = temp_path.join(".conclaude.yaml");
+
+    // Create a config with both flags false and a command that will fail
+    let config_content = r#"
+stop:
+  commands:
+    - run: "bash -c 'echo STDOUT_TEST_OUTPUT && echo STDERR_TEST_OUTPUT >&2 && exit 1'"
+      showStdout: false
+      showStderr: false
+rules:
+  preventRootAdditions: true
+"#;
+
+    fs::write(&config_path, config_content).unwrap();
+
+    // Build the project first to ensure the binary exists
+    let project_root = std::env::current_dir().unwrap();
+    let binary_path = project_root.join("target/debug/conclaude");
+
+    // Create JSON payload for Stop hook
+    let payload = serde_json::json!({
+        "session_id": "test_session",
+        "transcript_path": "/tmp/test.jsonl",
+        "hook_event_name": "Stop",
+        "cwd": temp_path.to_string_lossy(),
+        "permission_mode": "default",
+        "stop_hook_active": true
+    });
+
+    // Run the stop hook from temp directory so it picks up the config
+    let mut child = Command::new(&binary_path)
+        .arg("Stop")
+        .current_dir(temp_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn stop hook");
+
+    // Write JSON payload to stdin
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(serde_json::to_string(&payload).unwrap().as_bytes())
+            .expect("Failed to write to stdin");
+    }
+
+    let output = child.wait_with_output().expect("Failed to run stop hook");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Extract the eprintln diagnostic (the part before the error message)
+    let diagnostic_part = stderr
+        .split("Command failed with exit code")
+        .next()
+        .unwrap_or("");
+
+    // Verify the eprintln diagnostic does NOT contain Stdout or Stderr sections
+    assert!(
+        !diagnostic_part.contains("  Stdout:"),
+        "Console diagnostic should completely omit Stdout section when showStdout is false. stderr was:\n{}",
+        stderr
+    );
+    assert!(
+        !diagnostic_part.contains("  Stderr:"),
+        "Console diagnostic should completely omit Stderr section when showStderr is false. stderr was:\n{}",
+        stderr
+    );
+
+    // Verify Command and Status are always shown
+    assert!(
+        diagnostic_part.contains("Stop command failed"),
+        "Should always show command failure message. stderr was:\n{}",
+        stderr
+    );
+    assert!(
+        diagnostic_part.contains("exit code"),
+        "Should always show exit code. stderr was:\n{}",
+        stderr
+    );
+
+    // Verify the error message does not include stdout or stderr sections
+    let error_message_part = stderr
+        .split("Command failed with exit code")
+        .nth(1)
+        .unwrap_or("");
+    assert!(
+        !error_message_part.contains("\nStdout:"),
+        "Error message should not include Stdout section when showStdout is false. stderr was:\n{}",
+        stderr
+    );
+    assert!(
+        !error_message_part.contains("\nStderr:"),
+        "Error message should not include Stderr section when showStderr is false. stderr was:\n{}",
+        stderr
+    );
+}
+
+/// Integration test: Verify output is shown when both flags are true
+#[test]
+fn test_stop_hook_console_output_with_both_flags_true() {
+    let temp_dir = tempdir().unwrap();
+    let temp_path = temp_dir.path();
+    let config_path = temp_path.join(".conclaude.yaml");
+
+    // Create a config with both flags true and a command that will fail
+    let config_content = r#"
+stop:
+  commands:
+    - run: "bash -c 'echo STDOUT_TEST_OUTPUT && echo STDERR_TEST_OUTPUT >&2 && exit 1'"
+      showStdout: true
+      showStderr: true
+rules:
+  preventRootAdditions: true
+"#;
+
+    fs::write(&config_path, config_content).unwrap();
+
+    // Build the project first to ensure the binary exists
+    let project_root = std::env::current_dir().unwrap();
+    let binary_path = project_root.join("target/debug/conclaude");
+
+    // Create JSON payload for Stop hook
+    let payload = serde_json::json!({
+        "session_id": "test_session",
+        "transcript_path": "/tmp/test.jsonl",
+        "hook_event_name": "Stop",
+        "cwd": temp_path.to_string_lossy(),
+        "permission_mode": "default",
+        "stop_hook_active": true
+    });
+
+    // Run the stop hook from temp directory so it picks up the config
+    let mut child = Command::new(&binary_path)
+        .arg("Stop")
+        .current_dir(temp_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn stop hook");
+
+    // Write JSON payload to stdin
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(serde_json::to_string(&payload).unwrap().as_bytes())
+            .expect("Failed to write to stdin");
+    }
+
+    let output = child.wait_with_output().expect("Failed to run stop hook");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Extract the eprintln diagnostic (the part before the error message)
+    let diagnostic_part = stderr
+        .split("Command failed with exit code")
+        .next()
+        .unwrap_or("");
+
+    // Verify the eprintln diagnostic shows both stdout and stderr
+    assert!(
+        diagnostic_part.contains("  Stdout:\n    STDOUT_TEST_OUTPUT"),
+        "Console diagnostic should show stdout when showStdout is true. stderr was:\n{}",
+        stderr
+    );
+    assert!(
+        diagnostic_part.contains("  Stderr:\n    STDERR_TEST_OUTPUT"),
+        "Console diagnostic should show stderr when showStderr is true. stderr was:\n{}",
+        stderr
+    );
+
+    // Verify Command and Status are always shown
+    assert!(
+        diagnostic_part.contains("Stop command failed"),
+        "Should always show command failure message. stderr was:\n{}",
+        stderr
+    );
+    assert!(
+        diagnostic_part.contains("exit code"),
+        "Should always show exit code. stderr was:\n{}",
+        stderr
+    );
+
+    // Verify the error message includes both stdout and stderr sections
+    let error_message_part = stderr
+        .split("Command failed with exit code")
+        .nth(1)
+        .unwrap_or("");
+    assert!(
+        error_message_part.contains("\nStdout: STDOUT_TEST_OUTPUT"),
+        "Error message should include Stdout section when showStdout is true. stderr was:\n{}",
+        stderr
+    );
+    assert!(
+        error_message_part.contains("\nStderr: STDERR_TEST_OUTPUT"),
+        "Error message should include Stderr section when showStderr is true. stderr was:\n{}",
+        stderr
     );
 }

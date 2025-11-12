@@ -645,7 +645,10 @@ cd /tmp && echo "test""#;
     fn test_suggest_similar_fields_common_typo() {
         // Test common typo: "showStdOut" should suggest "showStdout"
         let suggestions = suggest_similar_fields("showStdOut", "commands");
-        assert!(!suggestions.is_empty(), "Should suggest fields for common typo");
+        assert!(
+            !suggestions.is_empty(),
+            "Should suggest fields for common typo"
+        );
         assert_eq!(
             suggestions[0], "showStdout",
             "First suggestion should be 'showStdout'"
@@ -656,7 +659,10 @@ cd /tmp && echo "test""#;
     fn test_suggest_similar_fields_case_insensitive() {
         // Test case-insensitive matching: "INFINITE" should suggest "infinite"
         let suggestions = suggest_similar_fields("INFINITE", "stop");
-        assert!(!suggestions.is_empty(), "Should suggest fields ignoring case");
+        assert!(
+            !suggestions.is_empty(),
+            "Should suggest fields ignoring case"
+        );
         assert!(
             suggestions.contains(&"infinite".to_string()),
             "Should suggest 'infinite' for 'INFINITE'"
