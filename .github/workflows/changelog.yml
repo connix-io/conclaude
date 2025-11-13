@@ -24,13 +24,12 @@ jobs:
 
       # Generate changelog using git-cliff
       - name: Generate changelog
-        uses: orhun/git-cliff-action@v3
+        uses: orhun/git-cliff-action@104a6cf3c9aa0fdfe4eab129f9c1900e1eb8f7fd # main
         with:
           config: cliff.toml
-          args: --verbose --tag ${{ github.ref_name }}
+          args: -vv --tag ${{ github.ref_name }} --github-repo ${{ github.repository }}
         env:
           OUTPUT: CHANGELOG.md
-          GITHUB_REPO: ${{ github.repository }}
 
       # Configure git with bot credentials
       - name: Configure git
