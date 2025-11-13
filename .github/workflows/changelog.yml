@@ -1,0 +1,51 @@
+name: Generate Changelog
+
+# Trigger on version tag pushes
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  changelog:
+    name: Generate and commit changelog
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout with full history to access all tags and commits
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Generate changelog using git-cliff
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v3
+        with:
+          config: cliff.toml
+          args: --verbose --tag ${{ github.ref_name }}
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPO: ${{ github.repository }}
+
+      # Configure git with bot credentials
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Commit and push changelog if there are changes
+      - name: Commit changelog
+        run: |
+          git add CHANGELOG.md
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to CHANGELOG.md, skipping commit"
+          else
+            git commit -m "chore(release): update CHANGELOG.md for ${{ github.ref_name }}"
+            git push origin HEAD:main
+          fi
