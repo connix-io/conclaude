@@ -14,8 +14,9 @@ Born from real developer frustration, conclaude transforms chaotic AI coding ses
 
 ## Releases
 
-Official builds are published on GitHub Releases when tags matching `v*` are pushed. The latest version is **v0.1.6**.
+Official builds are published on GitHub Releases when tags matching `v*` are pushed.
 
+- Latest release: https://github.com/connix-io/conclaude/releases/latest
 - All releases: https://github.com/connix-io/conclaude/releases
 
 ### Quick Install Options
@@ -23,27 +24,28 @@ Official builds are published on GitHub Releases when tags matching `v*` are pus
 #### Option 1: Shell Script (Recommended)
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/connix-io/conclaude/releases/download/v0.1.6/conclaude-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/connix-io/conclaude/releases/latest/download/conclaude-installer.sh | sh
 ```
 
 #### Option 2: PowerShell (Windows)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/connix-io/conclaude/releases/download/v0.1.6/conclaude-installer.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/connix-io/conclaude/releases/latest/download/conclaude-installer.ps1 | iex"
 ```
 
 #### Option 3: NPM Package
 
 ```bash
-npm install conclaude@0.1.6
+npm install conclaude
 ```
 
 #### Option 4: Manual Binary Download
 
 ```bash
 # Linux x86_64 example
+# Visit https://github.com/connix-io/conclaude/releases/latest to find the download URL for your platform
 curl -L -o conclaude.tar.xz \
-  https://github.com/connix-io/conclaude/releases/download/v0.1.6/conclaude-x86_64-unknown-linux-gnu.tar.xz
+  https://github.com/connix-io/conclaude/releases/latest/download/conclaude-x86_64-unknown-linux-gnu.tar.xz
 tar -xf conclaude.tar.xz
 chmod +x conclaude && sudo mv conclaude /usr/local/bin/
 conclaude --version
