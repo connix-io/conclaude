@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://github.com/conneroisu/conclaude/releases/latest/download/conclaude-schema.json
+# yaml-language-server: $schema=https://github.com/connix-io/conclaude/releases/latest/download/conclaude-schema.json
 # Conclaude YAML Configuration - Complete Default Configuration
 # This configuration defines how conclaude handles Claude Code hook events
 # All supported options are shown below with their default values
