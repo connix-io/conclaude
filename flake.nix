@@ -118,6 +118,7 @@
             napi-rs-cli
             yarn
             cargo-dist
+            git-cliff
           ]
           ++ builtins.attrValues scriptPackages;
         shellHook = ''
