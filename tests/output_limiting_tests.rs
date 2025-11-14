@@ -245,7 +245,10 @@ rules:
 "#;
 
     let result = serde_yaml::from_str::<ConclaudeConfig>(config_content);
-    assert!(result.is_ok(), "Empty commands array should parse successfully");
+    assert!(
+        result.is_ok(),
+        "Empty commands array should parse successfully"
+    );
 
     let config = result.unwrap();
     assert!(config.stop.commands.is_empty());

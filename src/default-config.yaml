@@ -71,13 +71,15 @@ rules:
 # Pre-tool-use hook configuration - runs before tools are executed
 preToolUse:
   # Directories where file additions are prevented (in addition to root)
-  # List of directory paths where new files cannot be created
+  # List of glob patterns for paths where new files cannot be created
+  # NOTE: This only blocks the Write tool. Edit operations are not affected.
   preventAdditions: []
   # Examples:
   # preventAdditions:
-  #   - "dist"
-  #   - "build"
-  #   - "node_modules"
+  #   - "dist/**"         # Block new files in dist directory
+  #   - "build/**"        # Block new files in build directory
+  #   - "node_modules/**" # Block new files in node_modules
+  #   - "*.log"           # Block creation of log files
 
   # Prevent editing of auto-generated files (enabled by default)
   # Checks for common markers like "DO\ NOT\ EDIT", "Code\ generated\ by", etc.

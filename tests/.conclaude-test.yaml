@@ -1,0 +1,17 @@
+# Test configuration for preventAdditions hook validation
+# This config is used for manual testing of the preventAdditions feature
+
+preToolUse:
+  preventAdditions:
+    - "dist/**"
+    - "build/**"
+    - "*.log"
+
+# Minimal config - other features disabled for focused testing
+rules:
+  preventRootAdditions: false
+  uneditableFiles: []
+
+stop:
+  commands: []
+  infinite: false

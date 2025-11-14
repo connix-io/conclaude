@@ -337,6 +337,32 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
         }
     }
 
+    // Check preventAdditions rule - only applies to Write tool
+    if payload.tool_name == "Write" {
+        for pattern in &config.pre_tool_use.prevent_additions {
+            if matches_uneditable_pattern(
+                &file_path,
+                &relative_path,
+                &resolved_path.to_string_lossy(),
+                pattern,
+            )? {
+                let error_message = format!(
+                    "Blocked {} operation: file matches preventAdditions pattern '{}'. File: {}",
+                    payload.tool_name, pattern, file_path
+                );
+
+                eprintln!(
+                    "PreToolUse blocked by preventAdditions rule: tool_name={}, file_path={}, pattern={}",
+                    payload.tool_name,
+                    file_path,
+                    pattern
+                );
+
+                return Ok(Some(HookResult::blocked(error_message)));
+            }
+        }
+    }
+
     Ok(None)
 }
 

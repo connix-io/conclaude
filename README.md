@@ -998,11 +998,17 @@ preToolUse:
     - filePattern: "**/*.rs"
       forbiddenPattern: "unsafe"
       description: "Unsafe code blocks not allowed"
-  
-  # Additional directories to protect from additions
+
+  # Additional directories to protect from additions (Write tool only)
+  # Prevents new file creation in specified directories using glob patterns
+  # NOTE: This only blocks the Write tool. Edit operations are not affected.
   preventAdditions:
-    - "docs/"
-    - "examples/"
+    - "docs/**"        # Block new files in docs directory
+    - "examples/**"    # Block new files in examples directory
+    - "dist/**"        # Block new files in build output
+
+  # Example error message when blocked:
+  # "Blocked Write operation: file matches preventAdditions pattern 'docs/**'. File: /path/to/docs/newfile.md"
 
 ```
 
