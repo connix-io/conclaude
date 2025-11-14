@@ -163,7 +163,7 @@ cargo install conclaude
 
 ```bash
 # Clone and build from source
-git clone https://github.com/conneroisu/conclaude.git
+git clone https://github.com/connix-io/conclaude.git
 cd conclaude
 cargo build --release
 
@@ -174,7 +174,7 @@ cargo build --release
 
 ```bash
 # Use the flake directly
-nix run github:conneroisu/conclaude -- --help
+nix run github:connix-io/conclaude -- --help
 ```
 
 #### Adding conclaude to your development shell
@@ -186,7 +186,7 @@ Add conclaude as a flake input and include it in your development shell:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    conclaude.url = "github:conneroisu/conclaude";
+    conclaude.url = "github:connix-io/conclaude";
   };
 
   outputs = { self, nixpkgs, conclaude, ... }:
@@ -219,7 +219,7 @@ nix develop
 
 ```bash
 # Clone the repository
-git clone https://github.com/conneroisu/conclaude.git
+git clone https://github.com/connix-io/conclaude.git
 cd conclaude
 
 # Build the project
@@ -333,7 +333,7 @@ The complete configuration schema is defined as Rust structs with serde serializ
 - **notifications**: System notification settings for hook events
 
 The JSON schema for IDE autocomplete and validation is automatically published with each release at:
-`https://github.com/conneroisu/conclaude/releases/latest/download/conclaude-schema.json`
+`https://github.com/connix-io/conclaude/releases/latest/download/conclaude-schema.json`
 
 Developers can regenerate the schema locally using: `cargo run --bin generate-schema`
 
