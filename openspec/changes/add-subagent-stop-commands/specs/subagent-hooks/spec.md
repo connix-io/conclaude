@@ -2,6 +2,9 @@
 
 This spec defines the requirements for executing commands when subagents terminate, including pattern matching and environment variable context.
 
+**Dependencies:**
+- `add-subagent-stop-payload-fields` - Provides `agent_id` and `agent_transcript_path` fields in SubagentStopPayload
+
 ## ADDED Requirements
 
 ### Requirement: Subagent Stop Command Configuration
@@ -27,26 +30,20 @@ The system SHALL provide a `subagentStop` configuration section that maps subage
 - **THEN** the configuration SHALL be valid
 - **AND** both patterns SHALL be evaluated independently during matching
 
-### Requirement: Transcript Parsing for Subagent Name
-The system SHALL parse the transcript file to extract the subagent name when a SubagentStop hook fires.
+### Requirement: Agent ID from Payload
+The system SHALL use the `agent_id` field from SubagentStopPayload (provided by `add-subagent-stop-payload-fields`) to identify the subagent for pattern matching.
 
-#### Scenario: Transcript contains subagent invocation
-- **WHEN** SubagentStop hook fires with transcript_path pointing to valid JSONL file
-- **AND** transcript contains a "Task" tool invocation with "subagent_type" parameter
-- **THEN** the system SHALL extract the subagent_type value as the subagent name
-- **AND** use the most recent matching invocation if multiple exist
+#### Scenario: Agent ID provided in payload
+- **WHEN** SubagentStop hook fires with valid SubagentStopPayload
+- **AND** payload contains `agent_id` field (e.g., "coder", "tester", "stuck")
+- **THEN** the system SHALL use the agent_id value for pattern matching
+- **AND** SHALL NOT need to parse transcript files
 
-#### Scenario: Transcript does not contain subagent data
-- **WHEN** transcript file cannot be read or parsed
-- **OR** transcript does not contain any Task tool invocations with subagent_type
-- **THEN** the system SHALL use "unknown" as the subagent name
-- **AND** continue processing without failing the hook
-
-#### Scenario: Malformed transcript file
-- **WHEN** transcript file contains invalid JSONL
-- **THEN** the system SHALL log a warning
-- **AND** use "unknown" as the subagent name
-- **AND** continue SubagentStop hook processing
+#### Scenario: Agent ID used for all pattern matching
+- **WHEN** agent_id is "coder"
+- **AND** configuration has patterns like `*`, `coder`, `*coder`
+- **THEN** all pattern matching SHALL be performed against the agent_id value "coder"
+- **AND** no transcript parsing or file reading is required
 
 ### Requirement: Glob Pattern Matching
 The system SHALL match subagent names against configured patterns using glob syntax, supporting wildcard, exact, and glob patterns.
@@ -117,21 +114,23 @@ The system SHALL pass subagent context to command execution via environment vari
 #### Scenario: Environment variables available in commands
 - **WHEN** a subagent stop command executes
 - **THEN** the following environment variables SHALL be available:
-  - `CONCLAUDE_SUBAGENT_NAME` - Name of the stopped subagent
+  - `CONCLAUDE_AGENT_ID` - Agent identifier from payload (provided by add-subagent-stop-payload-fields)
+  - `CONCLAUDE_AGENT_TRANSCRIPT_PATH` - Agent's transcript path from payload (provided by add-subagent-stop-payload-fields)
   - `CONCLAUDE_SESSION_ID` - Session ID from payload
-  - `CONCLAUDE_TRANSCRIPT_PATH` - Path to transcript file
+  - `CONCLAUDE_TRANSCRIPT_PATH` - Main transcript file path
   - `CONCLAUDE_HOOK_EVENT` - Always "SubagentStop"
   - `CONCLAUDE_CWD` - Current working directory
 
-#### Scenario: Subagent name in environment variable
-- **WHEN** subagent "coder" stops and command executes
-- **THEN** `CONCLAUDE_SUBAGENT_NAME` environment variable SHALL equal "coder"
-- **AND** command can access this via `$CONCLAUDE_SUBAGENT_NAME` in bash
+#### Scenario: Agent ID in environment variable
+- **WHEN** agent with agent_id "coder" stops and command executes
+- **THEN** `CONCLAUDE_AGENT_ID` environment variable SHALL equal "coder"
+- **AND** command can access this via `$CONCLAUDE_AGENT_ID` in bash
 
-#### Scenario: Unknown subagent name in environment variable
-- **WHEN** subagent name cannot be determined from transcript
-- **THEN** `CONCLAUDE_SUBAGENT_NAME` SHALL equal "unknown"
-- **AND** all other environment variables SHALL still be populated
+#### Scenario: Agent transcript path in environment variable
+- **WHEN** agent stops with agent_transcript_path "/tmp/agent_coder.json"
+- **THEN** `CONCLAUDE_AGENT_TRANSCRIPT_PATH` SHALL equal "/tmp/agent_coder.json"
+- **AND** commands can read the agent-specific transcript if needed
+- **AND** this is separate from `CONCLAUDE_TRANSCRIPT_PATH` which points to the main session transcript
 
 #### Scenario: Environment variables do not conflict with system
 - **WHEN** commands execute with environment variables

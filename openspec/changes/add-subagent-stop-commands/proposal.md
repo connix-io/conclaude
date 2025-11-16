@@ -32,12 +32,19 @@ The `SubagentStop` hook is fired when Claude subagents terminate, but it only su
 ### User Request
 Users need the ability to run commands when subagents stop, with matching logic for specific subagent names and wildcard patterns, passing subagent context via environment variables.
 
+## Dependencies
+
+**Depends On:**
+- `add-subagent-stop-payload-fields` - Provides `agent_id` and `agent_transcript_path` fields in SubagentStopPayload
+
+This proposal builds on the payload fields to enable pattern matching and command execution.
+
 ## What Changes
 
 1. **Configuration Schema** - Add new `subagentStop` section to YAML config with command execution and glob pattern matching
-2. **Transcript Parsing** - Extract subagent name from transcript file when `SubagentStop` hook fires
-3. **Environment Variables** - Pass subagent context (name, session ID, transcript path) to all hook commands
-4. **Command Execution** - Support both specific subagent name matching and glob patterns (`*`, `test*`, `*coder`, `agent_[0-9]*`)
+2. **Agent ID Usage** - Use `agent_id` field from SubagentStopPayload (provided by `add-subagent-stop-payload-fields`)
+3. **Environment Variables** - Pass subagent context (agent_id, session ID, transcript paths) to all hook commands
+4. **Command Execution** - Support both specific agent ID matching and glob patterns (`*`, `test*`, `*coder`, `agent_[0-9]*`)
 5. **Matching Logic** - Run both wildcard and specific commands when both match
 6. **Type System** - Add `SubagentStopConfig` struct similar to existing `StopConfig`
 7. **Documentation** - Configuration examples and pattern matching guide
@@ -53,10 +60,10 @@ Users need the ability to run commands when subagents stop, with matching logic 
 - Environment variable passing for all commands
 
 **Execution:**
-- Parse transcript file to extract subagent name from metadata
-- Match subagent name against configured patterns (glob-based)
+- Use `agent_id` field from SubagentStopPayload (no transcript parsing needed)
+- Match agent_id against configured patterns (glob-based)
 - Execute matching commands (both wildcard and specific)
-- Pass context via environment variables: `CONCLAUDE_SUBAGENT_NAME`, `CONCLAUDE_SESSION_ID`, `CONCLAUDE_TRANSCRIPT_PATH`, `CONCLAUDE_HOOK_EVENT`
+- Pass context via environment variables: `CONCLAUDE_AGENT_ID`, `CONCLAUDE_AGENT_TRANSCRIPT_PATH`, `CONCLAUDE_SESSION_ID`, `CONCLAUDE_TRANSCRIPT_PATH`, `CONCLAUDE_HOOK_EVENT`
 
 **Pattern Matching:**
 - Exact match: `coder` matches only `coder`
@@ -77,18 +84,19 @@ Users need the ability to run commands when subagents stop, with matching logic 
 
 ### Q: How should commands access subagent context?
 **Decision:** Pass via environment variables in all hook commands:
-- `CONCLAUDE_SUBAGENT_NAME` - Name of the subagent that stopped
+- `CONCLAUDE_AGENT_ID` - Agent identifier (from add-subagent-stop-payload-fields)
+- `CONCLAUDE_AGENT_TRANSCRIPT_PATH` - Agent's transcript path (from add-subagent-stop-payload-fields)
 - `CONCLAUDE_SESSION_ID` - Session ID from payload
-- `CONCLAUDE_TRANSCRIPT_PATH` - Transcript file path
+- `CONCLAUDE_TRANSCRIPT_PATH` - Main transcript file path
 - `CONCLAUDE_HOOK_EVENT` - Always "SubagentStop"
 - `CONCLAUDE_CWD` - Current working directory
 
 This provides maximum flexibility and follows Unix conventions.
 
-### Q: How to obtain subagent name from SubagentStop payload?
-**Decision:** Parse transcript file to extract subagent name from metadata.
+### Q: How to obtain agent identifier from SubagentStop payload?
+**Decision:** Use the `agent_id` field provided by the `add-subagent-stop-payload-fields` proposal.
 
-The `SubagentStopPayload` does not include subagent name directly. We'll parse the JSONL transcript file to find the most recent subagent invocation and extract its name/type.
+Claude Code now directly provides `agent_id` and `agent_transcript_path` in the SubagentStopPayload. No transcript parsing is needed - we use the structured data directly.
 
 ### Q: When both wildcard and specific commands match, what should happen?
 **Decision:** Run both wildcard and specific commands in order.
@@ -137,9 +145,9 @@ subagentStop:
 ## Success Criteria
 
 1. **Configuration validates** - Schema accepts `subagentStop` section with pattern-based commands
-2. **Transcript parsing works** - Subagent name correctly extracted from transcript file
-3. **Pattern matching works** - Glob patterns correctly match subagent names
-4. **Environment variables available** - Commands receive subagent context via env vars
+2. **Agent ID usage works** - agent_id field from payload is used for pattern matching
+3. **Pattern matching works** - Glob patterns correctly match agent IDs
+4. **Environment variables available** - Commands receive subagent context via env vars (including CONCLAUDE_AGENT_ID and CONCLAUDE_AGENT_TRANSCRIPT_PATH)
 5. **Multiple commands execute** - Both wildcard and specific commands run when applicable
 6. **Backward compatibility maintained** - Existing `SubagentStop` notification behavior unchanged
 
@@ -147,7 +155,7 @@ subagentStop:
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| Transcript format changes | High | Low | Robust parsing with fallback to "unknown" subagent name |
+| Missing agent_id field (old Claude Code) | High | Low | Requires add-subagent-stop-payload-fields; validation ensures field is present |
 | Glob pattern performance | Medium | Low | Pattern compilation cached; matches are O(n) per hook |
 | Environment variable conflicts | Low | Low | Use `CONCLAUDE_` prefix to avoid collisions |
 | Command execution failures | Medium | Medium | Graceful error handling; don't block SubagentStop completion |
@@ -186,12 +194,12 @@ subagentStop:
 
 **Key files to modify:**
 - `src/config.rs` - Add `SubagentStopConfig` struct and `subagentStop` field to `ConclaudeConfig`
-- `src/hooks.rs` - Modify `handle_subagent_stop()` to parse transcript, match patterns, execute commands
-- `src/types.rs` - No changes needed (SubagentStopPayload sufficient)
+- `src/hooks.rs` - Modify `handle_subagent_stop()` to use agent_id, match patterns, execute commands
+- `src/types.rs` - No changes needed (SubagentStopPayload updated by add-subagent-stop-payload-fields)
 - Schema will auto-generate from new config structs
 
 **Testing approach:**
-- Unit tests for transcript parsing logic
-- Unit tests for glob pattern matching
-- Integration tests with mock transcript files
+- Unit tests for glob pattern matching against agent_id
+- Integration tests with mock SubagentStopPayload containing agent_id
+- Verify environment variables include CONCLAUDE_AGENT_ID and CONCLAUDE_AGENT_TRANSCRIPT_PATH
 - End-to-end tests with actual subagent stop events
