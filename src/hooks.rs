@@ -1,8 +1,8 @@
 use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig};
 use crate::types::{
-    validate_base_payload, HookResult, NotificationPayload, PostToolUsePayload, PreCompactPayload,
-    PreToolUsePayload, SessionEndPayload, SessionStartPayload, StopPayload, SubagentStopPayload,
-    UserPromptSubmitPayload,
+    validate_base_payload, validate_subagent_stop_payload, HookResult, NotificationPayload,
+    PostToolUsePayload, PreCompactPayload, PreToolUsePayload, SessionEndPayload,
+    SessionStartPayload, StopPayload, SubagentStopPayload, UserPromptSubmitPayload,
 };
 use anyhow::{Context, Result};
 use glob::Pattern;
@@ -838,15 +838,25 @@ pub async fn handle_stop() -> Result<HookResult> {
 pub async fn handle_subagent_stop() -> Result<HookResult> {
     let payload: SubagentStopPayload = read_payload_from_stdin()?;
 
-    validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
+    // Validate the payload including new agent_id and agent_transcript_path fields
+    validate_subagent_stop_payload(&payload).map_err(|e| anyhow::anyhow!(e))?;
 
     println!(
-        "Processing SubagentStop hook: session_id={}",
-        payload.base.session_id
+        "Processing SubagentStop hook: session_id={}, agent_id={}",
+        payload.base.session_id, payload.agent_id
     );
 
-    // Send notification for subagent stop
-    send_notification("SubagentStop", "success", Some("Subagent task completed"));
+    // Set environment variables for the subagent's information
+    // These allow downstream hooks and processes to access subagent details
+    std::env::set_var("CONCLAUDE_AGENT_ID", &payload.agent_id);
+    std::env::set_var("CONCLAUDE_AGENT_TRANSCRIPT_PATH", &payload.agent_transcript_path);
+
+    // Send notification for subagent stop with agent ID included
+    send_notification(
+        "SubagentStop",
+        "success",
+        Some(&format!("Subagent '{}' completed", payload.agent_id)),
+    );
     Ok(HookResult::success())
 }
 

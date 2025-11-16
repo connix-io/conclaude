@@ -630,9 +630,13 @@ Reason: Invalid YAML syntax at line 15: unexpected key 'invalid_field'
 echo '{"session_id":"test","transcript_path":"/tmp/test.jsonl","hook_event_name":"Stop","stop_hook_active":true}' | \
   conclaude Stop
 
-# Test PreToolUse hook  
+# Test PreToolUse hook
 echo '{"session_id":"test","transcript_path":"/tmp/test.jsonl","hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"test.txt"}}' | \
   conclaude PreToolUse
+
+# Test SubagentStop hook
+echo '{"session_id":"test","transcript_path":"/tmp/test.jsonl","hook_event_name":"SubagentStop","stop_hook_active":true,"agent_id":"coder","agent_transcript_path":"/tmp/agent_coder.jsonl"}' | \
+  conclaude SubagentStop
 
 # Get help
 conclaude --help
@@ -673,10 +677,92 @@ When `preventRootAdditions: true`, file-modifying tools are blocked at repo root
 Write → /repo/newfile.txt          ❌ Blocked
 Edit → /repo/config.json           ❌ Blocked
 
-# Allowed operations  
+# Allowed operations
 Write → /repo/.gitignore           ✓ Allowed (dotfile)
 Write → /repo/src/component.rs     ✓ Allowed (subdirectory)
 Read → /repo/Cargo.toml            ✓ Allowed (read-only)
+```
+
+### SubagentStop Hook Payload
+
+The SubagentStop hook is triggered when Claude's internal subagents (like the coder, tester, or stuck agents) complete their work. The hook receives a JSON payload containing information about which subagent completed and where its transcript is located.
+
+**SubagentStop Payload Structure:**
+
+```json
+{
+  "session_id": "abc123def456",
+  "transcript_path": "/tmp/conclaude-sessions/main_transcript.jsonl",
+  "hook_event_name": "SubagentStop",
+  "cwd": "/home/user/project",
+  "stop_hook_active": true,
+  "agent_id": "coder",
+  "agent_transcript_path": "/tmp/conclaude-sessions/agent_coder_transcript.jsonl"
+}
+```
+
+**Payload Fields:**
+
+- `session_id`: Unique identifier for the current Claude Code session
+- `transcript_path`: Path to the main session transcript file
+- `hook_event_name`: Always "SubagentStop" for this hook
+- `cwd`: Current working directory where the session is executing
+- `stop_hook_active`: Whether stop hook validation is enabled for this session
+- `agent_id`: **NEW** - Identifier for the subagent that completed (e.g., "coder", "tester", "stuck", or other agent names)
+- `agent_transcript_path`: **NEW** - Path to the subagent's transcript file, allowing access to the agent's work history and decisions
+
+**Use Cases:**
+
+- **Logging and Monitoring**: Track which subagents complete and when
+- **Cleanup Operations**: Perform cleanup after specific subagents finish
+- **Validation Checks**: Validate work done by subagents using their transcript
+- **Integration**: Trigger external systems when specific subagents complete
+- **Metrics**: Collect performance metrics per subagent
+
+**Environment Variables Available:**
+
+When SubagentStop hook commands execute, these environment variables are available:
+
+```bash
+# Main session context
+$CONCLAUDE_SESSION_ID          # Session ID
+$CONCLAUDE_TRANSCRIPT_PATH     # Main transcript path
+$CONCLAUDE_CWD                 # Working directory
+$CONCLAUDE_HOOK_EVENT          # "SubagentStop"
+
+# Subagent-specific context
+$CONCLAUDE_AGENT_ID            # The subagent identifier
+$CONCLAUDE_AGENT_TRANSCRIPT_PATH # Path to subagent's transcript
+```
+
+**Example Configuration:**
+
+```yaml
+# .conclaude.yaml
+notifications:
+  enabled: true
+  hooks:
+    - "SubagentStop"  # Get notified when subagents complete
+```
+
+**Manual Testing:**
+
+```bash
+# Test SubagentStop hook with complete payload
+cat > subagent_stop_payload.json << 'EOF'
+{
+  "session_id": "test-session-123",
+  "transcript_path": "/tmp/main_transcript.jsonl",
+  "hook_event_name": "SubagentStop",
+  "cwd": "/home/user/project",
+  "stop_hook_active": true,
+  "agent_id": "coder",
+  "agent_transcript_path": "/tmp/agent_coder_transcript.jsonl"
+}
+EOF
+
+# Send to conclaude
+cat subagent_stop_payload.json | conclaude SubagentStop
 ```
 
 ## Development
@@ -1008,8 +1094,19 @@ preToolUse:
 
 ### Environment Variables
 
+**General Configuration:**
 - `CONCLAUDE_LOG_LEVEL`: Set logging level (debug, info, warn, error)
 - `CONCLAUDE_DISABLE_FILE_LOGGING`: Disable logging to temporary files
+
+**Hook Context Variables** (Available to hook commands):
+- `CONCLAUDE_SESSION_ID`: Unique session identifier
+- `CONCLAUDE_TRANSCRIPT_PATH`: Path to the main session transcript file
+- `CONCLAUDE_CWD`: Current working directory where the session is running
+- `CONCLAUDE_HOOK_EVENT`: Name of the currently executing hook
+
+**SubagentStop Hook Variables** (Available when SubagentStop hook executes):
+- `CONCLAUDE_AGENT_ID`: Identifier for the subagent that completed (e.g., "coder", "tester", "stuck")
+- `CONCLAUDE_AGENT_TRANSCRIPT_PATH`: Path to the subagent's transcript file for accessing its work history
 
 ## CI/CD Integration
 
