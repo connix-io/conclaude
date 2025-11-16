@@ -969,7 +969,7 @@ fn test_subagent_stop_payload_structure() {
     assert_eq!(payload.base.hook_event_name, "SubagentStop");
     assert_eq!(payload.base.cwd, "/home/user/project");
     assert!(payload.base.permission_mode.is_some());
-    assert_eq!(payload.stop_hook_active, true);
+    assert!(payload.stop_hook_active);
     assert_eq!(payload.agent_id, "coder");
     assert_eq!(payload.agent_transcript_path, "/tmp/coder_transcript.jsonl");
 }
@@ -1159,7 +1159,7 @@ fn test_subagent_stop_payload_json_round_trip_tester() {
 
     assert_eq!(payload.agent_id, "tester");
     assert_eq!(payload.agent_transcript_path, "/tmp/tester_456.jsonl");
-    assert_eq!(payload.stop_hook_active, false);
+    assert!(!payload.stop_hook_active);
     assert!(validate_subagent_stop_payload(&payload).is_ok());
 }
 
@@ -1348,7 +1348,7 @@ fn test_subagent_stop_environment_variable_setting_simulation() {
 
 #[test]
 fn test_subagent_stop_environment_variables_different_agents() {
-    let agents = vec!["coder", "tester", "stuck"];
+    let agents = ["coder", "tester", "stuck"];
 
     for (idx, agent) in agents.iter().enumerate() {
         let mut payload = create_subagent_stop_payload();
@@ -1377,12 +1377,10 @@ fn test_subagent_stop_environment_variables_different_agents() {
 
 #[test]
 fn test_subagent_stop_environment_variables_special_paths() {
-    let paths = vec![
-        "/tmp/transcript-with-dashes.jsonl",
+    let paths = ["/tmp/transcript-with-dashes.jsonl",
         "/tmp/transcript_with_underscores.jsonl",
         "/tmp/transcript.2024-11-16.jsonl",
-        "/var/log/conclaude/transcript.jsonl",
-    ];
+        "/var/log/conclaude/transcript.jsonl"];
 
     for (idx, path) in paths.iter().enumerate() {
         let mut payload = create_subagent_stop_payload();
@@ -1413,11 +1411,9 @@ fn test_subagent_stop_environment_variables_special_paths() {
 
 #[test]
 fn test_subagent_stop_multiple_sequential_invocations() {
-    let agents = vec![
-        ("coder", "/tmp/coder_001.jsonl"),
+    let agents = [("coder", "/tmp/coder_001.jsonl"),
         ("tester", "/tmp/tester_001.jsonl"),
-        ("stuck", "/tmp/stuck_001.jsonl"),
-    ];
+        ("stuck", "/tmp/stuck_001.jsonl")];
 
     for (idx, (agent_id, transcript_path)) in agents.iter().enumerate() {
         let mut payload = create_subagent_stop_payload();
