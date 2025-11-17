@@ -199,3 +199,116 @@ fn test_session_start_payload_deserialization() {
     assert_eq!(payload.base.session_id, "test_session");
     assert_eq!(payload.source, "CLI");
 }
+
+#[test]
+fn test_subagent_stop_payload_deserialization() {
+    let json = r#"{
+        "session_id": "test_session",
+        "transcript_path": "/path/to/transcript",
+        "hook_event_name": "SubagentStop",
+        "cwd": "/current/dir",
+        "permission_mode": "default",
+        "stop_hook_active": true,
+        "agent_id": "coder",
+        "agent_transcript_path": "/path/to/agent/transcript"
+    }"#;
+
+    let payload: SubagentStopPayload = serde_json::from_str(json).unwrap();
+    assert_eq!(payload.base.session_id, "test_session");
+    assert_eq!(payload.agent_id, "coder");
+    assert_eq!(payload.agent_transcript_path, "/path/to/agent/transcript");
+    assert!(payload.stop_hook_active);
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_valid() {
+    let payload = SubagentStopPayload {
+        base: BasePayload {
+            session_id: "test_session".to_string(),
+            transcript_path: "/path/to/transcript".to_string(),
+            hook_event_name: "SubagentStop".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
+        },
+        stop_hook_active: true,
+        agent_id: "coder".to_string(),
+        agent_transcript_path: "/path/to/agent/transcript".to_string(),
+    };
+    assert!(validate_subagent_stop_payload(&payload).is_ok());
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_empty_agent_id() {
+    let payload = SubagentStopPayload {
+        base: BasePayload {
+            session_id: "test_session".to_string(),
+            transcript_path: "/path/to/transcript".to_string(),
+            hook_event_name: "SubagentStop".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
+        },
+        stop_hook_active: true,
+        agent_id: String::new(),
+        agent_transcript_path: "/path/to/agent/transcript".to_string(),
+    };
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err(), "agent_id cannot be empty");
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_whitespace_agent_id() {
+    let payload = SubagentStopPayload {
+        base: BasePayload {
+            session_id: "test_session".to_string(),
+            transcript_path: "/path/to/transcript".to_string(),
+            hook_event_name: "SubagentStop".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
+        },
+        stop_hook_active: true,
+        agent_id: "   ".to_string(),
+        agent_transcript_path: "/path/to/agent/transcript".to_string(),
+    };
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err(), "agent_id cannot be empty");
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_empty_agent_transcript_path() {
+    let payload = SubagentStopPayload {
+        base: BasePayload {
+            session_id: "test_session".to_string(),
+            transcript_path: "/path/to/transcript".to_string(),
+            hook_event_name: "SubagentStop".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
+        },
+        stop_hook_active: true,
+        agent_id: "coder".to_string(),
+        agent_transcript_path: String::new(),
+    };
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err(), "agent_transcript_path cannot be empty");
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_whitespace_agent_transcript_path() {
+    let payload = SubagentStopPayload {
+        base: BasePayload {
+            session_id: "test_session".to_string(),
+            transcript_path: "/path/to/transcript".to_string(),
+            hook_event_name: "SubagentStop".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
+        },
+        stop_hook_active: true,
+        agent_id: "coder".to_string(),
+        agent_transcript_path: "   ".to_string(),
+    };
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err(), "agent_transcript_path cannot be empty");
+}

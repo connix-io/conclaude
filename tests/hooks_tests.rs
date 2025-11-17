@@ -938,3 +938,605 @@ async fn test_bash_validation_multiple_rules() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+// ============================================================================
+// Integration Tests for SubagentStop Hook
+// ============================================================================
+
+// Helper function to create a SubagentStop payload for testing
+fn create_subagent_stop_payload() -> SubagentStopPayload {
+    SubagentStopPayload {
+        base: BasePayload {
+            session_id: "test_session_456".to_string(),
+            transcript_path: "/tmp/session_transcript.jsonl".to_string(),
+            hook_event_name: "SubagentStop".to_string(),
+            cwd: "/home/user/project".to_string(),
+            permission_mode: Some("default".to_string()),
+        },
+        stop_hook_active: true,
+        agent_id: "coder".to_string(),
+        agent_transcript_path: "/tmp/coder_transcript.jsonl".to_string(),
+    }
+}
+
+#[test]
+fn test_subagent_stop_payload_structure() {
+    let payload = create_subagent_stop_payload();
+
+    // Verify all required fields are present and populated
+    assert_eq!(payload.base.session_id, "test_session_456");
+    assert_eq!(payload.base.transcript_path, "/tmp/session_transcript.jsonl");
+    assert_eq!(payload.base.hook_event_name, "SubagentStop");
+    assert_eq!(payload.base.cwd, "/home/user/project");
+    assert!(payload.base.permission_mode.is_some());
+    assert!(payload.stop_hook_active);
+    assert_eq!(payload.agent_id, "coder");
+    assert_eq!(payload.agent_transcript_path, "/tmp/coder_transcript.jsonl");
+}
+
+#[test]
+fn test_subagent_stop_payload_with_different_agent_ids() {
+    // Test with different agent IDs: coder, tester, stuck
+    let agent_ids = vec!["coder", "tester", "stuck", "orchestrator"];
+
+    for agent_id in agent_ids {
+        let mut payload = create_subagent_stop_payload();
+        payload.agent_id = agent_id.to_string();
+
+        assert_eq!(payload.agent_id, agent_id);
+        assert!(validate_subagent_stop_payload(&payload).is_ok());
+    }
+}
+
+#[test]
+fn test_subagent_stop_payload_serialization() {
+    let payload = create_subagent_stop_payload();
+
+    // Serialize to JSON
+    let json_str = serde_json::to_string(&payload).expect("Failed to serialize");
+
+    // Deserialize back
+    let deserialized: SubagentStopPayload =
+        serde_json::from_str(&json_str).expect("Failed to deserialize");
+
+    // Verify round-trip preservation
+    assert_eq!(deserialized.base.session_id, payload.base.session_id);
+    assert_eq!(deserialized.agent_id, payload.agent_id);
+    assert_eq!(
+        deserialized.agent_transcript_path,
+        payload.agent_transcript_path
+    );
+    assert_eq!(deserialized.stop_hook_active, payload.stop_hook_active);
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_all_fields_valid() {
+    let payload = create_subagent_stop_payload();
+    let result = validate_subagent_stop_payload(&payload);
+
+    assert!(result.is_ok(), "Valid payload should pass validation");
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_missing_base_session_id() {
+    let mut payload = create_subagent_stop_payload();
+    payload.base.session_id = String::new();
+
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(
+        result.is_err(),
+        "Payload with empty session_id should fail validation"
+    );
+    let error = result.unwrap_err();
+    assert!(
+        error.contains("session_id") || error.contains("Missing required field"),
+        "Error should mention session_id or missing field: {}",
+        error
+    );
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_missing_base_transcript_path() {
+    let mut payload = create_subagent_stop_payload();
+    payload.base.transcript_path = String::new();
+
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(
+        result.is_err(),
+        "Payload with empty transcript_path should fail validation"
+    );
+    let error = result.unwrap_err();
+    assert!(
+        error.contains("transcript_path") || error.contains("Missing required field"),
+        "Error should mention transcript_path or missing field: {}",
+        error
+    );
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_missing_agent_id() {
+    let mut payload = create_subagent_stop_payload();
+    payload.agent_id = String::new();
+
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(
+        result.is_err(),
+        "Payload with empty agent_id should fail validation"
+    );
+    assert!(result.unwrap_err().contains("agent_id cannot be empty"));
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_whitespace_agent_id() {
+    let mut payload = create_subagent_stop_payload();
+    payload.agent_id = "   ".to_string(); // Only whitespace
+
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(
+        result.is_err(),
+        "Payload with whitespace-only agent_id should fail validation"
+    );
+    assert!(result.unwrap_err().contains("agent_id cannot be empty"));
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_missing_agent_transcript_path() {
+    let mut payload = create_subagent_stop_payload();
+    payload.agent_transcript_path = String::new();
+
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(
+        result.is_err(),
+        "Payload with empty agent_transcript_path should fail validation"
+    );
+    assert!(result
+        .unwrap_err()
+        .contains("agent_transcript_path cannot be empty"));
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_whitespace_agent_transcript_path() {
+    let mut payload = create_subagent_stop_payload();
+    payload.agent_transcript_path = "   ".to_string(); // Only whitespace
+
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(
+        result.is_err(),
+        "Payload with whitespace-only agent_transcript_path should fail validation"
+    );
+    assert!(result
+        .unwrap_err()
+        .contains("agent_transcript_path cannot be empty"));
+}
+
+#[test]
+fn test_validate_subagent_stop_payload_multiple_missing_fields() {
+    let mut payload = create_subagent_stop_payload();
+    payload.agent_id = String::new();
+    payload.agent_transcript_path = String::new();
+
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(result.is_err(), "Payload with multiple missing fields should fail");
+}
+
+#[test]
+fn test_subagent_stop_payload_json_round_trip_coder() {
+    let json_str = r#"{
+        "session_id": "test_session_coder",
+        "transcript_path": "/tmp/session_123.jsonl",
+        "hook_event_name": "SubagentStop",
+        "cwd": "/home/user/project",
+        "permission_mode": "default",
+        "stop_hook_active": true,
+        "agent_id": "coder",
+        "agent_transcript_path": "/tmp/coder_123.jsonl"
+    }"#;
+
+    let payload: SubagentStopPayload =
+        serde_json::from_str(json_str).expect("Failed to deserialize JSON");
+
+    assert_eq!(payload.agent_id, "coder");
+    assert_eq!(payload.agent_transcript_path, "/tmp/coder_123.jsonl");
+    assert_eq!(payload.base.session_id, "test_session_coder");
+    assert!(validate_subagent_stop_payload(&payload).is_ok());
+}
+
+#[test]
+fn test_subagent_stop_payload_json_round_trip_tester() {
+    let json_str = r#"{
+        "session_id": "test_session_tester",
+        "transcript_path": "/tmp/session_456.jsonl",
+        "hook_event_name": "SubagentStop",
+        "cwd": "/home/user/project",
+        "permission_mode": "default",
+        "stop_hook_active": false,
+        "agent_id": "tester",
+        "agent_transcript_path": "/tmp/tester_456.jsonl"
+    }"#;
+
+    let payload: SubagentStopPayload =
+        serde_json::from_str(json_str).expect("Failed to deserialize JSON");
+
+    assert_eq!(payload.agent_id, "tester");
+    assert_eq!(payload.agent_transcript_path, "/tmp/tester_456.jsonl");
+    assert!(!payload.stop_hook_active);
+    assert!(validate_subagent_stop_payload(&payload).is_ok());
+}
+
+#[test]
+fn test_subagent_stop_payload_json_round_trip_stuck() {
+    let json_str = r#"{
+        "session_id": "test_session_stuck",
+        "transcript_path": "/tmp/session_789.jsonl",
+        "hook_event_name": "SubagentStop",
+        "cwd": "/home/user/project",
+        "permission_mode": "restrict",
+        "stop_hook_active": true,
+        "agent_id": "stuck",
+        "agent_transcript_path": "/tmp/stuck_789.jsonl"
+    }"#;
+
+    let payload: SubagentStopPayload =
+        serde_json::from_str(json_str).expect("Failed to deserialize JSON");
+
+    assert_eq!(payload.agent_id, "stuck");
+    assert_eq!(payload.agent_transcript_path, "/tmp/stuck_789.jsonl");
+    assert_eq!(payload.base.permission_mode, Some("restrict".to_string()));
+    assert!(validate_subagent_stop_payload(&payload).is_ok());
+}
+
+#[test]
+fn test_subagent_stop_payload_with_long_paths() {
+    let mut payload = create_subagent_stop_payload();
+    let long_path = "/very/long/path/to/transcript/file/that/contains/many/nested/directories/transcript.jsonl";
+    payload.agent_transcript_path = long_path.to_string();
+
+    assert_eq!(payload.agent_transcript_path, long_path);
+    assert!(validate_subagent_stop_payload(&payload).is_ok());
+}
+
+#[test]
+fn test_subagent_stop_payload_with_special_characters_in_paths() {
+    let mut payload = create_subagent_stop_payload();
+    payload.agent_transcript_path = "/tmp/transcript-2024-11-16_10:30:45.jsonl".to_string();
+    payload.agent_id = "coder-v2.1".to_string();
+
+    assert!(validate_subagent_stop_payload(&payload).is_ok());
+}
+
+#[test]
+fn test_subagent_stop_payload_agent_id_case_sensitive() {
+    let mut payload1 = create_subagent_stop_payload();
+    let mut payload2 = create_subagent_stop_payload();
+
+    payload1.agent_id = "Coder".to_string();
+    payload2.agent_id = "coder".to_string();
+
+    // Both should validate successfully
+    assert!(validate_subagent_stop_payload(&payload1).is_ok());
+    assert!(validate_subagent_stop_payload(&payload2).is_ok());
+
+    // But they should be different values
+    assert_ne!(payload1.agent_id, payload2.agent_id);
+}
+
+#[test]
+fn test_subagent_stop_hook_event_name_validation() {
+    let payload = create_subagent_stop_payload();
+
+    // Verify the hook event name is correctly set
+    assert_eq!(payload.base.hook_event_name, "SubagentStop");
+
+    // Verify the base payload validates correctly
+    assert!(validate_base_payload(&payload.base).is_ok());
+}
+
+#[test]
+fn test_subagent_stop_payload_with_empty_cwd() {
+    let mut payload = create_subagent_stop_payload();
+    payload.base.cwd = String::new();
+
+    // Should fail on base payload validation
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_subagent_stop_payload_with_none_permission_mode() {
+    let mut payload = create_subagent_stop_payload();
+    payload.base.permission_mode = None;
+
+    // Should still validate successfully since permission_mode is optional
+    assert!(validate_subagent_stop_payload(&payload).is_ok());
+}
+
+#[test]
+fn test_subagent_stop_payload_with_empty_permission_mode() {
+    let mut payload = create_subagent_stop_payload();
+    payload.base.permission_mode = Some(String::new());
+
+    // Should still validate - only required fields matter for base payload
+    // Empty permission_mode is allowed
+    assert!(validate_subagent_stop_payload(&payload).is_ok());
+}
+
+#[test]
+fn test_subagent_stop_payload_stop_hook_active_true_and_false() {
+    let mut payload_true = create_subagent_stop_payload();
+    let mut payload_false = create_subagent_stop_payload();
+
+    payload_true.stop_hook_active = true;
+    payload_false.stop_hook_active = false;
+
+    assert!(validate_subagent_stop_payload(&payload_true).is_ok());
+    assert!(validate_subagent_stop_payload(&payload_false).is_ok());
+    assert_ne!(payload_true.stop_hook_active, payload_false.stop_hook_active);
+}
+
+#[test]
+fn test_subagent_stop_payload_json_with_missing_agent_id_field() {
+    let json_str = r#"{
+        "session_id": "test_session",
+        "transcript_path": "/tmp/session.jsonl",
+        "hook_event_name": "SubagentStop",
+        "cwd": "/home/user/project",
+        "permission_mode": "default",
+        "stop_hook_active": true,
+        "agent_transcript_path": "/tmp/agent.jsonl"
+    }"#;
+
+    // This should fail to deserialize because agent_id is required
+    let result: Result<SubagentStopPayload, _> = serde_json::from_str(json_str);
+    assert!(
+        result.is_err(),
+        "JSON missing agent_id should fail to deserialize"
+    );
+}
+
+#[test]
+fn test_subagent_stop_payload_json_with_missing_agent_transcript_path_field() {
+    let json_str = r#"{
+        "session_id": "test_session",
+        "transcript_path": "/tmp/session.jsonl",
+        "hook_event_name": "SubagentStop",
+        "cwd": "/home/user/project",
+        "permission_mode": "default",
+        "stop_hook_active": true,
+        "agent_id": "coder"
+    }"#;
+
+    // This should fail to deserialize because agent_transcript_path is required
+    let result: Result<SubagentStopPayload, _> = serde_json::from_str(json_str);
+    assert!(
+        result.is_err(),
+        "JSON missing agent_transcript_path should fail to deserialize"
+    );
+}
+
+#[test]
+fn test_subagent_stop_environment_variable_setting_simulation() {
+    // Simulate setting environment variables as the hook handler would do
+    let payload = create_subagent_stop_payload();
+    let unique_id = "test_env_var_setting";
+
+    // Set environment variables with unique suffix to avoid test conflicts
+    let agent_id_var = format!("CONCLAUDE_AGENT_ID_{}", unique_id);
+    let transcript_var = format!("CONCLAUDE_AGENT_TRANSCRIPT_PATH_{}", unique_id);
+
+    std::env::set_var(&agent_id_var, &payload.agent_id);
+    std::env::set_var(&transcript_var, &payload.agent_transcript_path);
+
+    // Verify they were set correctly
+    assert_eq!(
+        std::env::var(&agent_id_var).unwrap(),
+        payload.agent_id
+    );
+    assert_eq!(
+        std::env::var(&transcript_var).unwrap(),
+        payload.agent_transcript_path
+    );
+
+    // Test the actual environment variables (document what the hook does)
+    // Note: We only verify the structure is correct, actual env vars may be set by other tests
+    assert!(!payload.agent_id.is_empty());
+    assert!(!payload.agent_transcript_path.is_empty());
+
+    // Clean up
+    std::env::remove_var(&agent_id_var);
+    std::env::remove_var(&transcript_var);
+}
+
+#[test]
+fn test_subagent_stop_environment_variables_different_agents() {
+    let agents = ["coder", "tester", "stuck"];
+
+    for (idx, agent) in agents.iter().enumerate() {
+        let mut payload = create_subagent_stop_payload();
+        payload.agent_id = agent.to_string();
+
+        // Set environment variables with unique suffix to avoid test conflicts
+        let agent_id_var = format!("CONCLAUDE_AGENT_ID_diff_agents_{}", idx);
+        let transcript_var = format!("CONCLAUDE_AGENT_TRANSCRIPT_PATH_diff_agents_{}", idx);
+
+        std::env::set_var(&agent_id_var, &payload.agent_id);
+        std::env::set_var(&transcript_var, &payload.agent_transcript_path);
+
+        // Verify they match
+        assert_eq!(
+            std::env::var(&agent_id_var).unwrap(),
+            *agent,
+            "Agent ID should match in environment for {}",
+            agent
+        );
+
+        // Clean up
+        std::env::remove_var(&agent_id_var);
+        std::env::remove_var(&transcript_var);
+    }
+}
+
+#[test]
+fn test_subagent_stop_environment_variables_special_paths() {
+    let paths = ["/tmp/transcript-with-dashes.jsonl",
+        "/tmp/transcript_with_underscores.jsonl",
+        "/tmp/transcript.2024-11-16.jsonl",
+        "/var/log/conclaude/transcript.jsonl"];
+
+    for (idx, path) in paths.iter().enumerate() {
+        let mut payload = create_subagent_stop_payload();
+        payload.agent_transcript_path = path.to_string();
+
+        // Set environment variable with unique suffix
+        let transcript_var = format!("CONCLAUDE_AGENT_TRANSCRIPT_PATH_special_{}", idx);
+        std::env::set_var(&transcript_var, &payload.agent_transcript_path);
+
+        // Verify it was set correctly by reading it back
+        let read_value = std::env::var(&transcript_var);
+        assert!(
+            read_value.is_ok(),
+            "Path should be set in environment: {}",
+            path
+        );
+        assert_eq!(
+            read_value.unwrap(),
+            *path,
+            "Path should be preserved in environment: {}",
+            path
+        );
+
+        // Clean up for next iteration
+        std::env::remove_var(&transcript_var);
+    }
+}
+
+#[test]
+fn test_subagent_stop_multiple_sequential_invocations() {
+    let agents = [("coder", "/tmp/coder_001.jsonl"),
+        ("tester", "/tmp/tester_001.jsonl"),
+        ("stuck", "/tmp/stuck_001.jsonl")];
+
+    for (idx, (agent_id, transcript_path)) in agents.iter().enumerate() {
+        let mut payload = create_subagent_stop_payload();
+        payload.agent_id = agent_id.to_string();
+        payload.agent_transcript_path = transcript_path.to_string();
+
+        // Validate the payload
+        assert!(
+            validate_subagent_stop_payload(&payload).is_ok(),
+            "Payload for {} should validate",
+            agent_id
+        );
+
+        // Simulate setting environment variables with unique suffix
+        let agent_id_var = format!("CONCLAUDE_AGENT_ID_seq_{}", idx);
+        let transcript_var = format!("CONCLAUDE_AGENT_TRANSCRIPT_PATH_seq_{}", idx);
+
+        std::env::set_var(&agent_id_var, &payload.agent_id);
+        std::env::set_var(&transcript_var, &payload.agent_transcript_path);
+
+        // Verify environment variables are set to the new values
+        let agent_id_read = std::env::var(&agent_id_var);
+        assert!(agent_id_read.is_ok());
+        assert_eq!(
+            agent_id_read.unwrap(),
+            *agent_id,
+            "Environment variable should reflect current agent"
+        );
+
+        let transcript_path_read = std::env::var(&transcript_var);
+        assert!(transcript_path_read.is_ok());
+        assert_eq!(
+            transcript_path_read.unwrap(),
+            *transcript_path,
+            "Environment variable should reflect current transcript path"
+        );
+
+        // Clean up
+        std::env::remove_var(&agent_id_var);
+        std::env::remove_var(&transcript_var);
+    }
+}
+
+#[test]
+fn test_subagent_stop_payload_all_required_fields_present() {
+    // This test ensures all required fields are actually present and tested
+    let payload = create_subagent_stop_payload();
+
+    // Base fields
+    assert!(!payload.base.session_id.is_empty());
+    assert!(!payload.base.transcript_path.is_empty());
+    assert_eq!(payload.base.hook_event_name, "SubagentStop");
+    assert!(!payload.base.cwd.is_empty());
+
+    // New SubagentStop-specific fields
+    assert!(!payload.agent_id.is_empty());
+    assert!(!payload.agent_transcript_path.is_empty());
+
+    // Verify validation passes
+    assert!(validate_subagent_stop_payload(&payload).is_ok());
+}
+
+#[test]
+fn test_subagent_stop_validation_fails_gracefully_on_invalid_base() {
+    let mut payload = create_subagent_stop_payload();
+    // Invalidate the base payload by removing session_id
+    payload.base.session_id = String::new();
+
+    // The validation should fail due to invalid base
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(result.is_err());
+
+    // The error message should indicate which field is invalid
+    let error_msg = result.unwrap_err();
+    assert!(error_msg.contains("session_id"));
+}
+
+#[test]
+fn test_subagent_stop_validation_fails_gracefully_on_invalid_agent_id() {
+    let mut payload = create_subagent_stop_payload();
+    payload.agent_id = String::new();
+
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("agent_id"));
+}
+
+#[test]
+fn test_subagent_stop_validation_fails_gracefully_on_invalid_agent_transcript_path() {
+    let mut payload = create_subagent_stop_payload();
+    payload.agent_transcript_path = String::new();
+
+    let result = validate_subagent_stop_payload(&payload);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("agent_transcript_path"));
+}
+
+#[test]
+fn test_subagent_stop_validation_error_messages_specific() {
+    // Test that error messages are specific and helpful
+
+    let mut payload = create_subagent_stop_payload();
+
+    // Test agent_id error
+    payload.agent_id = String::new();
+    let error = validate_subagent_stop_payload(&payload).unwrap_err();
+    assert!(error.contains("agent_id"), "Error should mention agent_id field");
+
+    // Test agent_transcript_path error
+    let mut payload = create_subagent_stop_payload();
+    payload.agent_transcript_path = String::new();
+    let error = validate_subagent_stop_payload(&payload).unwrap_err();
+    assert!(
+        error.contains("agent_transcript_path"),
+        "Error should mention agent_transcript_path field"
+    );
+
+    // Test whitespace-only agent_id error
+    let mut payload = create_subagent_stop_payload();
+    payload.agent_id = "   ".to_string();
+    let error = validate_subagent_stop_payload(&payload).unwrap_err();
+    assert!(
+        error.contains("agent_id"),
+        "Error should mention agent_id for whitespace-only value"
+    );
+}

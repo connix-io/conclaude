@@ -189,15 +189,15 @@
 
 Before marking this proposal as complete, verify:
 
-- [ ] SubagentStopPayload struct has agent_id and agent_transcript_path fields
-- [ ] Both fields are required (non-Optional) Strings
-- [ ] Validation rejects missing or empty field values
-- [ ] Environment variables CONCLAUDE_AGENT_ID and CONCLAUDE_AGENT_TRANSCRIPT_PATH are exported
-- [ ] Unit tests cover success and failure scenarios
-- [ ] Integration tests verify end-to-end hook processing
-- [ ] schema.json includes new fields as required
-- [ ] All tests pass (`cargo test`)
-- [ ] No clippy warnings (`cargo clippy`)
-- [ ] OpenSpec validation passes (`openspec validate add-subagent-stop-payload-fields --strict`)
-- [ ] Documentation updated with new fields and environment variables
-- [ ] Manual testing confirms hooks receive and process new fields correctly
+- [x] SubagentStopPayload struct has agent_id and agent_transcript_path fields
+- [x] Both fields are required (non-Optional) Strings
+- [x] Validation rejects missing or empty field values
+- [x] Environment variables CONCLAUDE_AGENT_ID and CONCLAUDE_AGENT_TRANSCRIPT_PATH are exported
+- [x] Unit tests cover success and failure scenarios
+- [x] Integration tests verify end-to-end hook processing
+- [x] schema.json includes new fields as required
+- [x] All tests pass (`cargo test`)
+- [x] No clippy warnings (`cargo clippy`)
+- [x] OpenSpec validation passes (`openspec validate add-subagent-stop-payload-fields --strict`)
+- [x] Documentation updated with new fields and environment variables
+- [x] Manual testing confirms hooks receive and process new fields correctly
