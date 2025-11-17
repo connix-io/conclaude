@@ -3,6 +3,7 @@ use anyhow::{Context, Result};
 use conclaude_field_derive::FieldList;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -35,6 +36,30 @@ pub struct StopConfig {
     pub infinite_message: Option<String>,
     #[serde(default)]
     pub rounds: Option<u32>,
+}
+
+/// Configuration for individual subagent stop commands with optional messages
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, FieldList)]
+#[serde(deny_unknown_fields)]
+pub struct SubagentStopCommand {
+    pub run: String,
+    #[serde(default)]
+    pub message: Option<String>,
+    #[serde(default, rename = "showStdout")]
+    pub show_stdout: Option<bool>,
+    #[serde(default, rename = "showStderr")]
+    pub show_stderr: Option<bool>,
+    #[serde(default, rename = "maxOutputLines")]
+    #[schemars(range(min = 1, max = 10000))]
+    pub max_output_lines: Option<u32>,
+}
+
+/// Configuration interface for subagent stop hook commands
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, FieldList)]
+#[serde(deny_unknown_fields)]
+pub struct SubagentStopConfig {
+    #[serde(default)]
+    pub commands: HashMap<String, Vec<SubagentStopCommand>>,
 }
 
 /// Configuration interface for validation rules
@@ -145,6 +170,8 @@ pub struct ConclaudeConfig {
     pub pre_tool_use: PreToolUseConfig,
     #[serde(default)]
     pub notifications: NotificationsConfig,
+    #[serde(default, rename = "subagentStop")]
+    pub subagent_stop: SubagentStopConfig,
 }
 
 /// Extract the field name from an unknown field error message
@@ -167,6 +194,8 @@ fn suggest_similar_fields(unknown_field: &str, section: &str) -> Vec<String> {
         ("preToolUse", PreToolUseConfig::field_names()),
         ("notifications", NotificationsConfig::field_names()),
         ("commands", StopCommand::field_names()),
+        ("subagentStop", SubagentStopConfig::field_names()),
+        ("subagentStopCommands", SubagentStopCommand::field_names()),
     ];
 
     // Find the section's valid fields
@@ -288,6 +317,8 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
                 .to_string(),
         );
         parts.push("  commands: run, message, showStdout, showStderr, maxOutputLines".to_string());
+        parts.push("  subagentStop: commands".to_string());
+        parts.push("  subagentStopCommands: run, message, showStdout, showStderr, maxOutputLines".to_string());
     } else if base_error.contains("invalid type") {
         parts.push(String::new());
         parts.push("Type mismatch detected. Common causes:".to_string());
@@ -376,6 +407,48 @@ fn validate_config_constraints(config: &ConclaudeConfig) -> Result<()> {
                        conclaude init"
                 );
                 return Err(anyhow::anyhow!(error_msg));
+            }
+        }
+    }
+
+    // Validate subagentStop maxOutputLines range (1-10000) and patterns
+    for (pattern, commands) in &config.subagent_stop.commands {
+        // Validate pattern is not empty
+        if pattern.is_empty() {
+            let error_msg = "Validation failed for subagentStop.commands\n\n\
+                Error: Pattern cannot be empty string\n\n\
+                ✅ Valid patterns:\n\
+                  • \"*\"            # matches all subagents\n\
+                  • \"coder\"        # exact match\n\
+                  • \"test*\"        # prefix match\n\
+                  • \"*coder\"       # suffix match\n\n\
+                For a valid configuration template, run:\n\
+                  conclaude init"
+                .to_string();
+            return Err(anyhow::anyhow!(error_msg));
+        }
+
+        // Validate each command's maxOutputLines
+        for (idx, command) in commands.iter().enumerate() {
+            if let Some(max_lines) = command.max_output_lines {
+                if !(1..=10000).contains(&max_lines) {
+                    let error_msg = format!(
+                        "Range validation failed for subagentStop.commands[\"{pattern}\"][{idx}].maxOutputLines\n\n\
+                         Error: Value {max_lines} is out of valid range\n\n\
+                         ✅ Valid range: 1 to 10000\n\n\
+                         Common causes:\n\
+                           • Value is too large (maximum is 10000)\n\
+                           • Value is too small (minimum is 1)\n\
+                           • Using a negative number\n\n\
+                         Example valid configurations:\n\
+                           maxOutputLines: 100      # default, good for most cases\n\
+                           maxOutputLines: 1000     # for verbose output\n\
+                           maxOutputLines: 10000    # maximum allowed\n\n\
+                         For a valid configuration template, run:\n\
+                           conclaude init"
+                    );
+                    return Err(anyhow::anyhow!(error_msg));
+                }
             }
         }
     }

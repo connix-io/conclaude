@@ -26,6 +26,16 @@ struct StopCommandConfig {
     max_output_lines: Option<u32>,
 }
 
+/// Represents a subagent stop command with its configuration
+struct SubagentStopCommandConfig {
+    command: String,
+    #[allow(dead_code)] // Reserved for future use in error messages
+    message: Option<String>,
+    show_stdout: bool,
+    show_stderr: bool,
+    max_output_lines: Option<u32>,
+}
+
 /// Cached configuration instance to avoid repeated loads
 static CACHED_CONFIG: OnceLock<(ConclaudeConfig, std::path::PathBuf)> = OnceLock::new();
 
@@ -728,6 +738,194 @@ async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<
     Ok(None)
 }
 
+/// Collect subagent stop commands that match the given agent_id
+///
+/// # Errors
+///
+/// Returns an error if bash command extraction fails or glob pattern compilation fails.
+fn collect_subagent_stop_commands(
+    config: &ConclaudeConfig,
+    agent_id: &str,
+) -> Result<Vec<SubagentStopCommandConfig>> {
+    let mut commands = Vec::new();
+
+    // First, collect wildcard commands (if configured)
+    if let Some(wildcard_commands) = config.subagent_stop.commands.get("*") {
+        for cmd_config in wildcard_commands {
+            let extracted = extract_bash_commands(&cmd_config.run)?;
+            let show_stdout = cmd_config.show_stdout.unwrap_or(false);
+            let show_stderr = cmd_config.show_stderr.unwrap_or(false);
+            let max_output_lines = cmd_config.max_output_lines;
+            for cmd in extracted {
+                commands.push(SubagentStopCommandConfig {
+                    command: cmd,
+                    message: cmd_config.message.clone(),
+                    show_stdout,
+                    show_stderr,
+                    max_output_lines,
+                });
+            }
+        }
+    }
+
+    // Then, collect commands from patterns that match the agent_id (excluding wildcard)
+    for (pattern, pattern_commands) in &config.subagent_stop.commands {
+        // Skip wildcard - we already processed it
+        if pattern == "*" {
+            continue;
+        }
+
+        // Try to compile the glob pattern
+        let glob_pattern = glob::Pattern::new(pattern)
+            .with_context(|| format!("Invalid glob pattern in subagentStop config: {}", pattern))?;
+
+        // Check if the pattern matches the agent_id
+        if glob_pattern.matches(agent_id) {
+            for cmd_config in pattern_commands {
+                let extracted = extract_bash_commands(&cmd_config.run)?;
+                let show_stdout = cmd_config.show_stdout.unwrap_or(false);
+                let show_stderr = cmd_config.show_stderr.unwrap_or(false);
+                let max_output_lines = cmd_config.max_output_lines;
+                for cmd in extracted {
+                    commands.push(SubagentStopCommandConfig {
+                        command: cmd,
+                        message: cmd_config.message.clone(),
+                        show_stdout,
+                        show_stderr,
+                        max_output_lines,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(commands)
+}
+
+/// Execute subagent stop hook commands
+///
+/// # Errors
+///
+/// Returns an error if command execution fails or process spawning fails.
+async fn execute_subagent_stop_commands(
+    commands: &[SubagentStopCommandConfig],
+) -> Result<()> {
+    if commands.is_empty() {
+        return Ok(());
+    }
+
+    println!("Executing {} subagent stop hook commands", commands.len());
+
+    for (index, cmd_config) in commands.iter().enumerate() {
+        println!(
+            "Executing subagent stop command {}/{}: {}",
+            index + 1,
+            commands.len(),
+            cmd_config.command
+        );
+
+        let child = TokioCommand::new("bash")
+            .arg("-c")
+            .arg(&cmd_config.command)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn();
+
+        let child = match child {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!(
+                    "Failed to spawn subagent stop command '{}': {}",
+                    cmd_config.command, e
+                );
+                // Continue with other commands despite spawn failure
+                continue;
+            }
+        };
+
+        let output = match child.wait_with_output().await {
+            Ok(o) => o,
+            Err(e) => {
+                eprintln!(
+                    "Failed to wait for subagent stop command '{}': {}",
+                    cmd_config.command, e
+                );
+                // Continue with other commands despite execution failure
+                continue;
+            }
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        if !output.status.success() {
+            let exit_code = output.status.code().unwrap_or(1);
+
+            // Log failure but don't block the SubagentStop hook
+            let mut diagnostic = format!(
+                "Subagent stop command failed (non-blocking):\n  Command: {}\n  Status: Failed (exit code: {})",
+                cmd_config.command, exit_code
+            );
+
+            if cmd_config.show_stdout && !stdout.trim().is_empty() {
+                let stdout_display = stdout
+                    .trim()
+                    .lines()
+                    .map(|line| format!("    {}", line))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                diagnostic.push_str(&format!("\n  Stdout:\n{}", stdout_display));
+            }
+
+            if cmd_config.show_stderr && !stderr.trim().is_empty() {
+                let stderr_display = stderr
+                    .trim()
+                    .lines()
+                    .map(|line| format!("    {}", line))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                diagnostic.push_str(&format!("\n  Stderr:\n{}", stderr_display));
+            }
+
+            eprintln!("{}", diagnostic);
+            // Continue with other commands despite failure
+            continue;
+        }
+
+        // Show stdout if requested
+        if cmd_config.show_stdout && !stdout.trim().is_empty() {
+            if let Some(max_lines) = cmd_config.max_output_lines {
+                let (truncated, is_truncated, omitted) = truncate_output(&stdout, max_lines);
+                if is_truncated {
+                    println!("Stdout: {}\n... ({} lines omitted)", truncated, omitted);
+                } else {
+                    println!("Stdout: {}", truncated);
+                }
+            } else {
+                println!("Stdout: {}", stdout);
+            }
+        }
+
+        // Show stderr if requested
+        if cmd_config.show_stderr && !stderr.trim().is_empty() {
+            if let Some(max_lines) = cmd_config.max_output_lines {
+                let (truncated, is_truncated, omitted) = truncate_output(&stderr, max_lines);
+                if is_truncated {
+                    eprintln!("Stderr: {}\n... ({} lines omitted)", truncated, omitted);
+                } else {
+                    eprintln!("Stderr: {}", truncated);
+                }
+            } else {
+                eprintln!("Stderr: {}", stderr);
+            }
+        }
+    }
+
+    println!("All subagent stop hook commands completed");
+    Ok(())
+}
+
 /// Handles `Stop` hook events when a Claude session is terminating.
 ///
 /// # Errors
@@ -834,7 +1032,6 @@ pub async fn handle_stop() -> Result<HookResult> {
 /// # Errors
 ///
 /// Returns an error if payload validation fails or configuration loading fails.
-#[allow(clippy::unused_async)]
 pub async fn handle_subagent_stop() -> Result<HookResult> {
     let payload: SubagentStopPayload = read_payload_from_stdin()?;
 
@@ -850,6 +1047,15 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
     // These allow downstream hooks and processes to access subagent details
     std::env::set_var("CONCLAUDE_AGENT_ID", &payload.agent_id);
     std::env::set_var("CONCLAUDE_AGENT_TRANSCRIPT_PATH", &payload.agent_transcript_path);
+
+    // Load configuration
+    let (config, _config_path) = get_config().await?;
+
+    // Collect commands that match the agent_id pattern
+    let commands = collect_subagent_stop_commands(config, &payload.agent_id)?;
+
+    // Execute the matching commands (failures are logged but don't block the hook)
+    execute_subagent_stop_commands(&commands).await?;
 
     // Send notification for subagent stop with agent ID included
     send_notification(

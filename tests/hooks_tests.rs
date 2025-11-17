@@ -1540,3 +1540,325 @@ fn test_subagent_stop_validation_error_messages_specific() {
         "Error should mention agent_id for whitespace-only value"
     );
 }
+
+// Unit tests for SubagentStop command pattern matching
+
+#[test]
+fn test_glob_pattern_exact_match() {
+    use glob::Pattern;
+
+    // Exact match pattern
+    let pattern = Pattern::new("coder").unwrap();
+
+    // Should match exact name
+    assert!(pattern.matches("coder"), "Should match exact 'coder'");
+
+    // Should NOT match similar names
+    assert!(!pattern.matches("auto-coder"), "Should not match 'auto-coder'");
+    assert!(!pattern.matches("coder-agent"), "Should not match 'coder-agent'");
+    assert!(!pattern.matches("Coder"), "Should not match 'Coder' (case sensitive)");
+}
+
+#[test]
+fn test_glob_pattern_wildcard_matches_all() {
+    use glob::Pattern;
+
+    // Wildcard pattern
+    let pattern = Pattern::new("*").unwrap();
+
+    // Should match any agent name
+    assert!(pattern.matches("coder"), "Should match 'coder'");
+    assert!(pattern.matches("tester"), "Should match 'tester'");
+    assert!(pattern.matches("stuck"), "Should match 'stuck'");
+    assert!(pattern.matches("any-agent-name"), "Should match 'any-agent-name'");
+    assert!(pattern.matches("123"), "Should match '123'");
+}
+
+#[test]
+fn test_glob_pattern_prefix_match() {
+    use glob::Pattern;
+
+    // Prefix pattern
+    let pattern = Pattern::new("test*").unwrap();
+
+    // Should match names starting with 'test'
+    assert!(pattern.matches("test"), "Should match 'test'");
+    assert!(pattern.matches("tester"), "Should match 'tester'");
+    assert!(pattern.matches("test-runner"), "Should match 'test-runner'");
+    assert!(pattern.matches("testing123"), "Should match 'testing123'");
+
+    // Should NOT match names not starting with 'test'
+    assert!(!pattern.matches("runner-test"), "Should not match 'runner-test'");
+    assert!(!pattern.matches("my-tester"), "Should not match 'my-tester'");
+}
+
+#[test]
+fn test_glob_pattern_suffix_match() {
+    use glob::Pattern;
+
+    // Suffix pattern
+    let pattern = Pattern::new("*coder").unwrap();
+
+    // Should match names ending with 'coder'
+    assert!(pattern.matches("coder"), "Should match 'coder'");
+    assert!(pattern.matches("auto-coder"), "Should match 'auto-coder'");
+    assert!(pattern.matches("smart-coder"), "Should match 'smart-coder'");
+    assert!(pattern.matches("123coder"), "Should match '123coder'");
+
+    // Should NOT match names not ending with 'coder'
+    assert!(!pattern.matches("coder-agent"), "Should not match 'coder-agent'");
+    assert!(!pattern.matches("coders"), "Should not match 'coders'");
+}
+
+#[test]
+fn test_glob_pattern_character_class() {
+    use glob::Pattern;
+
+    // Character class pattern
+    let pattern = Pattern::new("agent_[0-9]*").unwrap();
+
+    // Should match names with digit after 'agent_'
+    assert!(pattern.matches("agent_1"), "Should match 'agent_1'");
+    assert!(pattern.matches("agent_2x"), "Should match 'agent_2x'");
+    assert!(pattern.matches("agent_99test"), "Should match 'agent_99test'");
+    assert!(pattern.matches("agent_0"), "Should match 'agent_0'");
+
+    // Should NOT match names without digit after 'agent_'
+    assert!(!pattern.matches("agent_x"), "Should not match 'agent_x'");
+    assert!(!pattern.matches("agent_"), "Should not match 'agent_'");
+    assert!(!pattern.matches("agent"), "Should not match 'agent'");
+    assert!(!pattern.matches("agent_abc"), "Should not match 'agent_abc'");
+}
+
+#[test]
+fn test_glob_pattern_multiple_wildcards() {
+    use glob::Pattern;
+
+    // Multiple wildcard pattern
+    let pattern = Pattern::new("*-test-*").unwrap();
+
+    // Should match names with '-test-' in the middle
+    assert!(pattern.matches("my-test-runner"), "Should match 'my-test-runner'");
+    assert!(pattern.matches("a-test-b"), "Should match 'a-test-b'");
+    assert!(pattern.matches("-test-"), "Should match '-test-'");
+
+    // Should NOT match names without '-test-'
+    assert!(!pattern.matches("test"), "Should not match 'test'");
+    assert!(!pattern.matches("my-tester"), "Should not match 'my-tester'");
+}
+
+#[test]
+fn test_glob_pattern_case_sensitivity() {
+    use glob::Pattern;
+
+    // Glob patterns are case-sensitive
+    let pattern = Pattern::new("Coder").unwrap();
+
+    assert!(pattern.matches("Coder"), "Should match 'Coder' (exact case)");
+    assert!(!pattern.matches("coder"), "Should not match 'coder' (different case)");
+    assert!(!pattern.matches("CODER"), "Should not match 'CODER' (different case)");
+}
+
+#[test]
+fn test_glob_pattern_special_characters() {
+    use glob::Pattern;
+
+    // Pattern with special characters
+    let pattern = Pattern::new("agent-*-v[12]").unwrap();
+
+    // Should match hyphenated names with version
+    assert!(pattern.matches("agent-test-v1"), "Should match 'agent-test-v1'");
+    assert!(pattern.matches("agent-prod-v2"), "Should match 'agent-prod-v2'");
+    assert!(pattern.matches("agent-abc-v1"), "Should match 'agent-abc-v1'");
+
+    // Should NOT match without version or wrong version
+    assert!(!pattern.matches("agent-test-v3"), "Should not match 'agent-test-v3'");
+    assert!(!pattern.matches("agent-test"), "Should not match 'agent-test'");
+}
+
+// Integration tests for SubagentStop command execution
+// Note: These tests verify configuration parsing and command collection logic
+// Actual command execution requires mocking or integration testing with shell
+
+#[test]
+fn test_subagent_stop_config_parsing_wildcard() {
+    use conclaude::config::*;
+    use serde_yaml;
+
+    let yaml = r#"
+subagentStop:
+  commands:
+    "*":
+      - run: "echo 'All agents'"
+        message: "Logging all agents"
+        showStdout: true
+"#;
+
+    let config: ConclaudeConfig = serde_yaml::from_str(yaml).expect("Should parse valid YAML");
+
+    assert!(
+        config.subagent_stop.commands.contains_key("*"),
+        "Config should contain wildcard pattern"
+    );
+
+    let wildcard_commands = &config.subagent_stop.commands["*"];
+    assert_eq!(wildcard_commands.len(), 1, "Should have one wildcard command");
+    assert_eq!(wildcard_commands[0].run, "echo 'All agents'");
+    assert_eq!(wildcard_commands[0].message, Some("Logging all agents".to_string()));
+    assert_eq!(wildcard_commands[0].show_stdout, Some(true));
+}
+
+#[test]
+fn test_subagent_stop_config_parsing_exact_match() {
+    use conclaude::config::*;
+    use serde_yaml;
+
+    let yaml = r#"
+subagentStop:
+  commands:
+    "coder":
+      - run: "npm run lint"
+        message: "Running linter"
+        showStdout: true
+        showStderr: true
+"#;
+
+    let config: ConclaudeConfig = serde_yaml::from_str(yaml).expect("Should parse valid YAML");
+
+    assert!(
+        config.subagent_stop.commands.contains_key("coder"),
+        "Config should contain 'coder' pattern"
+    );
+
+    let coder_commands = &config.subagent_stop.commands["coder"];
+    assert_eq!(coder_commands.len(), 1, "Should have one coder command");
+    assert_eq!(coder_commands[0].run, "npm run lint");
+    assert_eq!(coder_commands[0].message, Some("Running linter".to_string()));
+    assert_eq!(coder_commands[0].show_stdout, Some(true));
+    assert_eq!(coder_commands[0].show_stderr, Some(true));
+}
+
+#[test]
+fn test_subagent_stop_config_parsing_glob_patterns() {
+    use conclaude::config::*;
+    use serde_yaml;
+
+    let yaml = r#"
+subagentStop:
+  commands:
+    "test*":
+      - run: "echo 'Test agent'"
+        showStdout: true
+    "*coder":
+      - run: "git add ."
+        message: "Staging changes"
+"#;
+
+    let config: ConclaudeConfig = serde_yaml::from_str(yaml).expect("Should parse valid YAML");
+
+    assert!(
+        config.subagent_stop.commands.contains_key("test*"),
+        "Config should contain 'test*' pattern"
+    );
+    assert!(
+        config.subagent_stop.commands.contains_key("*coder"),
+        "Config should contain '*coder' pattern"
+    );
+
+    let test_commands = &config.subagent_stop.commands["test*"];
+    assert_eq!(test_commands.len(), 1);
+    assert_eq!(test_commands[0].run, "echo 'Test agent'");
+
+    let coder_commands = &config.subagent_stop.commands["*coder"];
+    assert_eq!(coder_commands.len(), 1);
+    assert_eq!(coder_commands[0].run, "git add .");
+    assert_eq!(coder_commands[0].message, Some("Staging changes".to_string()));
+}
+
+#[test]
+fn test_subagent_stop_config_parsing_multiple_commands_per_pattern() {
+    use conclaude::config::*;
+    use serde_yaml;
+
+    let yaml = r#"
+subagentStop:
+  commands:
+    "coder":
+      - run: "npm run lint"
+        message: "Running linter"
+      - run: "npm run test"
+        message: "Running tests"
+      - run: "git add ."
+        showStdout: false
+"#;
+
+    let config: ConclaudeConfig = serde_yaml::from_str(yaml).expect("Should parse valid YAML");
+
+    let coder_commands = &config.subagent_stop.commands["coder"];
+    assert_eq!(coder_commands.len(), 3, "Should have three commands for 'coder'");
+
+    assert_eq!(coder_commands[0].run, "npm run lint");
+    assert_eq!(coder_commands[0].message, Some("Running linter".to_string()));
+
+    assert_eq!(coder_commands[1].run, "npm run test");
+    assert_eq!(coder_commands[1].message, Some("Running tests".to_string()));
+
+    assert_eq!(coder_commands[2].run, "git add .");
+    assert_eq!(coder_commands[2].show_stdout, Some(false));
+}
+
+#[test]
+fn test_subagent_stop_config_parsing_with_max_output_lines() {
+    use conclaude::config::*;
+    use serde_yaml;
+
+    let yaml = r#"
+subagentStop:
+  commands:
+    "*":
+      - run: "echo 'test'"
+        maxOutputLines: 100
+"#;
+
+    let config: ConclaudeConfig = serde_yaml::from_str(yaml).expect("Should parse valid YAML");
+
+    let commands = &config.subagent_stop.commands["*"];
+    assert_eq!(commands[0].max_output_lines, Some(100));
+}
+
+#[test]
+fn test_subagent_stop_config_validation_empty_pattern() {
+    use conclaude::config::*;
+    use serde_yaml;
+
+    let yaml = r#"
+subagentStop:
+  commands:
+    "":
+      - run: "echo 'test'"
+"#;
+
+    let config: ConclaudeConfig = serde_yaml::from_str(yaml).expect("YAML should parse");
+
+    // The validation function should catch this
+    // For now, we just verify it parses (validation happens at runtime)
+    assert!(config.subagent_stop.commands.contains_key(""));
+}
+
+#[test]
+fn test_subagent_stop_config_empty() {
+    use conclaude::config::*;
+    use serde_yaml;
+
+    let yaml = r#"
+subagentStop:
+  commands: {}
+"#;
+
+    let config: ConclaudeConfig = serde_yaml::from_str(yaml).expect("Should parse empty config");
+
+    assert!(
+        config.subagent_stop.commands.is_empty(),
+        "Should have no commands when empty"
+    );
+}

@@ -735,15 +735,62 @@ $CONCLAUDE_AGENT_ID            # The subagent identifier
 $CONCLAUDE_AGENT_TRANSCRIPT_PATH # Path to subagent's transcript
 ```
 
-**Example Configuration:**
+**Configuring Commands for Subagent Completion:**
+
+You can configure commands to run when specific subagents complete their work using the `subagentStop` section. This allows you to perform cleanup, validation, or logging operations based on which subagent finished.
 
 ```yaml
 # .conclaude.yaml
+subagentStop:
+  commands:
+    # Run for all subagents
+    "*":
+      - run: "echo 'Subagent completed: $CONCLAUDE_AGENT_ID'"
+        message: "Logging subagent completion"
+        showStdout: true
+
+    # Run only when the coder subagent completes
+    "coder":
+      - run: "npm run lint"
+        message: "Running linter after coder"
+        showStderr: true
+      - run: "git add ."
+        message: "Staging changes from coder"
+
+    # Run for any test-related subagent (test*, tester, etc.)
+    "test*":
+      - run: "echo 'Test agent completed'"
+        showStdout: true
+
+    # Run for any subagent ending with "coder" (coder, auto-coder, etc.)
+    "*coder":
+      - run: "cargo check"
+        message: "Validating code after coder agents"
+
+# Also enable notifications
 notifications:
   enabled: true
   hooks:
     - "SubagentStop"  # Get notified when subagents complete
 ```
+
+**Pattern Matching:**
+
+The `subagentStop.commands` section uses glob patterns to match subagent names:
+
+- `"*"` - Matches all subagents (runs for every subagent completion)
+- `"coder"` - Exact match (only matches "coder")
+- `"test*"` - Prefix match (matches "tester", "test-runner", etc.)
+- `"*coder"` - Suffix match (matches "coder", "auto-coder", etc.)
+- `"agent_[0-9]*"` - Character class patterns (matches "agent_1", "agent_2x", etc.)
+
+**Execution Order:**
+
+When a subagent completes:
+1. Wildcard (`*`) commands run first (if configured)
+2. Specific/glob pattern matched commands run second
+
+This allows you to have global cleanup plus targeted actions per subagent.
 
 **Manual Testing:**
 
@@ -1084,11 +1131,38 @@ preToolUse:
     - filePattern: "**/*.rs"
       forbiddenPattern: "unsafe"
       description: "Unsafe code blocks not allowed"
-  
+
   # Additional directories to protect from additions
   preventAdditions:
     - "docs/"
     - "examples/"
+
+# Subagent stop hook configuration
+subagentStop:
+  commands:
+    # Wildcard - runs for all subagents
+    "*":
+      - run: "echo 'Subagent $CONCLAUDE_AGENT_ID completed'"
+        message: "Logging subagent completion"
+        showStdout: true
+        showStderr: false
+        maxOutputLines: 100
+
+    # Exact match - runs only for specific subagent
+    "coder":
+      - run: "npm run lint"
+        message: "Running linter after coder"
+        showStderr: true
+      - run: "git add ."
+        message: "Staging changes"
+
+    # Glob patterns - matches multiple subagents
+    "test*":
+      - run: "echo 'Test agent completed'"
+
+    "*coder":
+      - run: "cargo check"
+        message: "Validating code"
 
 ```
 
