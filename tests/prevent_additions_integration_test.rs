@@ -357,15 +357,8 @@ stop:
     file.write_all(config_content.as_bytes())?;
     drop(file);
 
-    // Change to temp directory for config loading
-    let original_dir = std::env::current_dir()?;
-    std::env::set_current_dir(temp_path)?;
-
-    // Load actual config from file
-    let (config, _config_path) = load_conclaude_config(Some(&config_path)).await?;
-
-    // Restore original directory
-    std::env::set_current_dir(&original_dir)?;
+    // Load actual config from file using the temp directory path
+    let (config, _config_path) = load_conclaude_config(Some(temp_path)).await?;
 
     // Validate config loaded correctly
     assert_eq!(
