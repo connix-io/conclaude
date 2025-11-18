@@ -9,7 +9,7 @@ use clap::{Parser, Subcommand};
 use hooks::{
     handle_hook_result, handle_notification, handle_post_tool_use, handle_pre_compact,
     handle_pre_tool_use, handle_session_end, handle_session_start, handle_stop,
-    handle_subagent_stop, handle_user_prompt_submit,
+    handle_subagent_start, handle_subagent_stop, handle_user_prompt_submit,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -70,6 +70,9 @@ enum Commands {
     /// Process Stop hook - fired when session terminates
     #[clap(name = "Stop")]
     Stop,
+    /// Process `SubagentStart` hook - fired when subagent begins
+    #[clap(name = "SubagentStart")]
+    SubagentStart,
     /// Process `SubagentStop` hook - fired when subagent completes
     #[clap(name = "SubagentStop")]
     SubagentStop,
@@ -112,6 +115,7 @@ async fn main() -> Result<()> {
         Commands::SessionStart => handle_hook_result(handle_session_start).await,
         Commands::SessionEnd => handle_hook_result(handle_session_end).await,
         Commands::Stop => handle_hook_result(handle_stop).await,
+        Commands::SubagentStart => handle_hook_result(handle_subagent_start).await,
         Commands::SubagentStop => handle_hook_result(handle_subagent_stop).await,
         Commands::PreCompact => handle_hook_result(handle_pre_compact).await,
         Commands::Visualize { rule, show_matches } => handle_visualize(rule, show_matches).await,
@@ -233,6 +237,7 @@ async fn handle_init(
         "PostToolUse",
         "Notification",
         "Stop",
+        "SubagentStart",
         "SubagentStop",
         "PreCompact",
         "SessionStart",

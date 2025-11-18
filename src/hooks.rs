@@ -1,8 +1,9 @@
 use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig};
 use crate::types::{
-    validate_base_payload, validate_subagent_stop_payload, HookResult, NotificationPayload,
-    PostToolUsePayload, PreCompactPayload, PreToolUsePayload, SessionEndPayload,
-    SessionStartPayload, StopPayload, SubagentStopPayload, UserPromptSubmitPayload,
+    validate_base_payload, validate_subagent_start_payload, validate_subagent_stop_payload,
+    HookResult, NotificationPayload, PostToolUsePayload, PreCompactPayload, PreToolUsePayload,
+    SessionEndPayload, SessionStartPayload, StopPayload, SubagentStartPayload, SubagentStopPayload,
+    UserPromptSubmitPayload,
 };
 use anyhow::{Context, Result};
 use glob::Pattern;
@@ -45,7 +46,12 @@ static CACHED_CONFIG: OnceLock<(ConclaudeConfig, std::path::PathBuf)> = OnceLock
 fn is_system_event_hook(hook_name: &str) -> bool {
     matches!(
         hook_name,
-        "SessionStart" | "SessionEnd" | "UserPromptSubmit" | "SubagentStop" | "PreCompact"
+        "SessionStart"
+            | "SessionEnd"
+            | "UserPromptSubmit"
+            | "SubagentStart"
+            | "SubagentStop"
+            | "PreCompact"
     )
 }
 
@@ -829,6 +835,41 @@ pub async fn handle_stop() -> Result<HookResult> {
     Ok(HookResult::success())
 }
 
+/// Handles `SubagentStart` hook events when Claude subagents begin execution.
+///
+/// # Errors
+///
+/// Returns an error if payload validation fails or configuration loading fails.
+#[allow(clippy::unused_async)]
+pub async fn handle_subagent_start() -> Result<HookResult> {
+    let payload: SubagentStartPayload = read_payload_from_stdin()?;
+
+    // Validate the payload including agent_id, subagent_type, and agent_transcript_path fields
+    validate_subagent_start_payload(&payload).map_err(|e| anyhow::anyhow!(e))?;
+
+    println!(
+        "Processing SubagentStart hook: session_id={}, agent_id={}",
+        payload.base.session_id, payload.agent_id
+    );
+
+    // Set environment variables for the subagent's information
+    // These allow downstream hooks and processes to access subagent details
+    std::env::set_var("CONCLAUDE_AGENT_ID", &payload.agent_id);
+    std::env::set_var("CONCLAUDE_SUBAGENT_TYPE", &payload.subagent_type);
+    std::env::set_var(
+        "CONCLAUDE_AGENT_TRANSCRIPT_PATH",
+        &payload.agent_transcript_path,
+    );
+
+    // Send notification for subagent start with agent ID included
+    send_notification(
+        "SubagentStart",
+        "success",
+        Some(&format!("Subagent '{}' started", payload.agent_id)),
+    );
+    Ok(HookResult::success())
+}
+
 /// Handles `SubagentStop` hook events when Claude subagents complete their tasks.
 ///
 /// # Errors
@@ -849,7 +890,10 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
     // Set environment variables for the subagent's information
     // These allow downstream hooks and processes to access subagent details
     std::env::set_var("CONCLAUDE_AGENT_ID", &payload.agent_id);
-    std::env::set_var("CONCLAUDE_AGENT_TRANSCRIPT_PATH", &payload.agent_transcript_path);
+    std::env::set_var(
+        "CONCLAUDE_AGENT_TRANSCRIPT_PATH",
+        &payload.agent_transcript_path,
+    );
 
     // Send notification for subagent stop with agent ID included
     send_notification(
@@ -1112,6 +1156,7 @@ mod tests {
         assert!(is_system_event_hook("SessionStart"));
         assert!(is_system_event_hook("SessionEnd"));
         assert!(is_system_event_hook("UserPromptSubmit"));
+        assert!(is_system_event_hook("SubagentStart"));
         assert!(is_system_event_hook("SubagentStop"));
         assert!(is_system_event_hook("PreCompact"));
 
