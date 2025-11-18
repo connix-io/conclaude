@@ -52,6 +52,8 @@ pub struct PreToolUsePayload {
     pub tool_name: String,
     /// Input parameters that will be passed to the tool
     pub tool_input: HashMap<String, serde_json::Value>,
+    /// Unique identifier for this tool invocation, allowing correlation between PreToolUse and PostToolUse events.
+    pub tool_use_id: Option<String>,
 }
 
 /// Payload for `PostToolUse` hook - fired after Claude executes a tool.
@@ -64,6 +66,8 @@ pub struct PostToolUsePayload {
     pub tool_name: String,
     /// Input parameters that were passed to the tool
     pub tool_input: HashMap<String, serde_json::Value>,
+    /// Unique identifier for this tool invocation, allowing correlation between PreToolUse and PostToolUse events.
+    pub tool_use_id: Option<String>,
     /// Response data returned by the tool execution (can be any JSON value)
     pub tool_response: serde_json::Value,
 }
@@ -88,6 +92,20 @@ pub struct StopPayload {
     pub base: BasePayload,
     /// Whether stop hooks are currently active for this session
     pub stop_hook_active: bool,
+}
+
+/// Payload for `SubagentStart` hook - fired when a Claude subagent is launched.
+/// Subagents are spawned for complex tasks and this fires when they begin execution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubagentStartPayload {
+    #[serde(flatten)]
+    pub base: BasePayload,
+    /// Unique identifier for the subagent being started (e.g., "coder", "tester", "stuck")
+    pub agent_id: String,
+    /// Type of subagent being started
+    pub subagent_type: String,
+    /// Path to the subagent's specific transcript file for conversation history
+    pub agent_transcript_path: String,
 }
 
 /// Payload for `SubagentStop` hook - fired when a Claude subagent terminates.
@@ -166,6 +184,8 @@ pub enum HookPayload {
     Notification(NotificationPayload),
     #[serde(rename = "Stop")]
     Stop(StopPayload),
+    #[serde(rename = "SubagentStart")]
+    SubagentStart(SubagentStartPayload),
     #[serde(rename = "SubagentStop")]
     SubagentStop(SubagentStopPayload),
     #[serde(rename = "UserPromptSubmit")]
@@ -187,6 +207,7 @@ impl HookPayload {
             HookPayload::PostToolUse(p) => &p.base.session_id,
             HookPayload::Notification(p) => &p.base.session_id,
             HookPayload::Stop(p) => &p.base.session_id,
+            HookPayload::SubagentStart(p) => &p.base.session_id,
             HookPayload::SubagentStop(p) => &p.base.session_id,
             HookPayload::UserPromptSubmit(p) => &p.base.session_id,
             HookPayload::PreCompact(p) => &p.base.session_id,
@@ -203,6 +224,7 @@ impl HookPayload {
             HookPayload::PostToolUse(p) => &p.base.transcript_path,
             HookPayload::Notification(p) => &p.base.transcript_path,
             HookPayload::Stop(p) => &p.base.transcript_path,
+            HookPayload::SubagentStart(p) => &p.base.transcript_path,
             HookPayload::SubagentStop(p) => &p.base.transcript_path,
             HookPayload::UserPromptSubmit(p) => &p.base.transcript_path,
             HookPayload::PreCompact(p) => &p.base.transcript_path,
@@ -219,6 +241,7 @@ impl HookPayload {
             HookPayload::PostToolUse(p) => &p.base.hook_event_name,
             HookPayload::Notification(p) => &p.base.hook_event_name,
             HookPayload::Stop(p) => &p.base.hook_event_name,
+            HookPayload::SubagentStart(p) => &p.base.hook_event_name,
             HookPayload::SubagentStop(p) => &p.base.hook_event_name,
             HookPayload::UserPromptSubmit(p) => &p.base.hook_event_name,
             HookPayload::PreCompact(p) => &p.base.hook_event_name,
@@ -246,6 +269,34 @@ pub fn validate_base_payload(base: &BasePayload) -> Result<(), String> {
     if base.cwd.is_empty() {
         return Err("Missing required field: cwd".to_string());
     }
+    Ok(())
+}
+
+/// Validates that a SubagentStartPayload contains all required fields.
+///
+/// # Errors
+///
+/// Returns an error if any required field is missing or empty (after trimming whitespace).
+#[allow(dead_code)]
+pub fn validate_subagent_start_payload(payload: &SubagentStartPayload) -> Result<(), String> {
+    // First validate the base payload
+    validate_base_payload(&payload.base)?;
+
+    // Validate agent_id
+    if payload.agent_id.trim().is_empty() {
+        return Err("agent_id cannot be empty".to_string());
+    }
+
+    // Validate subagent_type
+    if payload.subagent_type.trim().is_empty() {
+        return Err("subagent_type cannot be empty".to_string());
+    }
+
+    // Validate agent_transcript_path
+    if payload.agent_transcript_path.trim().is_empty() {
+        return Err("agent_transcript_path cannot be empty".to_string());
+    }
+
     Ok(())
 }
 
@@ -459,5 +510,412 @@ mod tests {
             };
             assert!(validate_subagent_stop_payload(&payload).is_ok());
         }
+    }
+
+    #[test]
+    fn test_pre_tool_use_payload_serialization_with_tool_use_id() {
+        let mut tool_input = HashMap::new();
+        tool_input.insert("param1".to_string(), serde_json::json!("value1"));
+
+        let payload = PreToolUsePayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "PreToolUse".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            tool_name: "Edit".to_string(),
+            tool_input,
+            tool_use_id: Some("test-id-123".to_string()),
+        };
+
+        let json = serde_json::to_string(&payload).unwrap();
+        assert!(json.contains("\"tool_use_id\":\"test-id-123\""));
+    }
+
+    #[test]
+    fn test_pre_tool_use_payload_deserialization_without_tool_use_id() {
+        let json = r#"{
+            "session_id": "test_session",
+            "transcript_path": "/path/to/transcript",
+            "hook_event_name": "PreToolUse",
+            "cwd": "/current/dir",
+            "permission_mode": "default",
+            "tool_name": "Edit",
+            "tool_input": {"param1": "value1"}
+        }"#;
+
+        let payload: PreToolUsePayload = serde_json::from_str(json).unwrap();
+        assert_eq!(payload.tool_use_id, None);
+        assert_eq!(payload.tool_name, "Edit");
+        assert_eq!(payload.base.session_id, "test_session");
+    }
+
+    #[test]
+    fn test_post_tool_use_payload_serialization_with_tool_use_id() {
+        let mut tool_input = HashMap::new();
+        tool_input.insert("param1".to_string(), serde_json::json!("value1"));
+
+        let payload = PostToolUsePayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "PostToolUse".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            tool_name: "Edit".to_string(),
+            tool_input,
+            tool_use_id: Some("test-id-456".to_string()),
+            tool_response: serde_json::json!({"status": "success"}),
+        };
+
+        let json = serde_json::to_string(&payload).unwrap();
+        assert!(json.contains("\"tool_use_id\":\"test-id-456\""));
+    }
+
+    #[test]
+    fn test_post_tool_use_payload_deserialization_without_tool_use_id() {
+        let json = r#"{
+            "session_id": "test_session",
+            "transcript_path": "/path/to/transcript",
+            "hook_event_name": "PostToolUse",
+            "cwd": "/current/dir",
+            "permission_mode": "default",
+            "tool_name": "Edit",
+            "tool_input": {"param1": "value1"},
+            "tool_response": {"status": "success"}
+        }"#;
+
+        let payload: PostToolUsePayload = serde_json::from_str(json).unwrap();
+        assert_eq!(payload.tool_use_id, None);
+        assert_eq!(payload.tool_name, "Edit");
+        assert_eq!(payload.base.session_id, "test_session");
+    }
+
+    #[test]
+    fn test_tool_use_id_round_trip_serialization() {
+        // Test PreToolUsePayload round-trip
+        let mut tool_input = HashMap::new();
+        tool_input.insert("param1".to_string(), serde_json::json!("value1"));
+
+        let pre_payload = PreToolUsePayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "PreToolUse".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            tool_name: "Edit".to_string(),
+            tool_input: tool_input.clone(),
+            tool_use_id: Some("round-trip-id".to_string()),
+        };
+
+        let json = serde_json::to_string(&pre_payload).unwrap();
+        let deserialized: PreToolUsePayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.tool_use_id, Some("round-trip-id".to_string()));
+
+        // Test PostToolUsePayload round-trip
+        let post_payload = PostToolUsePayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "PostToolUse".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            tool_name: "Edit".to_string(),
+            tool_input,
+            tool_use_id: Some("round-trip-id-2".to_string()),
+            tool_response: serde_json::json!({"status": "success"}),
+        };
+
+        let json = serde_json::to_string(&post_payload).unwrap();
+        let deserialized: PostToolUsePayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            deserialized.tool_use_id,
+            Some("round-trip-id-2".to_string())
+        );
+    }
+
+    #[test]
+    fn test_validate_subagent_start_payload_valid() {
+        let payload = SubagentStartPayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "SubagentStart".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            agent_id: "coder".to_string(),
+            subagent_type: "implementation".to_string(),
+            agent_transcript_path: "/path/to/agent/transcript".to_string(),
+        };
+        assert!(validate_subagent_start_payload(&payload).is_ok());
+    }
+
+    #[test]
+    fn test_validate_subagent_start_payload_empty_agent_id() {
+        let payload = SubagentStartPayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "SubagentStart".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            agent_id: String::new(),
+            subagent_type: "implementation".to_string(),
+            agent_transcript_path: "/path/to/agent/transcript".to_string(),
+        };
+        let result = validate_subagent_start_payload(&payload);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "agent_id cannot be empty");
+    }
+
+    #[test]
+    fn test_validate_subagent_start_payload_whitespace_agent_id() {
+        let payload = SubagentStartPayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "SubagentStart".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            agent_id: "   ".to_string(),
+            subagent_type: "implementation".to_string(),
+            agent_transcript_path: "/path/to/agent/transcript".to_string(),
+        };
+        let result = validate_subagent_start_payload(&payload);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "agent_id cannot be empty");
+    }
+
+    #[test]
+    fn test_validate_subagent_start_payload_empty_subagent_type() {
+        let payload = SubagentStartPayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "SubagentStart".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            agent_id: "coder".to_string(),
+            subagent_type: String::new(),
+            agent_transcript_path: "/path/to/agent/transcript".to_string(),
+        };
+        let result = validate_subagent_start_payload(&payload);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "subagent_type cannot be empty");
+    }
+
+    #[test]
+    fn test_validate_subagent_start_payload_whitespace_subagent_type() {
+        let payload = SubagentStartPayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "SubagentStart".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            agent_id: "coder".to_string(),
+            subagent_type: "   ".to_string(),
+            agent_transcript_path: "/path/to/agent/transcript".to_string(),
+        };
+        let result = validate_subagent_start_payload(&payload);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "subagent_type cannot be empty");
+    }
+
+    #[test]
+    fn test_validate_subagent_start_payload_empty_agent_transcript_path() {
+        let payload = SubagentStartPayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "SubagentStart".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            agent_id: "coder".to_string(),
+            subagent_type: "implementation".to_string(),
+            agent_transcript_path: String::new(),
+        };
+        let result = validate_subagent_start_payload(&payload);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "agent_transcript_path cannot be empty");
+    }
+
+    #[test]
+    fn test_validate_subagent_start_payload_whitespace_agent_transcript_path() {
+        let payload = SubagentStartPayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "SubagentStart".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            agent_id: "coder".to_string(),
+            subagent_type: "implementation".to_string(),
+            agent_transcript_path: "   ".to_string(),
+        };
+        let result = validate_subagent_start_payload(&payload);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "agent_transcript_path cannot be empty");
+    }
+
+    #[test]
+    fn test_validate_subagent_start_payload_invalid_base() {
+        let payload = SubagentStartPayload {
+            base: BasePayload {
+                session_id: String::new(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "SubagentStart".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            agent_id: "coder".to_string(),
+            subagent_type: "implementation".to_string(),
+            agent_transcript_path: "/path/to/agent/transcript".to_string(),
+        };
+        let result = validate_subagent_start_payload(&payload);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("session_id"));
+    }
+
+    #[test]
+    fn test_validate_subagent_start_payload_agent_id_with_leading_trailing_spaces() {
+        let payload = SubagentStartPayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "SubagentStart".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            agent_id: "  coder  ".to_string(),
+            subagent_type: "implementation".to_string(),
+            agent_transcript_path: "/path/to/agent/transcript".to_string(),
+        };
+        assert!(validate_subagent_start_payload(&payload).is_ok());
+    }
+
+    #[test]
+    fn test_validate_subagent_start_payload_different_agent_types() {
+        let agent_types = vec!["coder", "tester", "stuck"];
+
+        for agent_type in agent_types {
+            let payload = SubagentStartPayload {
+                base: BasePayload {
+                    session_id: "test_session".to_string(),
+                    transcript_path: "/path/to/transcript".to_string(),
+                    hook_event_name: "SubagentStart".to_string(),
+                    cwd: "/current/dir".to_string(),
+                    permission_mode: Some("default".to_string()),
+                },
+                agent_id: agent_type.to_string(),
+                subagent_type: "implementation".to_string(),
+                agent_transcript_path: "/path/to/agent/transcript".to_string(),
+            };
+            assert!(validate_subagent_start_payload(&payload).is_ok());
+        }
+    }
+
+    #[test]
+    fn test_subagent_start_payload_deserialize_from_valid_json() {
+        let json = r#"{
+            "session_id": "test_session",
+            "transcript_path": "/path/to/transcript",
+            "hook_event_name": "SubagentStart",
+            "cwd": "/current/dir",
+            "permission_mode": "default",
+            "agent_id": "coder",
+            "subagent_type": "implementation",
+            "agent_transcript_path": "/path/to/agent/transcript"
+        }"#;
+
+        let payload: SubagentStartPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(payload.agent_id, "coder");
+        assert_eq!(payload.subagent_type, "implementation");
+        assert_eq!(payload.agent_transcript_path, "/path/to/agent/transcript");
+        assert_eq!(payload.base.session_id, "test_session");
+    }
+
+    #[test]
+    fn test_subagent_start_payload_deserialize_missing_agent_id() {
+        let json = r#"{
+            "session_id": "test_session",
+            "transcript_path": "/path/to/transcript",
+            "hook_event_name": "SubagentStart",
+            "cwd": "/current/dir",
+            "permission_mode": "default",
+            "subagent_type": "implementation",
+            "agent_transcript_path": "/path/to/agent/transcript"
+        }"#;
+
+        let result: Result<SubagentStartPayload, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_subagent_start_payload_deserialize_missing_subagent_type() {
+        let json = r#"{
+            "session_id": "test_session",
+            "transcript_path": "/path/to/transcript",
+            "hook_event_name": "SubagentStart",
+            "cwd": "/current/dir",
+            "permission_mode": "default",
+            "agent_id": "coder",
+            "agent_transcript_path": "/path/to/agent/transcript"
+        }"#;
+
+        let result: Result<SubagentStartPayload, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_subagent_start_payload_deserialize_missing_agent_transcript_path() {
+        let json = r#"{
+            "session_id": "test_session",
+            "transcript_path": "/path/to/transcript",
+            "hook_event_name": "SubagentStart",
+            "cwd": "/current/dir",
+            "permission_mode": "default",
+            "agent_id": "coder",
+            "subagent_type": "implementation"
+        }"#;
+
+        let result: Result<SubagentStartPayload, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_hook_payload_subagent_start_serialization() {
+        let subagent_start = SubagentStartPayload {
+            base: BasePayload {
+                session_id: "test_session".to_string(),
+                transcript_path: "/path/to/transcript".to_string(),
+                hook_event_name: "SubagentStart".to_string(),
+                cwd: "/current/dir".to_string(),
+                permission_mode: Some("default".to_string()),
+            },
+            agent_id: "coder".to_string(),
+            subagent_type: "implementation".to_string(),
+            agent_transcript_path: "/path/to/agent/transcript".to_string(),
+        };
+
+        let hook_payload = HookPayload::SubagentStart(subagent_start);
+        let json = serde_json::to_string(&hook_payload).unwrap();
+
+        assert!(json.contains("\"hook_event_name\":\"SubagentStart\""));
+        assert!(json.contains("\"agent_id\":\"coder\""));
+        assert!(json.contains("\"subagent_type\":\"implementation\""));
     }
 }

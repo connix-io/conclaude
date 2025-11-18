@@ -355,6 +355,7 @@ notifications:
 - `"SessionStart"` - When a new Claude session begins
 - `"UserPromptSubmit"` - When you submit input to Claude
 - `"Notification"` - When Claude sends internal notifications
+- `"SubagentStart"` - When Claude subagents begin their tasks
 - `"SubagentStop"` - When Claude subagents complete tasks
 - `"PreCompact"` - Before transcript compaction
 
@@ -424,7 +425,8 @@ conclaude taps into Claude Code's lifecycle through strategic intervention point
 ### Supporting Cast of Hooks
 
 - **UserPromptSubmit** - Intercept and potentially modify your prompts before Claude sees them
-- **SessionStart** - Initialize logging, set up monitoring, prepare your workspace  
+- **SessionStart** - Initialize logging, set up monitoring, prepare your workspace
+- **SubagentStart** - Track when Claude's internal subprocesses begin their work
 - **SubagentStop** - Handle completion of Claude's internal subprocesses
 - **Notification** - Process and potentially filter system notifications
 - **PreCompact** - Prepare transcripts before they're compressed or archived
@@ -634,6 +636,10 @@ echo '{"session_id":"test","transcript_path":"/tmp/test.jsonl","hook_event_name"
 echo '{"session_id":"test","transcript_path":"/tmp/test.jsonl","hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"test.txt"}}' | \
   conclaude PreToolUse
 
+# Test SubagentStart hook
+echo '{"session_id":"test","transcript_path":"/tmp/test.jsonl","hook_event_name":"SubagentStart","cwd":"/tmp","permission_mode":"ask","agent_id":"coder","subagent_type":"implementation","agent_transcript_path":"/tmp/agent_coder.jsonl"}' | \
+  conclaude SubagentStart
+
 # Test SubagentStop hook
 echo '{"session_id":"test","transcript_path":"/tmp/test.jsonl","hook_event_name":"SubagentStop","stop_hook_active":true,"agent_id":"coder","agent_transcript_path":"/tmp/agent_coder.jsonl"}' | \
   conclaude SubagentStop
@@ -681,6 +687,93 @@ Edit → /repo/config.json           ❌ Blocked
 Write → /repo/.gitignore           ✓ Allowed (dotfile)
 Write → /repo/src/component.rs     ✓ Allowed (subdirectory)
 Read → /repo/Cargo.toml            ✓ Allowed (read-only)
+```
+
+### SubagentStart Hook Payload
+
+The SubagentStart hook is triggered when Claude's internal subagents (like the coder, tester, or stuck agents) begin their work. The hook receives a JSON payload containing information about which subagent is starting and where its transcript will be located.
+
+**SubagentStart Payload Structure:**
+
+```json
+{
+  "session_id": "abc123def456",
+  "transcript_path": "/tmp/conclaude-sessions/main_transcript.jsonl",
+  "hook_event_name": "SubagentStart",
+  "cwd": "/home/user/project",
+  "permission_mode": "ask",
+  "agent_id": "coder",
+  "subagent_type": "implementation",
+  "agent_transcript_path": "/tmp/conclaude-sessions/agent_coder_transcript.jsonl"
+}
+```
+
+**Payload Fields:**
+
+- `session_id`: Unique identifier for the current Claude Code session
+- `transcript_path`: Path to the main session transcript file
+- `hook_event_name`: Always "SubagentStart" for this hook
+- `cwd`: Current working directory where the session is executing
+- `permission_mode`: Permission mode for the session (e.g., "ask", "allow", "deny")
+- `agent_id`: **Identifier for the subagent starting** (e.g., "coder", "tester", "stuck", or other agent names)
+- `subagent_type`: **Type/category of the subagent** (e.g., "implementation", "testing", "stuck")
+- `agent_transcript_path`: **Path to the subagent's transcript file**, allowing monitoring of the agent's work as it progresses
+
+**Use Cases:**
+
+- **Logging and Monitoring**: Track which subagents start and when
+- **Initialization**: Perform setup operations when specific subagents begin
+- **Metrics**: Collect timing and performance metrics for subagent workflows
+- **Integration**: Trigger external systems when specific subagents start
+- **Resource Management**: Allocate resources based on subagent type
+
+**Environment Variables Available:**
+
+When SubagentStart hook commands execute, these environment variables are available:
+
+```bash
+# Main session context
+$CONCLAUDE_SESSION_ID          # Session ID
+$CONCLAUDE_TRANSCRIPT_PATH     # Main transcript path
+$CONCLAUDE_CWD                 # Working directory
+$CONCLAUDE_HOOK_EVENT          # "SubagentStart"
+$CONCLAUDE_PERMISSION_MODE     # Permission mode
+
+# Subagent-specific context
+$CONCLAUDE_AGENT_ID            # The subagent identifier
+$CONCLAUDE_SUBAGENT_TYPE       # The subagent type/category
+$CONCLAUDE_AGENT_TRANSCRIPT_PATH # Path to subagent's transcript
+```
+
+**Example Configuration:**
+
+```yaml
+# .conclaude.yaml
+notifications:
+  enabled: true
+  hooks:
+    - "SubagentStart"  # Get notified when subagents start
+```
+
+**Manual Testing:**
+
+```bash
+# Test SubagentStart hook with complete payload
+cat > subagent_start_payload.json << 'EOF'
+{
+  "session_id": "test-session-123",
+  "transcript_path": "/tmp/main_transcript.jsonl",
+  "hook_event_name": "SubagentStart",
+  "cwd": "/home/user/project",
+  "permission_mode": "ask",
+  "agent_id": "coder",
+  "subagent_type": "implementation",
+  "agent_transcript_path": "/tmp/agent_coder_transcript.jsonl"
+}
+EOF
+
+# Send to conclaude
+cat subagent_start_payload.json | conclaude SubagentStart
 ```
 
 ### SubagentStop Hook Payload
@@ -856,6 +949,7 @@ config.stop.run → extract_bash_commands() → tokio::process::Command → sequ
 - **SessionStart**: Initialize session-specific logging and setup
 - **UserPromptSubmit**: Process and validate user input
 - **Notification**: Handle system notifications and alerts
+- **SubagentStart**: Track subagent initialization and setup
 - **SubagentStop**: Manage subagent completion events
 - **PreCompact**: Handle transcript compaction preparation
 
@@ -896,6 +990,7 @@ conclaude Stop
 conclaude SessionStart
 conclaude UserPromptSubmit
 conclaude Notification
+conclaude SubagentStart
 conclaude SubagentStop
 conclaude PreCompact
 
@@ -1103,6 +1198,12 @@ preToolUse:
 - `CONCLAUDE_TRANSCRIPT_PATH`: Path to the main session transcript file
 - `CONCLAUDE_CWD`: Current working directory where the session is running
 - `CONCLAUDE_HOOK_EVENT`: Name of the currently executing hook
+
+**SubagentStart Hook Variables** (Available when SubagentStart hook executes):
+- `CONCLAUDE_AGENT_ID`: Identifier for the subagent starting (e.g., "coder", "tester", "stuck")
+- `CONCLAUDE_SUBAGENT_TYPE`: Type/category of the subagent (e.g., "implementation", "testing", "stuck")
+- `CONCLAUDE_AGENT_TRANSCRIPT_PATH`: Path to the subagent's transcript file for monitoring its work
+- `CONCLAUDE_PERMISSION_MODE`: Permission mode for the session (e.g., "ask", "allow", "deny")
 
 **SubagentStop Hook Variables** (Available when SubagentStop hook executes):
 - `CONCLAUDE_AGENT_ID`: Identifier for the subagent that completed (e.g., "coder", "tester", "stuck")
