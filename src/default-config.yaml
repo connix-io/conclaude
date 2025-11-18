@@ -36,6 +36,59 @@ stop:
   rounds: null
   # Example: rounds: 3
 
+# Subagent stop hook configuration - runs when Claude subagents complete
+# Allows running commands based on which subagent finished (coder, tester, stuck, etc.)
+subagentStop:
+  # Map of subagent name patterns to command lists
+  # Patterns support glob syntax for flexible matching:
+  #   - "*" matches all subagents (wildcard)
+  #   - "coder" matches exactly "coder"
+  #   - "test*" matches "tester", "test-runner", etc. (prefix)
+  #   - "*coder" matches "coder", "auto-coder", etc. (suffix)
+  #   - "agent_[0-9]*" matches "agent_1", "agent_2", etc. (character classes)
+  #
+  # Execution order: wildcard (*) commands run first, then specific pattern matches
+  commands: {}
+  # Examples:
+  # commands:
+  #   # Wildcard - runs for ANY subagent completion
+  #   "*":
+  #     - run: "echo 'Subagent completed: $CONCLAUDE_AGENT_ID'"
+  #       showStdout: true
+  #
+  #   # Exact match - runs only when "coder" subagent completes
+  #   "coder":
+  #     - run: "npm run lint"
+  #       showStderr: true
+  #       message: "Linting failed - please fix errors"
+  #       maxOutputLines: 50
+  #
+  #   # Prefix glob - runs for any subagent starting with "test"
+  #   "test*":
+  #     - run: "npm test"
+  #       showStdout: true
+  #       showStderr: true
+  #       message: "Tests failed"
+  #
+  #   # Suffix glob - runs for any subagent ending with "coder"
+  #   "*coder":
+  #     - run: "cargo clippy"
+  #       showStderr: true
+  #
+  #   # Character class - runs for numbered agents
+  #   "agent_[0-9]*":
+  #     - run: "echo 'Numbered agent completed'"
+  #
+  # Available environment variables in commands:
+  #   CONCLAUDE_AGENT_ID - The subagent identifier (e.g., "coder", "tester")
+  #   CONCLAUDE_AGENT_TRANSCRIPT_PATH - Path to the subagent's transcript
+  #   CONCLAUDE_SESSION_ID - Main session identifier
+  #   CONCLAUDE_TRANSCRIPT_PATH - Path to main session transcript
+  #   CONCLAUDE_HOOK_EVENT - Always "SubagentStop"
+  #   CONCLAUDE_CWD - Current working directory
+  #
+  # Note: Command failures are logged but do not block the SubagentStop hook
+
 # Validation rules for hook processing
 rules:
   # Prevent Claude from creating or modifying files at the repository root
