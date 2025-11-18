@@ -25,6 +25,7 @@ fn create_test_payload_write(file_path: &str) -> PreToolUsePayload {
         base: create_test_base_payload(),
         tool_name: "Write".to_string(),
         tool_input,
+        tool_use_id: None,
     }
 }
 
@@ -277,6 +278,7 @@ fn create_test_payload_edit(file_path: &str) -> PreToolUsePayload {
         base: create_test_base_payload(),
         tool_name: "Edit".to_string(),
         tool_input,
+        tool_use_id: None,
     }
 }
 
@@ -296,6 +298,7 @@ fn create_test_payload_notebook_edit(notebook_path: &str) -> PreToolUsePayload {
         base: create_test_base_payload(),
         tool_name: "NotebookEdit".to_string(),
         tool_input,
+        tool_use_id: None,
     }
 }
 

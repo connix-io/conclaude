@@ -433,6 +433,7 @@ async fn test_bash_validation_block_exact_command() -> anyhow::Result<()> {
         base: create_test_base_payload(),
         tool_name: "Bash".to_string(),
         tool_input,
+        tool_use_id: None,
     };
 
     // Manually test the pattern matching logic (since we can't easily inject config)
@@ -492,6 +493,7 @@ async fn test_bash_validation_block_command_family() -> anyhow::Result<()> {
         base: create_test_base_payload(),
         tool_name: "Bash".to_string(),
         tool_input,
+        tool_use_id: None,
     };
 
     // Test prefix mode matching
@@ -553,6 +555,7 @@ async fn test_bash_validation_allow_whitelist() -> anyhow::Result<()> {
         base: create_test_base_payload(),
         tool_name: "Bash".to_string(),
         tool_input: tool_input_allowed,
+        tool_use_id: None,
     };
 
     let command_allowed = payload_allowed
@@ -581,6 +584,7 @@ async fn test_bash_validation_allow_whitelist() -> anyhow::Result<()> {
         base: create_test_base_payload(),
         tool_name: "Bash".to_string(),
         tool_input: tool_input_blocked,
+        tool_use_id: None,
     };
 
     let command_blocked = payload_blocked
@@ -630,6 +634,7 @@ async fn test_bash_validation_custom_message() -> anyhow::Result<()> {
         base: create_test_base_payload(),
         tool_name: "Bash".to_string(),
         tool_input,
+        tool_use_id: None,
     };
 
     let command = payload
@@ -678,6 +683,7 @@ async fn test_bash_validation_default_match_mode() -> anyhow::Result<()> {
         base: create_test_base_payload(),
         tool_name: "Bash".to_string(),
         tool_input,
+        tool_use_id: None,
     };
 
     let command = payload
@@ -728,6 +734,7 @@ async fn test_bash_validation_backward_compatible() -> anyhow::Result<()> {
         base: create_test_base_payload(),
         tool_name: "Write".to_string(),
         tool_input,
+        tool_use_id: None,
     };
 
     let file_path = payload
@@ -777,6 +784,7 @@ async fn test_bash_validation_wildcard_tool() -> anyhow::Result<()> {
         base: create_test_base_payload(),
         tool_name: "Bash".to_string(),
         tool_input,
+        tool_use_id: None,
     };
 
     let command = payload
@@ -831,6 +839,7 @@ async fn test_bash_validation_prefix_mode_no_match_in_middle() -> anyhow::Result
         base: create_test_base_payload(),
         tool_name: "Bash".to_string(),
         tool_input,
+        tool_use_id: None,
     };
 
     let command = payload
@@ -903,6 +912,7 @@ async fn test_bash_validation_multiple_rules() -> anyhow::Result<()> {
         base: create_test_base_payload(),
         tool_name: "Bash".to_string(),
         tool_input: tool_input1,
+        tool_use_id: None,
     };
 
     let command1 = payload1
@@ -925,6 +935,7 @@ async fn test_bash_validation_multiple_rules() -> anyhow::Result<()> {
         base: create_test_base_payload(),
         tool_name: "Bash".to_string(),
         tool_input: tool_input2,
+        tool_use_id: None,
     };
 
     let command2 = payload2
