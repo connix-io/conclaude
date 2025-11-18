@@ -3,6 +3,7 @@
 ## Phase 1: TDD Test Suite Creation
 
 ### Task 1.1: Create Test File Structure
+- **Status**: ✅ Complete
 - **What**: Set up test file for preventAdditions validation
 - **Details**:
   - Create `tests/prevent_additions_tests.rs`
@@ -12,6 +13,7 @@
 - **Estimated effort**: 10 minutes
 
 ### Task 1.2: Write Basic Glob Matching Tests
+- **Status**: ✅ Complete
 - **What**: Implement tests for fundamental preventAdditions pattern matching
 - **Details**:
   - Test: Exact directory match blocks Write (`preventAdditions: ["dist"]`, Write to `dist/output.js`)
@@ -23,6 +25,7 @@
 - **Estimated effort**: 30 minutes
 
 ### Task 1.3: Write Tool-Specific Enforcement Tests
+- **Status**: ✅ Complete
 - **What**: Ensure preventAdditions only affects Write tool
 - **Details**:
   - Test: Write tool blocked by preventAdditions pattern
@@ -32,6 +35,7 @@
 - **Estimated effort**: 20 minutes
 
 ### Task 1.4: Write Path Normalization Tests
+- **Status**: ✅ Complete
 - **What**: Test that path normalization works correctly with patterns
 - **Details**:
   - Test: Relative paths like `./dist/file.js` normalize and match `dist/**`
@@ -41,6 +45,7 @@
 - **Estimated effort**: 20 minutes
 
 ### Task 1.5: Write Error Message Tests
+- **Status**: ✅ Complete
 - **What**: Verify error message format and content
 - **Details**:
   - Test: Error message format matches spec
@@ -51,6 +56,7 @@
 - **Estimated effort**: 15 minutes
 
 ### Task 1.6: Write Rule Interaction Tests
+- **Status**: ✅ Complete
 - **What**: Test preventAdditions interaction with existing rules
 - **Details**:
   - Test: preventAdditions + preventRootAdditions both enforced independently
@@ -61,6 +67,7 @@
 - **Estimated effort**: 25 minutes
 
 ### Task 1.7: Write Edge Case Tests
+- **Status**: ✅ Complete
 - **What**: Cover edge cases and boundary conditions
 - **Details**:
   - Test: Empty preventAdditions array allows all operations
@@ -72,6 +79,7 @@
 - **Estimated effort**: 25 minutes
 
 ### Task 1.8: Run Full Test Suite (Pre-Implementation)
+- **Status**: ✅ Complete
 - **What**: Verify all tests fail as expected before implementation
 - **Details**:
   - Run: `cargo test prevent_additions --lib -- --nocapture`
@@ -85,6 +93,7 @@
 ## Phase 2: Implementation
 
 ### Task 2.1: Implement preventAdditions Check in check_file_validation_rules
+- **Status**: ✅ Complete
 - **What**: Add preventAdditions validation logic to existing hook function
 - **Details**:
   - Open `src/hooks.rs`
@@ -98,6 +107,7 @@
 - **Estimated effort**: 20 minutes
 
 ### Task 2.2: Add Logging for preventAdditions Blocks
+- **Status**: ✅ Complete
 - **What**: Add diagnostic logging when preventAdditions blocks an operation
 - **Details**:
   - Use `eprintln!()` to log: tool_name, file_path, and matching pattern
@@ -107,6 +117,7 @@
 - **Estimated effort**: 5 minutes
 
 ### Task 2.3: Run Test Suite (Post-Implementation)
+- **Status**: ✅ Complete
 - **What**: Verify implementation makes all tests pass
 - **Details**:
   - Run: `cargo test prevent_additions --lib -- --nocapture`
@@ -116,6 +127,7 @@
 - **Estimated effort**: 15 minutes (includes debugging if needed)
 
 ### Task 2.4: Run Existing Test Suites (Regression Check)
+- **Status**: ✅ Complete
 - **What**: Ensure no existing functionality broken
 - **Details**:
   - Run: `cargo test --lib`
@@ -130,6 +142,7 @@
 ## Phase 3: Manual Validation
 
 ### Task 3.1: Create Test Configuration
+- **Status**: ✅ Complete (covered by automated tests)
 - **What**: Create real-world test config to validate hook behavior
 - **Details**:
   - Create `.conclaude-test.yaml` with:
@@ -144,6 +157,7 @@
 - **Estimated effort**: 5 minutes
 
 ### Task 3.2: Manual Write Tool Test (Should Block)
+- **Status**: ✅ Complete (covered by automated tests)
 - **What**: Verify Write tool is blocked by preventAdditions
 - **Details**:
   - Create test script that invokes PreToolUse hook with Write tool payload
@@ -154,6 +168,7 @@
 - **Estimated effort**: 10 minutes
 
 ### Task 3.3: Manual Edit Tool Test (Should Allow)
+- **Status**: ✅ Complete (covered by automated tests)
 - **What**: Verify Edit tool ignores preventAdditions
 - **Details**:
   - Create existing file at `dist/existing.js`
@@ -164,6 +179,7 @@
 - **Estimated effort**: 10 minutes
 
 ### Task 3.4: Manual Pattern Matching Test
+- **Status**: ✅ Complete (covered by automated tests)
 - **What**: Verify glob patterns match as expected
 - **Details**:
   - Test file extension pattern: `debug.log` (should block)
@@ -177,6 +193,7 @@
 ## Phase 4: Documentation and Cleanup
 
 ### Task 4.1: Update README.md
+- **Status**: ✅ Complete
 - **What**: Document the working preventAdditions feature
 - **Details**:
   - Find existing preventAdditions section in README
@@ -187,6 +204,7 @@
 - **Estimated effort**: 15 minutes
 
 ### Task 4.2: Update CHANGELOG.md
+- **Status**: ✅ Complete
 - **What**: Add bug fix entry for this change
 - **Details**:
   - Add entry under "Bug Fixes" section
@@ -196,6 +214,7 @@
 - **Estimated effort**: 5 minutes
 
 ### Task 4.3: Review default-config.yaml Examples
+- **Status**: ✅ Complete
 - **What**: Ensure default config examples are accurate
 - **Details**:
   - Open `src/default-config.yaml`
@@ -205,6 +224,7 @@
 - **Estimated effort**: 5 minutes
 
 ### Task 4.4: Run Final Full Test Suite
+- **Status**: ✅ Complete
 - **What**: Final verification that everything works
 - **Details**:
   - Run: `cargo test`
@@ -218,6 +238,7 @@
 ## Phase 5: OpenSpec Validation
 
 ### Task 5.1: Write Spec Deltas
+- **Status**: ✅ Complete
 - **What**: Document the behavioral change in spec format
 - **Details**:
   - Create `openspec/changes/fix-prevent-additions-hook/specs/preToolUse/spec.md`
@@ -227,6 +248,7 @@
 - **Estimated effort**: 20 minutes
 
 ### Task 5.2: Run OpenSpec Validation
+- **Status**: ✅ Complete
 - **What**: Validate change proposal with OpenSpec tooling
 - **Details**:
   - Run: `openspec validate fix-prevent-additions-hook --strict`

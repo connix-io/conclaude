@@ -71,13 +71,17 @@ rules:
 # Pre-tool-use hook configuration - runs before tools are executed
 preToolUse:
   # Directories where file additions are prevented (in addition to root)
-  # List of directory paths where new files cannot be created
+  # NOTE: This only blocks the Write tool from creating new files
+  # Edit and NotebookEdit tools can still modify existing files in these directories
   preventAdditions: []
   # Examples:
   # preventAdditions:
-  #   - "dist"
-  #   - "build"
-  #   - "node_modules"
+  #   - "dist"              # Prevent new files in dist/
+  #   - "build"             # Prevent new files in build/
+  #   - "dist/**"           # Prevent new files in dist/ and all subdirectories
+  #   - "**/*.generated.*"  # Prevent creating files with .generated. in the name
+  #   - ".next"             # Prevent new files in Next.js build directory
+  #   - "node_modules"      # Prevent new files in dependencies
 
   # Prevent editing of auto-generated files (enabled by default)
   # Checks for common markers like "DO\ NOT\ EDIT", "Code\ generated\ by", etc.

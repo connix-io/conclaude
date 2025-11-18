@@ -1180,10 +1180,24 @@ preToolUse:
       forbiddenPattern: "unsafe"
       description: "Unsafe code blocks not allowed"
   
-  # Additional directories to protect from additions
+  # Prevent file creation in specific directories or patterns
+  # preventAdditions blocks the Write tool from creating/overwriting files matching glob patterns
+  # Note: This ONLY applies to the Write tool - Edit and NotebookEdit operations are NOT blocked
   preventAdditions:
-    - "docs/"
-    - "examples/"
+    - "dist/**"           # Block all files in dist directory and subdirectories
+    - "build/**"          # Block all files in build directory and subdirectories
+    - "docs/**/*.md"      # Block markdown files in docs directory and subdirectories
+    - "examples/*"        # Block files directly in examples directory (not subdirectories)
+
+  # How it works:
+  # - Patterns use glob syntax (supports **, *, ?, etc.)
+  # - Patterns are checked in order; first match blocks the operation
+  # - Only affects Write operations (file creation/overwriting)
+  # - Does NOT block Edit or NotebookEdit operations
+  # - Works alongside preventRootAdditions and uneditableFiles
+  #
+  # When a Write operation is blocked, the user sees:
+  # "Blocked Write operation: file matches preventAdditions pattern 'dist/**'. File: dist/output.js"
 
 ```
 
