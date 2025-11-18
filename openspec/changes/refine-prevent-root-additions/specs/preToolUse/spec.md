@@ -1,8 +1,12 @@
-# preToolUse Root Addition Prevention Specification
+# Spec: Refine preventRootAdditions to Allow Root File Edits
 
-## Purpose
+**Capability:** `preToolUse`
+**Status:** Draft
+**Version:** 1.0.0
 
-Define the refined enforcement behavior of the `preventRootAdditions` configuration setting to block only file **creation** at the repository root while allowing **modification** of existing root-level files.
+## Overview
+
+Refines the `preventRootAdditions` enforcement behavior to distinguish between file **creation** (blocked) and file **modification** (allowed) at the repository root. This change enables practical workflows that require updating root-level configuration files (e.g., `package.json`, `.env`, `tsconfig.json`) while maintaining protection against accidental file creation at the root.
 
 ## MODIFIED Requirements
 
@@ -220,3 +224,159 @@ The system SHALL check if a target file exists to distinguish between creation a
 ---
 
 **Summary:** preventRootAdditions now correctly allows modifications to existing root-level files while maintaining protection against creating new files at the root. This preserves the semantic meaning of "preventRootAdditions" (prevent adding/creating files at root) while enabling practical workflows that require updating configuration files.
+
+## Related Specs
+
+- **Modifies:** `preToolUse` - Refines preventRootAdditions enforcement logic
+- **Related to:** `fix-prevent-additions-hook` - Implements preventAdditions field enforcement (separate from root-level prevention)
+- **Related to:** `consolidate-rules-config` - Future consolidation of file protection rules
+- **Works with:** `uneditableFiles` - Can be combined with preventRootAdditions for fine-grained control
+
+## Testing Strategy
+
+### Unit Tests (tests/hooks_tests.rs)
+
+Extend existing `prevent_root_additions` tests with:
+
+1. **File Existence Checks:**
+   - Test blocking creation of new root file when file doesn't exist
+   - Test allowing Write to existing root file (overwrite operation)
+   - Test allowing Edit tool on existing root file
+   - Test allowing NotebookEdit tool on root file
+
+2. **Path Resolution:**
+   - Test relative paths normalize correctly before existence check
+   - Test canonical path resolution works with symlinks
+   - Test case-sensitive file systems handle names correctly
+
+3. **Edge Cases:**
+   - Test behavior when parent directories don't exist
+   - Test behavior with files lacking write permissions
+   - Test overwrite with identical contents
+
+4. **Integration with Other Rules:**
+   - Test preventRootAdditions with uneditableFiles (both enforced)
+   - Test preventRootAdditions doesn't affect preventAdditions
+   - Test multiple protection rules apply independently
+
+### Integration Tests (tests/integration_tests.rs)
+
+1. **Full Hook Cycle:**
+   - Load config with `preventRootAdditions: true`
+   - Invoke PreToolUse hook for Write to new root file → blocked
+   - Invoke PreToolUse hook for Write to existing root file → allowed
+   - Verify error messages are clear and accurate
+
+2. **Real-World Scenarios:**
+   - Edit existing `package.json` at root → allowed
+   - Create new `README.md` at root → blocked
+   - Edit files in subdirectories → allowed
+   - Combine with other file protection rules
+
+### Manual Testing Scenarios
+
+1. **Setup:** Create test config with `rules.preventRootAdditions: true`
+2. **Test 1:** Attempt to create new root file → BLOCKED ✓
+3. **Test 2:** Attempt to edit existing root file → ALLOWED ✓
+4. **Test 3:** Attempt to create non-root file → ALLOWED ✓
+5. **Test 4:** Verify error messages are clear
+
+## Implementation Notes
+
+### File: `src/hooks.rs`
+
+**Function:** `check_file_validation_rules()` (lines 298-314)
+
+#### Current Logic (Blocks All Modifications)
+```rust
+// Current: blocks both creation AND edit of root files
+if config.rules.prevent_root_additions
+    && payload.tool_name == "Write"
+    && is_root_addition(&file_path, &relative_path, config_path)
+{
+    // Blocked!
+}
+```
+
+#### Refined Logic (Only Blocks Creation)
+```rust
+// Refined: only block Write when file doesn't exist at root
+if config.rules.prevent_root_additions
+    && payload.tool_name == "Write"
+    && is_root_addition(&file_path, &relative_path, config_path)
+    && !resolved_path.exists()  // NEW: Allow if file exists (modification, not addition)
+{
+    // Only blocked for NEW files at root
+}
+```
+
+### Key Implementation Details
+
+1. **File Existence Check:** Use `Path::exists()` on the resolved path
+2. **Path Resolution:** Ensure canonical path resolution before existence check
+3. **Error Messages:** Maintain existing error message format for backward compatibility
+4. **Performance:** Minimal overhead (single file system check)
+
+### Code Location References
+
+- **Main logic:** `src/hooks.rs:298-314` (preventRootAdditions check)
+- **Helper function:** `is_root_addition()` (unchanged)
+- **Tests:** `tests/hooks_tests.rs` (extend prevent_root_additions tests)
+
+### Comments to Add
+
+```rust
+// Check preventRootAdditions rule - only applies to Write tool for NEW files
+// File existence check allows modifications to existing root files (e.g., package.json)
+// but prevents creation of new files at root
+if config.rules.prevent_root_additions
+    && payload.tool_name == "Write"
+    && is_root_addition(&file_path, &relative_path, config_path)
+    && !resolved_path.exists()  // Allow modifications, block only new files
+{
+    // Block creation of new root-level file
+}
+```
+
+## Migration Notes
+
+### Breaking Changes
+
+**None.** This is a **non-breaking refinement** that makes the behavior more permissive.
+
+### Backward Compatibility
+
+- **Configuration:** Same `preventRootAdditions` field, no changes needed
+- **Semantics:** Behavior becomes more permissive (allows edits), not more restrictive
+- **Existing Users:** Automatically gain ability to edit root files upon upgrade
+- **Migration Required:** None
+
+### Upgrade Path
+
+1. **Update conclaude** to version containing this change
+2. **No configuration changes** required
+3. **Immediate effect:** Root-level files become editable (while creation remains blocked)
+4. **Optional:** Combine with `uneditableFiles` if specific root files should remain read-only
+
+### Version Compatibility
+
+- **Minimum Version:** This change applies to conclaude vX.X.X+
+- **Config Version:** No schema changes, existing configs work unchanged
+- **Rollback:** Safe to downgrade (will revert to blocking all root modifications)
+
+### User Communication
+
+**CHANGELOG Entry:**
+```markdown
+### Fixed
+- **preventRootAdditions now allows editing existing root files**
+  - Refined semantics to distinguish between file creation (blocked) and modification (allowed)
+  - Users can now edit root-level configuration files like `.env` and `package.json`
+  - Maintains protection against accidental root file creation
+  - No configuration changes required
+```
+
+**Documentation Updates:**
+- Update README.md with refined semantics explanation
+- Add examples showing blocked creation vs allowed modification
+- Clarify relationship with `uneditableFiles` rule
