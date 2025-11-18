@@ -109,6 +109,7 @@ fn test_pre_tool_use_payload_serialization() {
         },
         tool_name: "Edit".to_string(),
         tool_input,
+        tool_use_id: None,
     };
 
     let json = serde_json::to_string(&payload).unwrap();

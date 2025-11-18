@@ -52,6 +52,8 @@ pub struct PreToolUsePayload {
     pub tool_name: String,
     /// Input parameters that will be passed to the tool
     pub tool_input: HashMap<String, serde_json::Value>,
+    /// Unique identifier for this tool invocation, allowing correlation between PreToolUse and PostToolUse events.
+    pub tool_use_id: Option<String>,
 }
 
 /// Payload for `PostToolUse` hook - fired after Claude executes a tool.
