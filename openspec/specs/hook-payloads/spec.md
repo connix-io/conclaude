@@ -3,7 +3,7 @@
 ## Purpose
 Define the structure of PreToolUse and PostToolUse hook payloads to support tool invocation tracking via unique tool_use_id identifiers.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: PreToolUse Payload Structure
 The system SHALL include a required tool_use_id field in PreToolUsePayload to identify the specific tool invocation.
