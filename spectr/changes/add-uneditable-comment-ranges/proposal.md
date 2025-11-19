@@ -77,8 +77,15 @@ rules:
       python: '#'
       javascript: '//'
       rust: '//'
-      shell: '#'
       ruby: '#'
+      shell: '#'
+      zig: '//'
+      nim: '#'
+      tsx: '//'
+      svelte: '<!--'
+      astro: '<!--'
+      html: '<!--'
+      md: '<!--'
 ```
 
 ### Marker Format
@@ -96,8 +103,15 @@ Standard format across all languages:
 - **Python:** `# <!-- conclaude-uneditable:start -->`
 - **JavaScript:** `// <!-- conclaude-uneditable:start -->`
 - **Rust:** `// <!-- conclaude-uneditable:start -->`
-- **Shell:** `# <!-- conclaude-uneditable:start -->`
 - **Ruby:** `# <!-- conclaude-uneditable:start -->`
+- **Shell:** `# <!-- conclaude-uneditable:start -->`
+- **Zig:** `// <!-- conclaude-uneditable:start -->`
+- **Nim:** `# <!-- conclaude-uneditable:start -->`
+- **TSX:** `// <!-- conclaude-uneditable:start -->` or `{/* <!-- conclaude-uneditable:start --> */}`
+- **Svelte:** `<!-- <!-- conclaude-uneditable:start --> -->`
+- **Astro:** `<!-- <!-- conclaude-uneditable:start --> -->`
+- **HTML:** `<!-- <!-- conclaude-uneditable:start --> -->`
+- **Markdown:** `<!-- <!-- conclaude-uneditable:start --> -->`
 
 ### Nested Ranges Support
 
@@ -127,6 +141,13 @@ Any edit overlapping lines 1-10 is blocked.
 - **comment-syntax-rust**: Rust comment pattern detection
 - **comment-syntax-ruby**: Ruby comment pattern detection
 - **comment-syntax-shell**: Shell/Bash comment pattern detection
+- **comment-syntax-zig**: Zig comment pattern detection
+- **comment-syntax-nim**: Nim comment pattern detection
+- **comment-syntax-tsx**: TSX (TypeScript + JSX) comment pattern detection
+- **comment-syntax-svelte**: Svelte component comment pattern detection
+- **comment-syntax-astro**: Astro component comment pattern detection
+- **comment-syntax-html**: HTML comment pattern detection
+- **comment-syntax-md**: Markdown comment pattern detection
 
 ### Configuration Changes
 - New `rules.uneditableRanges` section with opt-in enablement
@@ -193,7 +214,7 @@ Any edit overlapping lines 1-10 is blocked.
 ## Success Criteria
 
 - [ ] Configuration schema supports `uneditableRanges.enabled` and language mappings
-- [ ] Parser detects markers in C/C++, Go, Python, JavaScript, Rust, Ruby, Shell files
+- [ ] Parser detects markers in C/C++, Go, Python, JavaScript, Rust, Ruby, Shell, Zig, Nim, TSX, Svelte, Astro, HTML, Markdown files
 - [ ] Nested ranges correctly merge into protected line sets
 - [ ] Edit operations overlapping protected ranges are blocked
 - [ ] Custom error messages display range info and user message

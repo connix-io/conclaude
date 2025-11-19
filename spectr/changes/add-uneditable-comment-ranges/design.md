@@ -73,14 +73,51 @@ pub struct CommentSyntax {
 lazy_static! {
     static ref LANGUAGE_MAP: HashMap<&'static str, CommentSyntax> = {
         let mut m = HashMap::new();
+        // C/C++ family
         m.insert("c", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         m.insert("h", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         m.insert("cpp", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("cxx", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("cc", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("hpp", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("hxx", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        // Go
         m.insert("go", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        // Python
         m.insert("py", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
+        m.insert("pyw", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
+        // JavaScript/TypeScript
         m.insert("js", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("jsx", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("ts", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("tsx", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("mjs", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("cjs", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        // Rust
+        m.insert("rs", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        // Ruby
         m.insert("rb", CommentSyntax { line_prefix: "#", block_start: Some("=begin"), block_end: Some("=end") });
-        // ...
+        m.insert("rake", CommentSyntax { line_prefix: "#", block_start: Some("=begin"), block_end: Some("=end") });
+        m.insert("gemspec", CommentSyntax { line_prefix: "#", block_start: Some("=begin"), block_end: Some("=end") });
+        // Shell
+        m.insert("sh", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
+        m.insert("bash", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
+        m.insert("zsh", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
+        // Zig
+        m.insert("zig", CommentSyntax { line_prefix: "//", block_start: None, block_end: None });
+        // Nim
+        m.insert("nim", CommentSyntax { line_prefix: "#", block_start: Some("#["), block_end: Some("]#") });
+        m.insert("nims", CommentSyntax { line_prefix: "#", block_start: Some("#["), block_end: Some("]#") });
+        m.insert("nimble", CommentSyntax { line_prefix: "#", block_start: Some("#["), block_end: Some("]#") });
+        // Web components
+        m.insert("svelte", CommentSyntax { line_prefix: "//", block_start: Some("<!--"), block_end: Some("-->") });
+        m.insert("astro", CommentSyntax { line_prefix: "//", block_start: Some("<!--"), block_end: Some("-->") });
+        // HTML/Markdown
+        m.insert("html", CommentSyntax { line_prefix: "", block_start: Some("<!--"), block_end: Some("-->") });
+        m.insert("htm", CommentSyntax { line_prefix: "", block_start: Some("<!--"), block_end: Some("-->") });
+        m.insert("md", CommentSyntax { line_prefix: "", block_start: Some("<!--"), block_end: Some("-->") });
+        m.insert("markdown", CommentSyntax { line_prefix: "", block_start: Some("<!--"), block_end: Some("-->") });
+        m.insert("mdx", CommentSyntax { line_prefix: "", block_start: Some("<!--"), block_end: Some("-->") });
         m
     };
 }

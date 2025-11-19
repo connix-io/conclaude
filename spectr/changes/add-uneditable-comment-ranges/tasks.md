@@ -26,6 +26,13 @@
   - [ ] 2.2.5 Add Rust mapping (`.rs` → `//` and `/* */`)
   - [ ] 2.2.6 Add Ruby mapping (`.rb`, `.rake`, `.gemspec` → `#` and `=begin`/`=end`)
   - [ ] 2.2.7 Add Shell mapping (`.sh`, `.bash`, `.zsh` → `#`)
+  - [ ] 2.2.8 Add Zig mapping (`.zig` → `//`)
+  - [ ] 2.2.9 Add Nim mapping (`.nim`, `.nims`, `.nimble` → `#` and `#[` `]#`)
+  - [ ] 2.2.10 Add TSX mapping (`.tsx` → `//` and `/* */` and `{/* */}`)
+  - [ ] 2.2.11 Add Svelte mapping (`.svelte` → `//`, `/* */`, and `<!-- -->`)
+  - [ ] 2.2.12 Add Astro mapping (`.astro` → `//`, `/* */`, and `<!-- -->`)
+  - [ ] 2.2.13 Add HTML mapping (`.html`, `.htm` → `<!-- -->`)
+  - [ ] 2.2.14 Add Markdown mapping (`.md`, `.markdown`, `.mdx` → `<!-- -->`)
 - [ ] 2.3 Implement `get_comment_syntax(file_path: &str) -> Option<CommentSyntax>` function
 - [ ] 2.4 Add unit tests for language detection in `tests/types_tests.rs`
 
@@ -97,6 +104,13 @@
   - [ ] 6.1.5 Create `test_rust_uneditable.rs` with protected ranges
   - [ ] 6.1.6 Create `test_ruby_uneditable.rb` with protected ranges
   - [ ] 6.1.7 Create `test_shell_uneditable.sh` with protected ranges
+  - [ ] 6.1.8 Create `test_zig_uneditable.zig` with protected ranges
+  - [ ] 6.1.9 Create `test_nim_uneditable.nim` with protected ranges
+  - [ ] 6.1.10 Create `test_tsx_uneditable.tsx` with protected ranges
+  - [ ] 6.1.11 Create `test_svelte_uneditable.svelte` with protected ranges
+  - [ ] 6.1.12 Create `test_astro_uneditable.astro` with protected ranges
+  - [ ] 6.1.13 Create `test_html_uneditable.html` with protected ranges
+  - [ ] 6.1.14 Create `test_md_uneditable.md` with protected ranges
 - [ ] 6.2 Write integration tests in `tests/integration_tests.rs`
   - [ ] 6.2.1 Test Edit operation blocked when overlapping protected range
   - [ ] 6.2.2 Test Edit operation allowed when outside protected range
