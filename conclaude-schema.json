@@ -166,6 +166,68 @@
       },
       "type": "object"
     },
+    "SubagentStopCommand": {
+      "additionalProperties": false,
+      "description": "Configuration for individual subagent stop commands",
+      "properties": {
+        "maxOutputLines": {
+          "default": null,
+          "format": "uint32",
+          "maximum": 10000.0,
+          "minimum": 1.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "message": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "run": {
+          "type": "string"
+        },
+        "showStderr": {
+          "default": null,
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "showStdout": {
+          "default": null,
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "run"
+      ],
+      "type": "object"
+    },
+    "SubagentStopConfig": {
+      "additionalProperties": false,
+      "description": "Configuration interface for subagent stop hook commands",
+      "properties": {
+        "commands": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/definitions/SubagentStopCommand"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "description": "Map of subagent name patterns to lists of commands Patterns support glob syntax: \"*\", \"coder\", \"test*\", \"*coder\", \"agent_[0-9]*\"",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "ToolUsageRule": {
       "additionalProperties": false,
       "description": "Tool usage validation rule",
@@ -257,6 +319,16 @@
         "infinite": false,
         "infiniteMessage": null,
         "rounds": null
+      }
+    },
+    "subagentStop": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/SubagentStopConfig"
+        }
+      ],
+      "default": {
+        "commands": {}
       }
     }
   },
