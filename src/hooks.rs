@@ -870,12 +870,201 @@ pub async fn handle_subagent_start() -> Result<HookResult> {
     Ok(HookResult::success())
 }
 
+/// Match subagent agent_id against configured patterns
+///
+/// Returns a list of patterns that match the agent_id, with wildcard patterns first
+fn match_subagent_patterns<'a>(
+    agent_id: &str,
+    config: &'a crate::config::SubagentStopConfig,
+) -> Vec<&'a String> {
+    let mut matches = Vec::new();
+    let mut wildcard_match = None;
+
+    for pattern in config.commands.keys() {
+        if pattern == "*" {
+            wildcard_match = Some(pattern);
+        } else if pattern == agent_id {
+            // Exact match
+            matches.push(pattern);
+        } else if let Ok(glob_pattern) = Pattern::new(pattern) {
+            // Glob pattern match
+            if glob_pattern.matches(agent_id) {
+                matches.push(pattern);
+            }
+        }
+    }
+
+    // Put wildcard match first if it exists
+    if let Some(wildcard) = wildcard_match {
+        matches.insert(0, wildcard);
+    }
+
+    matches
+}
+
+/// Build environment variables for subagent commands
+fn build_subagent_env_vars(
+    agent_id: &str,
+    payload: &SubagentStopPayload,
+) -> std::collections::HashMap<String, String> {
+    let mut env_vars = std::collections::HashMap::new();
+
+    env_vars.insert("CONCLAUDE_AGENT_ID".to_string(), agent_id.to_string());
+    env_vars.insert(
+        "CONCLAUDE_AGENT_TRANSCRIPT_PATH".to_string(),
+        payload.agent_transcript_path.clone(),
+    );
+    env_vars.insert(
+        "CONCLAUDE_SESSION_ID".to_string(),
+        payload.base.session_id.clone(),
+    );
+    env_vars.insert(
+        "CONCLAUDE_TRANSCRIPT_PATH".to_string(),
+        payload.base.transcript_path.clone(),
+    );
+    env_vars.insert("CONCLAUDE_HOOK_EVENT".to_string(), "SubagentStop".to_string());
+    env_vars.insert("CONCLAUDE_CWD".to_string(), payload.base.cwd.clone());
+
+    env_vars
+}
+
+/// Collect subagent stop commands based on pattern matching
+///
+/// # Errors
+///
+/// Returns an error if bash command extraction fails.
+fn collect_subagent_stop_commands(
+    config: &crate::config::ConclaudeConfig,
+    agent_id: &str,
+) -> Result<Vec<StopCommandConfig>> {
+    let mut commands = Vec::new();
+    let matching_patterns = match_subagent_patterns(agent_id, &config.subagent_stop);
+
+    for pattern in matching_patterns {
+        if let Some(pattern_commands) = config.subagent_stop.commands.get(pattern) {
+            for cmd_config in pattern_commands {
+                let extracted = extract_bash_commands(&cmd_config.run)?;
+                let show_stdout = cmd_config.show_stdout.unwrap_or(false);
+                let show_stderr = cmd_config.show_stderr.unwrap_or(false);
+                let max_output_lines = cmd_config.max_output_lines;
+                for cmd in extracted {
+                    commands.push(StopCommandConfig {
+                        command: cmd,
+                        message: cmd_config.message.clone(),
+                        show_stdout,
+                        show_stderr,
+                        max_output_lines,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(commands)
+}
+
+/// Execute subagent stop hook commands with environment variables
+///
+/// # Errors
+///
+/// Returns an error if command execution fails or process spawning fails.
+async fn execute_subagent_stop_commands(
+    commands: &[StopCommandConfig],
+    env_vars: &std::collections::HashMap<String, String>,
+) -> Result<Option<HookResult>> {
+    if commands.is_empty() {
+        return Ok(None);
+    }
+
+    println!("Executing {} subagent stop hook commands", commands.len());
+
+    for (index, cmd_config) in commands.iter().enumerate() {
+        println!(
+            "Executing command {}/{}: {}",
+            index + 1,
+            commands.len(),
+            cmd_config.command
+        );
+
+        let mut cmd = TokioCommand::new("bash");
+        cmd.arg("-c")
+            .arg(&cmd_config.command)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        // Add environment variables
+        for (key, value) in env_vars {
+            cmd.env(key, value);
+        }
+
+        let child = cmd
+            .spawn()
+            .with_context(|| format!("Failed to spawn command: {}", cmd_config.command))?;
+
+        let output = child
+            .wait_with_output()
+            .await
+            .with_context(|| format!("Failed to wait for command: {}", cmd_config.command))?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        if !output.status.success() {
+            let exit_code = output.status.code().unwrap_or(1);
+
+            eprintln!(
+                "⚠️  Command failed with exit code {}: {}",
+                exit_code, cmd_config.command
+            );
+
+            // Show stdout if configured or if there's an error
+            if cmd_config.show_stdout || !stdout.is_empty() {
+                let lines: Vec<&str> = stdout.lines().collect();
+                let max_lines = cmd_config.max_output_lines.map_or(lines.len(), |max| max as usize);
+                let limited_lines = &lines[..std::cmp::min(lines.len(), max_lines)];
+                eprintln!("STDOUT:\n{}", limited_lines.join("\n"));
+            }
+
+            // Show stderr if configured or if there's an error
+            if cmd_config.show_stderr || !stderr.is_empty() {
+                let lines: Vec<&str> = stderr.lines().collect();
+                let max_lines = cmd_config.max_output_lines.map_or(lines.len(), |max| max as usize);
+                let limited_lines = &lines[..std::cmp::min(lines.len(), max_lines)];
+                eprintln!("STDERR:\n{}", limited_lines.join("\n"));
+            }
+
+            // For subagent stop hooks, we don't block - just log the error
+            eprintln!("⚠️  Subagent stop command failed, but continuing...");
+        } else {
+            println!("✅ Command succeeded: {}", cmd_config.command);
+
+            // Show stdout if configured
+            if cmd_config.show_stdout && !stdout.is_empty() {
+                let lines: Vec<&str> = stdout.lines().collect();
+                let max_lines = cmd_config.max_output_lines.map_or(lines.len(), |max| max as usize);
+                let limited_lines = &lines[..std::cmp::min(lines.len(), max_lines)];
+                println!("STDOUT:\n{}", limited_lines.join("\n"));
+            }
+
+            // Show stderr if configured
+            if cmd_config.show_stderr && !stderr.is_empty() {
+                let lines: Vec<&str> = stderr.lines().collect();
+                let max_lines = cmd_config.max_output_lines.map_or(lines.len(), |max| max as usize);
+                let limited_lines = &lines[..std::cmp::min(lines.len(), max_lines)];
+                println!("STDERR:\n{}", limited_lines.join("\n"));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
 /// Handles `SubagentStop` hook events when Claude subagents complete their tasks.
 ///
 /// # Errors
 ///
 /// Returns an error if payload validation fails or configuration loading fails.
-#[allow(clippy::unused_async)]
 pub async fn handle_subagent_stop() -> Result<HookResult> {
     let payload: SubagentStopPayload = read_payload_from_stdin()?;
 
@@ -894,6 +1083,18 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
         "CONCLAUDE_AGENT_TRANSCRIPT_PATH",
         &payload.agent_transcript_path,
     );
+
+    // Load configuration to check for subagent stop commands
+    let (config, _config_path) = get_config().await?;
+
+    // Build environment variables for commands
+    let env_vars = build_subagent_env_vars(&payload.agent_id, &payload);
+
+    // Collect commands for matching patterns
+    let commands = collect_subagent_stop_commands(config, &payload.agent_id)?;
+
+    // Execute commands with environment variables
+    execute_subagent_stop_commands(&commands, &env_vars).await?;
 
     // Send notification for subagent stop with agent ID included
     send_notification(
@@ -1610,5 +1811,232 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn test_match_subagent_patterns_wildcard() {
+        use crate::config::{SubagentStopCommand, SubagentStopConfig};
+        use std::collections::HashMap;
+
+        let mut commands = HashMap::new();
+        commands.insert(
+            "*".to_string(),
+            vec![SubagentStopCommand {
+                run: "echo test".to_string(),
+                message: None,
+                show_stdout: None,
+                show_stderr: None,
+                max_output_lines: None,
+            }],
+        );
+
+        let config = SubagentStopConfig { commands };
+
+        let matches = match_subagent_patterns("coder", &config);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0], "*");
+
+        let matches = match_subagent_patterns("tester", &config);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0], "*");
+    }
+
+    #[test]
+    fn test_match_subagent_patterns_exact() {
+        use crate::config::{SubagentStopCommand, SubagentStopConfig};
+        use std::collections::HashMap;
+
+        let mut commands = HashMap::new();
+        commands.insert(
+            "coder".to_string(),
+            vec![SubagentStopCommand {
+                run: "echo coder".to_string(),
+                message: None,
+                show_stdout: None,
+                show_stderr: None,
+                max_output_lines: None,
+            }],
+        );
+
+        let config = SubagentStopConfig { commands };
+
+        let matches = match_subagent_patterns("coder", &config);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0], "coder");
+
+        let matches = match_subagent_patterns("tester", &config);
+        assert_eq!(matches.len(), 0);
+    }
+
+    #[test]
+    fn test_match_subagent_patterns_prefix_glob() {
+        use crate::config::{SubagentStopCommand, SubagentStopConfig};
+        use std::collections::HashMap;
+
+        let mut commands = HashMap::new();
+        commands.insert(
+            "test*".to_string(),
+            vec![SubagentStopCommand {
+                run: "echo test".to_string(),
+                message: None,
+                show_stdout: None,
+                show_stderr: None,
+                max_output_lines: None,
+            }],
+        );
+
+        let config = SubagentStopConfig { commands };
+
+        let matches = match_subagent_patterns("tester", &config);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0], "test*");
+
+        let matches = match_subagent_patterns("test-runner", &config);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0], "test*");
+
+        let matches = match_subagent_patterns("coder", &config);
+        assert_eq!(matches.len(), 0);
+    }
+
+    #[test]
+    fn test_match_subagent_patterns_suffix_glob() {
+        use crate::config::{SubagentStopCommand, SubagentStopConfig};
+        use std::collections::HashMap;
+
+        let mut commands = HashMap::new();
+        commands.insert(
+            "*coder".to_string(),
+            vec![SubagentStopCommand {
+                run: "echo coder".to_string(),
+                message: None,
+                show_stdout: None,
+                show_stderr: None,
+                max_output_lines: None,
+            }],
+        );
+
+        let config = SubagentStopConfig { commands };
+
+        let matches = match_subagent_patterns("coder", &config);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0], "*coder");
+
+        let matches = match_subagent_patterns("auto-coder", &config);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0], "*coder");
+
+        let matches = match_subagent_patterns("tester", &config);
+        assert_eq!(matches.len(), 0);
+    }
+
+    #[test]
+    fn test_match_subagent_patterns_character_class() {
+        use crate::config::{SubagentStopCommand, SubagentStopConfig};
+        use std::collections::HashMap;
+
+        let mut commands = HashMap::new();
+        commands.insert(
+            "agent_[0-9]*".to_string(),
+            vec![SubagentStopCommand {
+                run: "echo agent".to_string(),
+                message: None,
+                show_stdout: None,
+                show_stderr: None,
+                max_output_lines: None,
+            }],
+        );
+
+        let config = SubagentStopConfig { commands };
+
+        let matches = match_subagent_patterns("agent_1", &config);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0], "agent_[0-9]*");
+
+        let matches = match_subagent_patterns("agent_2x", &config);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0], "agent_[0-9]*");
+
+        let matches = match_subagent_patterns("agent_x", &config);
+        assert_eq!(matches.len(), 0);
+    }
+
+    #[test]
+    fn test_match_subagent_patterns_wildcard_and_specific() {
+        use crate::config::{SubagentStopCommand, SubagentStopConfig};
+        use std::collections::HashMap;
+
+        let mut commands = HashMap::new();
+        commands.insert(
+            "*".to_string(),
+            vec![SubagentStopCommand {
+                run: "echo all".to_string(),
+                message: None,
+                show_stdout: None,
+                show_stderr: None,
+                max_output_lines: None,
+            }],
+        );
+        commands.insert(
+            "coder".to_string(),
+            vec![SubagentStopCommand {
+                run: "echo coder".to_string(),
+                message: None,
+                show_stdout: None,
+                show_stderr: None,
+                max_output_lines: None,
+            }],
+        );
+
+        let config = SubagentStopConfig { commands };
+
+        let matches = match_subagent_patterns("coder", &config);
+        assert_eq!(matches.len(), 2);
+        // Wildcard should be first
+        assert_eq!(matches[0], "*");
+        assert_eq!(matches[1], "coder");
+
+        let matches = match_subagent_patterns("tester", &config);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0], "*");
+    }
+
+    #[test]
+    fn test_build_subagent_env_vars() {
+        use crate::types::{BasePayload, SubagentStopPayload};
+
+        let payload = SubagentStopPayload {
+            base: BasePayload {
+                session_id: "test-session".to_string(),
+                transcript_path: "/path/to/transcript.jsonl".to_string(),
+                hook_event_name: "SubagentStop".to_string(),
+                cwd: "/home/user/project".to_string(),
+                permission_mode: None,
+            },
+            stop_hook_active: true,
+            agent_id: "coder".to_string(),
+            agent_transcript_path: "/path/to/agent/transcript.jsonl".to_string(),
+        };
+
+        let env_vars = build_subagent_env_vars("coder", &payload);
+
+        assert_eq!(env_vars.get("CONCLAUDE_AGENT_ID").unwrap(), "coder");
+        assert_eq!(
+            env_vars.get("CONCLAUDE_AGENT_TRANSCRIPT_PATH").unwrap(),
+            "/path/to/agent/transcript.jsonl"
+        );
+        assert_eq!(
+            env_vars.get("CONCLAUDE_SESSION_ID").unwrap(),
+            "test-session"
+        );
+        assert_eq!(
+            env_vars.get("CONCLAUDE_TRANSCRIPT_PATH").unwrap(),
+            "/path/to/transcript.jsonl"
+        );
+        assert_eq!(
+            env_vars.get("CONCLAUDE_HOOK_EVENT").unwrap(),
+            "SubagentStop"
+        );
+        assert_eq!(env_vars.get("CONCLAUDE_CWD").unwrap(), "/home/user/project");
     }
 }

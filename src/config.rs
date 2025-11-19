@@ -37,6 +37,33 @@ pub struct StopConfig {
     pub rounds: Option<u32>,
 }
 
+/// Configuration for individual subagent stop commands with optional messages
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, FieldList)]
+#[serde(deny_unknown_fields)]
+pub struct SubagentStopCommand {
+    pub run: String,
+    #[serde(default)]
+    pub message: Option<String>,
+    #[serde(default, rename = "showStdout")]
+    pub show_stdout: Option<bool>,
+    #[serde(default, rename = "showStderr")]
+    pub show_stderr: Option<bool>,
+    #[serde(default, rename = "maxOutputLines")]
+    #[schemars(range(min = 1, max = 10000))]
+    pub max_output_lines: Option<u32>,
+}
+
+/// Configuration interface for subagent stop hook commands with pattern matching
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, FieldList)]
+#[serde(deny_unknown_fields)]
+pub struct SubagentStopConfig {
+    /// Pattern-based command mapping: pattern -> list of commands
+    /// Patterns can be exact matches (e.g., "coder"), wildcard ("*"),
+    /// or glob patterns (e.g., "test*", "*coder", "agent_[0-9]*")
+    #[serde(default)]
+    pub commands: std::collections::HashMap<String, Vec<SubagentStopCommand>>,
+}
+
 /// Configuration interface for validation rules
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, FieldList)]
 #[serde(deny_unknown_fields)]
@@ -139,6 +166,8 @@ impl NotificationsConfig {
 pub struct ConclaudeConfig {
     #[serde(default)]
     pub stop: StopConfig,
+    #[serde(default, rename = "subagentStop")]
+    pub subagent_stop: SubagentStopConfig,
     #[serde(default)]
     pub rules: RulesConfig,
     #[serde(default, rename = "preToolUse")]
@@ -163,6 +192,7 @@ fn extract_unknown_field(error_msg: &str) -> Option<String> {
 fn suggest_similar_fields(unknown_field: &str, section: &str) -> Vec<String> {
     let all_fields: Vec<(&str, Vec<&str>)> = vec![
         ("stop", StopConfig::field_names()),
+        ("subagentStop", SubagentStopConfig::field_names()),
         ("rules", RulesConfig::field_names()),
         ("preToolUse", PreToolUseConfig::field_names()),
         ("notifications", NotificationsConfig::field_names()),
@@ -276,6 +306,7 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
         parts.push(String::new());
         parts.push("Valid field names by section:".to_string());
         parts.push("  stop: commands, infinite, infiniteMessage, rounds".to_string());
+        parts.push("  subagentStop: commands".to_string());
         parts.push(
             "  rules: preventRootAdditions, uneditableFiles, toolUsageValidation".to_string(),
         );
@@ -356,7 +387,7 @@ pub fn parse_and_validate_config(content: &str, config_path: &Path) -> Result<Co
 
 /// Validate configuration values against constraints
 fn validate_config_constraints(config: &ConclaudeConfig) -> Result<()> {
-    // Validate maxOutputLines range (1-10000)
+    // Validate maxOutputLines range (1-10000) for stop commands
     for (idx, command) in config.stop.commands.iter().enumerate() {
         if let Some(max_lines) = command.max_output_lines {
             if !(1..=10000).contains(&max_lines) {
@@ -376,6 +407,32 @@ fn validate_config_constraints(config: &ConclaudeConfig) -> Result<()> {
                        conclaude init"
                 );
                 return Err(anyhow::anyhow!(error_msg));
+            }
+        }
+    }
+
+    // Validate maxOutputLines range (1-10000) for subagent stop commands
+    for (pattern, commands) in &config.subagent_stop.commands {
+        for (idx, command) in commands.iter().enumerate() {
+            if let Some(max_lines) = command.max_output_lines {
+                if !(1..=10000).contains(&max_lines) {
+                    let error_msg = format!(
+                        "Range validation failed for subagentStop.commands[\"{pattern}\"][{idx}].maxOutputLines\n\n\
+                         Error: Value {max_lines} is out of valid range\n\n\
+                         ✅ Valid range: 1 to 10000\n\n\
+                         Common causes:\n\
+                           • Value is too large (maximum is 10000)\n\
+                           • Value is too small (minimum is 1)\n\
+                           • Using a negative number\n\n\
+                         Example valid configurations:\n\
+                           maxOutputLines: 100      # default, good for most cases\n\
+                           maxOutputLines: 1000     # for verbose output\n\
+                           maxOutputLines: 10000    # maximum allowed\n\n\
+                         For a valid configuration template, run:\n\
+                           conclaude init"
+                    );
+                    return Err(anyhow::anyhow!(error_msg));
+                }
             }
         }
     }
