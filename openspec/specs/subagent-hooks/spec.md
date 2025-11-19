@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This specification defines the SubagentStart hook support in conclaude, which enables users to hook into the beginning of subagent execution for initialization, logging, and setup operations. This provides symmetric lifecycle coverage alongside the existing SubagentStop hook, giving full visibility into when subagents begin and complete their work.
+This specification defines the SubagentStart hook support in conclaude, which provides visibility and control when subagents begin execution. The SubagentStart hook mirrors the existing SubagentStop hook, enabling full lifecycle tracking (start + stop) for all subagents. This allows users to initialize environments, run setup commands, log subagent starts, and send notifications when subagents begin their work.
 
 ## Requirements
 
