@@ -77,6 +77,7 @@ rules:
       javascript: '//'
       rust: '//'
       shell: '#'
+      ruby: '#'
 ```
 
 ### Marker Format
@@ -94,6 +95,7 @@ Standard format across all languages:
 - **JavaScript:** `// <!-- conclaude-uneditable:start -->`
 - **Rust:** `// <!-- conclaude-uneditable:start -->`
 - **Shell:** `# <!-- conclaude-uneditable:start -->`
+- **Ruby:** `# <!-- conclaude-uneditable:start -->`
 
 ### Nested Ranges Support
 
@@ -120,6 +122,7 @@ Any edit overlapping lines 1-10 is blocked.
 - **comment-syntax-python**: Python-specific comment pattern detection
 - **comment-syntax-javascript**: JavaScript/TypeScript comment pattern detection
 - **comment-syntax-rust**: Rust comment pattern detection
+- **comment-syntax-ruby**: Ruby comment pattern detection
 - **comment-syntax-shell**: Shell/Bash comment pattern detection
 
 ### Configuration Changes
@@ -187,7 +190,7 @@ Any edit overlapping lines 1-10 is blocked.
 ## Success Criteria
 
 - [ ] Configuration schema supports `uneditableRanges.enabled` and language mappings
-- [ ] Parser detects markers in Go, Python, JavaScript, Rust, Shell files
+- [ ] Parser detects markers in Go, Python, JavaScript, Rust, Ruby, Shell files
 - [ ] Nested ranges correctly merge into protected line sets
 - [ ] Edit operations overlapping protected ranges are blocked
 - [ ] Custom error messages display range info and user message

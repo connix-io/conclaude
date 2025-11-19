@@ -23,7 +23,8 @@
   - [ ] 2.2.2 Add Python mapping (`.py`, `.pyw` → `#`)
   - [ ] 2.2.3 Add JavaScript/TypeScript mapping (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` → `//` and `/* */`)
   - [ ] 2.2.4 Add Rust mapping (`.rs` → `//` and `/* */`)
-  - [ ] 2.2.5 Add Shell mapping (`.sh`, `.bash`, `.zsh` → `#`)
+  - [ ] 2.2.5 Add Ruby mapping (`.rb`, `.rake`, `.gemspec` → `#` and `=begin`/`=end`)
+  - [ ] 2.2.6 Add Shell mapping (`.sh`, `.bash`, `.zsh` → `#`)
 - [ ] 2.3 Implement `get_comment_syntax(file_path: &str) -> Option<CommentSyntax>` function
 - [ ] 2.4 Add unit tests for language detection in `tests/types_tests.rs`
 
@@ -92,7 +93,8 @@
   - [ ] 6.1.2 Create `test_python_uneditable.py` with protected ranges
   - [ ] 6.1.3 Create `test_javascript_uneditable.js` with protected ranges
   - [ ] 6.1.4 Create `test_rust_uneditable.rs` with protected ranges
-  - [ ] 6.1.5 Create `test_shell_uneditable.sh` with protected ranges
+  - [ ] 6.1.5 Create `test_ruby_uneditable.rb` with protected ranges
+  - [ ] 6.1.6 Create `test_shell_uneditable.sh` with protected ranges
 - [ ] 6.2 Write integration tests in `tests/integration_tests.rs`
   - [ ] 6.2.1 Test Edit operation blocked when overlapping protected range
   - [ ] 6.2.2 Test Edit operation allowed when outside protected range

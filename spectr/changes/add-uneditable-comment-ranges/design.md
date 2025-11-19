@@ -76,6 +76,7 @@ lazy_static! {
         m.insert("go", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         m.insert("py", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
         m.insert("js", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("rb", CommentSyntax { line_prefix: "#", block_start: Some("=begin"), block_end: Some("=end") });
         // ...
         m
     };
