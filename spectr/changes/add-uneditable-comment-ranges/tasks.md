@@ -19,12 +19,13 @@
   - [ ] 2.1.2 Add `block_start: Option<String>` field (e.g., `/*`)
   - [ ] 2.1.3 Add `block_end: Option<String>` field (e.g., `*/`)
 - [ ] 2.2 Create language mapping `HashMap<&str, CommentSyntax>` (use `lazy_static` or `OnceLock`)
-  - [ ] 2.2.1 Add Go mapping (`.go` → `//` and `/* */`)
-  - [ ] 2.2.2 Add Python mapping (`.py`, `.pyw` → `#`)
-  - [ ] 2.2.3 Add JavaScript/TypeScript mapping (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` → `//` and `/* */`)
-  - [ ] 2.2.4 Add Rust mapping (`.rs` → `//` and `/* */`)
-  - [ ] 2.2.5 Add Ruby mapping (`.rb`, `.rake`, `.gemspec` → `#` and `=begin`/`=end`)
-  - [ ] 2.2.6 Add Shell mapping (`.sh`, `.bash`, `.zsh` → `#`)
+  - [ ] 2.2.1 Add C/C++ mapping (`.c`, `.h`, `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx` → `//` and `/* */`)
+  - [ ] 2.2.2 Add Go mapping (`.go` → `//` and `/* */`)
+  - [ ] 2.2.3 Add Python mapping (`.py`, `.pyw` → `#`)
+  - [ ] 2.2.4 Add JavaScript/TypeScript mapping (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` → `//` and `/* */`)
+  - [ ] 2.2.5 Add Rust mapping (`.rs` → `//` and `/* */`)
+  - [ ] 2.2.6 Add Ruby mapping (`.rb`, `.rake`, `.gemspec` → `#` and `=begin`/`=end`)
+  - [ ] 2.2.7 Add Shell mapping (`.sh`, `.bash`, `.zsh` → `#`)
 - [ ] 2.3 Implement `get_comment_syntax(file_path: &str) -> Option<CommentSyntax>` function
 - [ ] 2.4 Add unit tests for language detection in `tests/types_tests.rs`
 
@@ -89,12 +90,13 @@
 ## 6. Integration Tests
 
 - [ ] 6.1 Create end-to-end test files for each supported language in `tests/fixtures/`
-  - [ ] 6.1.1 Create `test_go_uneditable.go` with protected ranges
-  - [ ] 6.1.2 Create `test_python_uneditable.py` with protected ranges
-  - [ ] 6.1.3 Create `test_javascript_uneditable.js` with protected ranges
-  - [ ] 6.1.4 Create `test_rust_uneditable.rs` with protected ranges
-  - [ ] 6.1.5 Create `test_ruby_uneditable.rb` with protected ranges
-  - [ ] 6.1.6 Create `test_shell_uneditable.sh` with protected ranges
+  - [ ] 6.1.1 Create `test_c_uneditable.c` with protected ranges
+  - [ ] 6.1.2 Create `test_go_uneditable.go` with protected ranges
+  - [ ] 6.1.3 Create `test_python_uneditable.py` with protected ranges
+  - [ ] 6.1.4 Create `test_javascript_uneditable.js` with protected ranges
+  - [ ] 6.1.5 Create `test_rust_uneditable.rs` with protected ranges
+  - [ ] 6.1.6 Create `test_ruby_uneditable.rb` with protected ranges
+  - [ ] 6.1.7 Create `test_shell_uneditable.sh` with protected ranges
 - [ ] 6.2 Write integration tests in `tests/integration_tests.rs`
   - [ ] 6.2.1 Test Edit operation blocked when overlapping protected range
   - [ ] 6.2.2 Test Edit operation allowed when outside protected range

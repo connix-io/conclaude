@@ -73,6 +73,9 @@ pub struct CommentSyntax {
 lazy_static! {
     static ref LANGUAGE_MAP: HashMap<&'static str, CommentSyntax> = {
         let mut m = HashMap::new();
+        m.insert("c", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("h", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("cpp", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         m.insert("go", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         m.insert("py", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
         m.insert("js", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
