@@ -1,15 +1,15 @@
-# OpenSpec Instructions
+# Spectr Instructions
 
-Instructions for AI coding assistants using OpenSpec for spec-driven development.
+Instructions for AI coding assistants using Spectr for spec-driven development.
 
 ## TL;DR Quick Checklist
 
-- Search existing work: `openspec spec list --long`, `openspec list` (use `rg` only for full-text search)
+- Search existing work: `spectr spec list --long`, `spectr list` (use `rg` only for full-text search)
 - Decide scope: new capability vs modify existing capability
 - Pick a unique `change-id`: kebab-case, verb-led (`add-`, `update-`, `remove-`, `refactor-`)
 - Scaffold: `proposal.md`, `tasks.md`, `design.md` (only if needed), and delta specs per affected capability
 - Write deltas: use `## ADDED|MODIFIED|REMOVED|RENAMED Requirements`; include at least one `#### Scenario:` per requirement
-- Validate: `openspec validate [change-id] --strict` and fix issues
+- Validate: `spectr validate [change-id] --strict` and fix issues
 - Request approval: Do not start implementation until proposal is approved
 
 ## Three-Stage Workflow
@@ -18,7 +18,7 @@ Instructions for AI coding assistants using OpenSpec for spec-driven development
 Create proposal when you need to:
 - Add features or functionality
 - Make breaking changes (API, schema)
-- Change architecture or patterns  
+- Change architecture or patterns
 - Optimize performance (changes behavior)
 - Update security patterns
 
@@ -41,10 +41,10 @@ Skip proposal for:
 - Tests for existing behavior
 
 **Workflow**
-1. Review `openspec/project.md`, `openspec list`, and `openspec list --specs` to understand current context.
-2. Choose a unique verb-led `change-id` and scaffold `proposal.md`, `tasks.md`, optional `design.md`, and spec deltas under `openspec/changes/<id>/`.
+1. Review `spectr/project.md`, `spectr list`, and `spectr list --specs` to understand current context.
+2. Choose a unique verb-led `change-id` and scaffold `proposal.md`, `tasks.md`, optional `design.md`, and spec deltas under `spectr/changes/<id>/`.
 3. Draft spec deltas using `## ADDED|MODIFIED|REMOVED Requirements` with at least one `#### Scenario:` per requirement.
-4. Run `openspec validate <id> --strict` and resolve any issues before sharing the proposal.
+4. Run `spectr validate <id> --strict` and resolve any issues before sharing the proposal.
 
 ### Stage 2: Implementing Changes
 Track these steps as TODOs and complete them one by one.
@@ -60,31 +60,31 @@ Track these steps as TODOs and complete them one by one.
 After deployment, create separate PR to:
 - Move `changes/[name]/` → `changes/archive/YYYY-MM-DD-[name]/`
 - Update `specs/` if capabilities changed
-- Use `openspec archive [change] --skip-specs --yes` for tooling-only changes
-- Run `openspec validate --strict` to confirm the archived change passes checks
+- Use `spectr archive <change-id> --skip-specs --yes` for tooling-only changes (always pass the change ID explicitly)
+- Run `spectr validate --strict` to confirm the archived change passes checks
 
 ## Before Any Task
 
 **Context Checklist:**
 - [ ] Read relevant specs in `specs/[capability]/spec.md`
 - [ ] Check pending changes in `changes/` for conflicts
-- [ ] Read `openspec/project.md` for conventions
-- [ ] Run `openspec list` to see active changes
-- [ ] Run `openspec list --specs` to see existing capabilities
+- [ ] Read `spectr/project.md` for conventions
+- [ ] Run `spectr list` to see active changes
+- [ ] Run `spectr list --specs` to see existing capabilities
 
 **Before Creating Specs:**
 - Always check if capability already exists
 - Prefer modifying existing specs over creating duplicates
-- Use `openspec show [spec]` to review current state
+- Use `spectr show [spec]` to review current state
 - If request is ambiguous, ask 1–2 clarifying questions before scaffolding
 
 ### Search Guidance
-- Enumerate specs: `openspec spec list --long` (or `--json` for scripts)
-- Enumerate changes: `openspec list` (or `openspec change list --json` - deprecated but available)
+- Enumerate specs: `spectr spec list --long` (or `--json` for scripts)
+- Enumerate changes: `spectr list` (or `spectr change list --json` - deprecated but available)
 - Show details:
-  - Spec: `openspec show <spec-id> --type spec` (use `--json` for filters)
-  - Change: `openspec show <change-id> --json --deltas-only`
-- Full-text search (use ripgrep): `rg -n "Requirement:|Scenario:" openspec/specs`
+  - Spec: `spectr show <spec-id> --type spec` (use `--json` for filters)
+  - Change: `spectr show <change-id> --json --deltas-only`
+- Full-text search (use ripgrep): `rg -n "Requirement:|Scenario:" spectr/specs`
 
 ## Quick Start
 
@@ -92,24 +92,23 @@ After deployment, create separate PR to:
 
 ```bash
 # Essential commands
-openspec list                  # List active changes
-openspec list --specs          # List specifications
-openspec show [item]           # Display change or spec
-openspec diff [change]         # Show spec differences
-openspec validate [item]       # Validate changes or specs
-openspec archive [change] [--yes|-y]      # Archive after deployment (add --yes for non-interactive runs)
+spectr list                  # List active changes
+spectr list --specs          # List specifications
+spectr show [item]           # Display change or spec
+spectr validate [item]       # Validate changes or specs
+spectr archive <change-id> [--yes|-y]   # Archive after deployment (add --yes for non-interactive runs)
 
 # Project management
-openspec init [path]           # Initialize OpenSpec
-openspec update [path]         # Update instruction files
+spectr init [path]           # Initialize Spectr
+spectr update [path]         # Update instruction files
 
 # Interactive mode
-openspec show                  # Prompts for selection
-openspec validate              # Bulk validation mode
+spectr show                  # Prompts for selection
+spectr validate              # Bulk validation mode
 
 # Debugging
-openspec show [change] --json --deltas-only
-openspec validate [change] --strict
+spectr show [change] --json --deltas-only
+spectr validate [change] --strict
 ```
 
 ### Command Flags
@@ -124,7 +123,7 @@ openspec validate [change] --strict
 ## Directory Structure
 
 ```
-openspec/
+spectr/
 ├── project.md              # Project conventions
 ├── specs/                  # Current truth - what IS built
 │   └── [capability]/       # Single focused capability
@@ -148,7 +147,7 @@ openspec/
 ```
 New request?
 ├─ Bug fix restoring spec behavior? → Fix directly
-├─ Typo/format/comment? → Fix directly  
+├─ Typo/format/comment? → Fix directly
 ├─ New feature/capability? → Create proposal
 ├─ Breaking change? → Create proposal
 ├─ Architecture change? → Create proposal
@@ -161,6 +160,8 @@ New request?
 
 2. **Write proposal.md:**
 ```markdown
+# Change: [Brief description of change]
+
 ## Why
 [1-2 sentences on problem/opportunity]
 
@@ -270,10 +271,10 @@ Headers matched with `trim(header)` - whitespace ignored.
 - MODIFIED: Changes the behavior, scope, or acceptance criteria of an existing requirement. Always paste the full, updated requirement content (header + all scenarios). The archiver will replace the entire requirement with what you provide here; partial deltas will drop previous details.
 - RENAMED: Use when only the name changes. If you also change behavior, use RENAMED (name) plus MODIFIED (content) referencing the new name.
 
-Common pitfall: Using MODIFIED to add a new concern without including the previous text. This causes loss of detail at archive time. If you aren’t explicitly changing the existing requirement, add a new requirement under ADDED instead.
+Common pitfall: Using MODIFIED to add a new concern without including the previous text. This causes loss of detail at archive time. If you aren't explicitly changing the existing requirement, add a new requirement under ADDED instead.
 
 Authoring a MODIFIED requirement correctly:
-1) Locate the existing requirement in `openspec/specs/<capability>/spec.md`.
+1) Locate the existing requirement in `spectr/specs/<capability>/spec.md`.
 2) Copy the entire requirement block (from `### Requirement: ...` through its scenarios).
 3) Paste it under `## MODIFIED Requirements` and edit to reflect the new behavior.
 4) Ensure the header text matches exactly (whitespace-insensitive) and keep at least one `#### Scenario:`.
@@ -299,39 +300,39 @@ Example for RENAMED:
 
 **Silent scenario parsing failures**
 - Exact format required: `#### Scenario: Name`
-- Debug with: `openspec show [change] --json --deltas-only`
+- Debug with: `spectr show [change] --json --deltas-only`
 
 ### Validation Tips
 
 ```bash
 # Always use strict mode for comprehensive checks
-openspec validate [change] --strict
+spectr validate [change] --strict
 
 # Debug delta parsing
-openspec show [change] --json | jq '.deltas'
+spectr show [change] --json | jq '.deltas'
 
 # Check specific requirement
-openspec show [spec] --json -r 1
+spectr show [spec] --json -r 1
 ```
 
 ## Happy Path Script
 
 ```bash
 # 1) Explore current state
-openspec spec list --long
-openspec list
+spectr spec list --long
+spectr list
 # Optional full-text search:
-# rg -n "Requirement:|Scenario:" openspec/specs
-# rg -n "^#|Requirement:" openspec/changes
+# rg -n "Requirement:|Scenario:" spectr/specs
+# rg -n "^#|Requirement:" spectr/changes
 
 # 2) Choose change id and scaffold
 CHANGE=add-two-factor-auth
-mkdir -p openspec/changes/$CHANGE/{specs/auth}
-printf "## Why\n...\n\n## What Changes\n- ...\n\n## Impact\n- ...\n" > openspec/changes/$CHANGE/proposal.md
-printf "## 1. Implementation\n- [ ] 1.1 ...\n" > openspec/changes/$CHANGE/tasks.md
+mkdir -p spectr/changes/$CHANGE/{specs/auth}
+printf "## Why\\n...\\n\\n## What Changes\\n- ...\\n\\n## Impact\\n- ...\\n" > spectr/changes/$CHANGE/proposal.md
+printf "## 1. Implementation\\n- [ ] 1.1 ...\\n" > spectr/changes/$CHANGE/tasks.md
 
 # 3) Add deltas (example)
-cat > openspec/changes/$CHANGE/specs/auth/spec.md << 'EOF'
+cat > spectr/changes/$CHANGE/specs/auth/spec.md << 'EOF'
 ## ADDED Requirements
 ### Requirement: Two-Factor Authentication
 Users MUST provide a second factor during login.
@@ -342,13 +343,13 @@ Users MUST provide a second factor during login.
 EOF
 
 # 4) Validate
-openspec validate $CHANGE --strict
+spectr validate $CHANGE --strict
 ```
 
 ## Multi-Capability Example
 
 ```
-openspec/changes/add-2fa-notify/
+spectr/changes/add-2fa-notify/
 ├── proposal.md
 ├── tasks.md
 └── specs/
@@ -414,7 +415,7 @@ Only add complexity with:
 ## Error Recovery
 
 ### Change Conflicts
-1. Run `openspec list` to see active changes
+1. Run `spectr list` to see active changes
 2. Check for overlapping specs
 3. Coordinate with change owners
 4. Consider combining proposals
@@ -446,11 +447,10 @@ Only add complexity with:
 
 ### CLI Essentials
 ```bash
-openspec list              # What's in progress?
-openspec show [item]       # View details
-openspec diff [change]     # What's changing?
-openspec validate --strict # Is it correct?
-openspec archive [change] [--yes|-y]  # Mark complete (add --yes for automation)
+spectr list              # What's in progress?
+spectr show [item]       # View details
+spectr validate --strict # Is it correct?
+spectr archive <change-id> [--yes|-y]  # Mark complete (add --yes for automation)
 ```
 
 Remember: Specs are truth. Changes are proposals. Keep them in sync.
