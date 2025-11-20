@@ -76,11 +76,16 @@ rules:
       csharp: '//'
       go: '//'
       java: '//'
+      jsonc: '//'
+      nix: '#'
       python: '#'
+      r: '#'
       javascript: '//'
       rust: '//'
       ruby: '#'
       shell: '#'
+      toml: '#'
+      yaml: '#'
       zig: '//'
       nim: '#'
       tsx: '//'
@@ -88,6 +93,7 @@ rules:
       astro: '<!--'
       html: '<!--'
       md: '<!--'
+      rst: '..'
 ```
 
 ### Marker Format
@@ -104,11 +110,16 @@ Standard format across all languages:
 - **C#:** `// <!-- conclaude-uneditable:start -->`
 - **Go:** `// <!-- conclaude-uneditable:start -->`
 - **Java:** `// <!-- conclaude-uneditable:start -->`
+- **JSONC:** `// <!-- conclaude-uneditable:start -->`
+- **Nix:** `# <!-- conclaude-uneditable:start -->`
 - **Python:** `# <!-- conclaude-uneditable:start -->`
+- **R:** `# <!-- conclaude-uneditable:start -->`
 - **JavaScript:** `// <!-- conclaude-uneditable:start -->`
 - **Rust:** `// <!-- conclaude-uneditable:start -->`
 - **Ruby:** `# <!-- conclaude-uneditable:start -->`
 - **Shell:** `# <!-- conclaude-uneditable:start -->`
+- **TOML:** `# <!-- conclaude-uneditable:start -->`
+- **YAML:** `# <!-- conclaude-uneditable:start -->`
 - **Zig:** `// <!-- conclaude-uneditable:start -->`
 - **Nim:** `# <!-- conclaude-uneditable:start -->`
 - **TSX:** `// <!-- conclaude-uneditable:start -->` or `{/* <!-- conclaude-uneditable:start --> */}`
@@ -116,6 +127,7 @@ Standard format across all languages:
 - **Astro:** `<!-- <!-- conclaude-uneditable:start --> -->`
 - **HTML:** `<!-- <!-- conclaude-uneditable:start --> -->`
 - **Markdown:** `<!-- <!-- conclaude-uneditable:start --> -->`
+- **RST:** `.. <!-- conclaude-uneditable:start -->`
 
 ### Nested Ranges Support
 
@@ -142,11 +154,16 @@ Any edit overlapping lines 1-10 is blocked.
 - **comment-syntax-csharp**: C# comment pattern detection
 - **comment-syntax-go**: Go-specific comment pattern detection
 - **comment-syntax-java**: Java comment pattern detection
+- **comment-syntax-jsonc**: JSONC (JSON with Comments) comment pattern detection
+- **comment-syntax-nix**: Nix expression comment pattern detection
 - **comment-syntax-python**: Python-specific comment pattern detection
+- **comment-syntax-r**: R statistical language comment pattern detection
 - **comment-syntax-javascript**: JavaScript/TypeScript comment pattern detection
 - **comment-syntax-rust**: Rust comment pattern detection
 - **comment-syntax-ruby**: Ruby comment pattern detection
 - **comment-syntax-shell**: Shell/Bash comment pattern detection
+- **comment-syntax-toml**: TOML configuration comment pattern detection
+- **comment-syntax-yaml**: YAML configuration comment pattern detection
 - **comment-syntax-zig**: Zig comment pattern detection
 - **comment-syntax-nim**: Nim comment pattern detection
 - **comment-syntax-tsx**: TSX (TypeScript + JSX) comment pattern detection
@@ -154,6 +171,7 @@ Any edit overlapping lines 1-10 is blocked.
 - **comment-syntax-astro**: Astro component comment pattern detection
 - **comment-syntax-html**: HTML comment pattern detection
 - **comment-syntax-md**: Markdown comment pattern detection
+- **comment-syntax-rst**: reStructuredText comment pattern detection
 
 ### Configuration Changes
 - New `rules.uneditableRanges` section with opt-in enablement
@@ -220,7 +238,7 @@ Any edit overlapping lines 1-10 is blocked.
 ## Success Criteria
 
 - [ ] Configuration schema supports `uneditableRanges.enabled` and language mappings
-- [ ] Parser detects markers in C/C++, C#, Go, Java, Python, JavaScript, Rust, Ruby, Shell, Zig, Nim, TSX, Svelte, Astro, HTML, Markdown files
+- [ ] Parser detects markers in C/C++, C#, Go, Java, JSONC, Nix, Python, R, JavaScript, Rust, Ruby, Shell, TOML, YAML, Zig, Nim, TSX, Svelte, Astro, HTML, Markdown, RST files
 - [ ] Nested ranges correctly merge into protected line sets
 - [ ] Edit operations overlapping protected ranges are blocked
 - [ ] Custom error messages display range info and user message

@@ -23,18 +23,24 @@
   - [ ] 2.2.2 Add C# mapping (`.cs`, `.csx` → `//` and `/* */`)
   - [ ] 2.2.3 Add Go mapping (`.go` → `//` and `/* */`)
   - [ ] 2.2.4 Add Java mapping (`.java` → `//` and `/* */`)
-  - [ ] 2.2.5 Add Python mapping (`.py`, `.pyw` → `#`)
-  - [ ] 2.2.6 Add JavaScript/TypeScript mapping (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` → `//` and `/* */`)
-  - [ ] 2.2.7 Add Rust mapping (`.rs` → `//` and `/* */`)
-  - [ ] 2.2.8 Add Ruby mapping (`.rb`, `.rake`, `.gemspec` → `#` and `=begin`/`=end`)
-  - [ ] 2.2.9 Add Shell mapping (`.sh`, `.bash`, `.zsh` → `#`)
-  - [ ] 2.2.10 Add Zig mapping (`.zig` → `//`)
-  - [ ] 2.2.11 Add Nim mapping (`.nim`, `.nims`, `.nimble` → `#` and `#[` `]#`)
-  - [ ] 2.2.12 Add TSX mapping (`.tsx` → `//` and `/* */` and `{/* */}`)
-  - [ ] 2.2.13 Add Svelte mapping (`.svelte` → `//`, `/* */`, and `<!-- -->`)
-  - [ ] 2.2.14 Add Astro mapping (`.astro` → `//`, `/* */`, and `<!-- -->`)
-  - [ ] 2.2.15 Add HTML mapping (`.html`, `.htm` → `<!-- -->`)
-  - [ ] 2.2.16 Add Markdown mapping (`.md`, `.markdown`, `.mdx` → `<!-- -->`)
+  - [ ] 2.2.5 Add JSONC mapping (`.jsonc` → `//` and `/* */`)
+  - [ ] 2.2.6 Add Nix mapping (`.nix` → `#` and `/* */`)
+  - [ ] 2.2.7 Add Python mapping (`.py`, `.pyw` → `#`)
+  - [ ] 2.2.8 Add R mapping (`.r`, `.R`, `.Rmd` → `#`)
+  - [ ] 2.2.9 Add JavaScript/TypeScript mapping (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` → `//` and `/* */`)
+  - [ ] 2.2.10 Add Rust mapping (`.rs` → `//` and `/* */`)
+  - [ ] 2.2.11 Add Ruby mapping (`.rb`, `.rake`, `.gemspec` → `#` and `=begin`/`=end`)
+  - [ ] 2.2.12 Add Shell mapping (`.sh`, `.bash`, `.zsh` → `#`)
+  - [ ] 2.2.13 Add TOML mapping (`.toml` → `#`)
+  - [ ] 2.2.14 Add YAML mapping (`.yaml`, `.yml` → `#`)
+  - [ ] 2.2.15 Add Zig mapping (`.zig` → `//`)
+  - [ ] 2.2.16 Add Nim mapping (`.nim`, `.nims`, `.nimble` → `#` and `#[` `]#`)
+  - [ ] 2.2.17 Add TSX mapping (`.tsx` → `//` and `/* */` and `{/* */}`)
+  - [ ] 2.2.18 Add Svelte mapping (`.svelte` → `//`, `/* */`, and `<!-- -->`)
+  - [ ] 2.2.19 Add Astro mapping (`.astro` → `//`, `/* */`, and `<!-- -->`)
+  - [ ] 2.2.20 Add HTML mapping (`.html`, `.htm` → `<!-- -->`)
+  - [ ] 2.2.21 Add Markdown mapping (`.md`, `.markdown`, `.mdx` → `<!-- -->`)
+  - [ ] 2.2.22 Add RST mapping (`.rst`, `.rest` → `..`)
 - [ ] 2.3 Implement `get_comment_syntax(file_path: &str) -> Option<CommentSyntax>` function
 - [ ] 2.4 Add unit tests for language detection in `tests/types_tests.rs`
 
@@ -103,18 +109,24 @@
   - [ ] 6.1.2 Create `test_csharp_uneditable.cs` with protected ranges
   - [ ] 6.1.3 Create `test_go_uneditable.go` with protected ranges
   - [ ] 6.1.4 Create `test_java_uneditable.java` with protected ranges
-  - [ ] 6.1.5 Create `test_python_uneditable.py` with protected ranges
-  - [ ] 6.1.6 Create `test_javascript_uneditable.js` with protected ranges
-  - [ ] 6.1.7 Create `test_rust_uneditable.rs` with protected ranges
-  - [ ] 6.1.8 Create `test_ruby_uneditable.rb` with protected ranges
-  - [ ] 6.1.9 Create `test_shell_uneditable.sh` with protected ranges
-  - [ ] 6.1.10 Create `test_zig_uneditable.zig` with protected ranges
-  - [ ] 6.1.11 Create `test_nim_uneditable.nim` with protected ranges
-  - [ ] 6.1.12 Create `test_tsx_uneditable.tsx` with protected ranges
-  - [ ] 6.1.13 Create `test_svelte_uneditable.svelte` with protected ranges
-  - [ ] 6.1.14 Create `test_astro_uneditable.astro` with protected ranges
-  - [ ] 6.1.15 Create `test_html_uneditable.html` with protected ranges
-  - [ ] 6.1.16 Create `test_md_uneditable.md` with protected ranges
+  - [ ] 6.1.5 Create `test_jsonc_uneditable.jsonc` with protected ranges
+  - [ ] 6.1.6 Create `test_nix_uneditable.nix` with protected ranges
+  - [ ] 6.1.7 Create `test_python_uneditable.py` with protected ranges
+  - [ ] 6.1.8 Create `test_r_uneditable.r` with protected ranges
+  - [ ] 6.1.9 Create `test_javascript_uneditable.js` with protected ranges
+  - [ ] 6.1.10 Create `test_rust_uneditable.rs` with protected ranges
+  - [ ] 6.1.11 Create `test_ruby_uneditable.rb` with protected ranges
+  - [ ] 6.1.12 Create `test_shell_uneditable.sh` with protected ranges
+  - [ ] 6.1.13 Create `test_toml_uneditable.toml` with protected ranges
+  - [ ] 6.1.14 Create `test_yaml_uneditable.yaml` with protected ranges
+  - [ ] 6.1.15 Create `test_zig_uneditable.zig` with protected ranges
+  - [ ] 6.1.16 Create `test_nim_uneditable.nim` with protected ranges
+  - [ ] 6.1.17 Create `test_tsx_uneditable.tsx` with protected ranges
+  - [ ] 6.1.18 Create `test_svelte_uneditable.svelte` with protected ranges
+  - [ ] 6.1.19 Create `test_astro_uneditable.astro` with protected ranges
+  - [ ] 6.1.20 Create `test_html_uneditable.html` with protected ranges
+  - [ ] 6.1.21 Create `test_md_uneditable.md` with protected ranges
+  - [ ] 6.1.22 Create `test_rst_uneditable.rst` with protected ranges
 - [ ] 6.2 Write integration tests in `tests/integration_tests.rs`
   - [ ] 6.2.1 Test Edit operation blocked when overlapping protected range
   - [ ] 6.2.2 Test Edit operation allowed when outside protected range

@@ -88,9 +88,17 @@ lazy_static! {
         m.insert("go", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         // Java
         m.insert("java", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        // JSONC
+        m.insert("jsonc", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        // Nix
+        m.insert("nix", CommentSyntax { line_prefix: "#", block_start: Some("/*"), block_end: Some("*/") });
         // Python
         m.insert("py", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
         m.insert("pyw", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
+        // R
+        m.insert("r", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
+        m.insert("R", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
+        m.insert("Rmd", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
         // JavaScript/TypeScript
         m.insert("js", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         m.insert("jsx", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
@@ -108,6 +116,11 @@ lazy_static! {
         m.insert("sh", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
         m.insert("bash", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
         m.insert("zsh", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
+        // TOML
+        m.insert("toml", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
+        // YAML
+        m.insert("yaml", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
+        m.insert("yml", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
         // Zig
         m.insert("zig", CommentSyntax { line_prefix: "//", block_start: None, block_end: None });
         // Nim
@@ -123,6 +136,9 @@ lazy_static! {
         m.insert("md", CommentSyntax { line_prefix: "", block_start: Some("<!--"), block_end: Some("-->") });
         m.insert("markdown", CommentSyntax { line_prefix: "", block_start: Some("<!--"), block_end: Some("-->") });
         m.insert("mdx", CommentSyntax { line_prefix: "", block_start: Some("<!--"), block_end: Some("-->") });
+        // RST (reStructuredText)
+        m.insert("rst", CommentSyntax { line_prefix: "..", block_start: None, block_end: None });
+        m.insert("rest", CommentSyntax { line_prefix: "..", block_start: None, block_end: None });
         m
     };
 }
