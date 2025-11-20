@@ -73,6 +73,7 @@ rules:
     # Optional: language-specific patterns (defaults provided)
     languages:
       c: '//'
+      csharp: '//'
       go: '//'
       java: '//'
       python: '#'
@@ -100,6 +101,7 @@ Standard format across all languages:
 
 **Examples:**
 - **C/C++:** `// <!-- conclaude-uneditable:start -->`
+- **C#:** `// <!-- conclaude-uneditable:start -->`
 - **Go:** `// <!-- conclaude-uneditable:start -->`
 - **Java:** `// <!-- conclaude-uneditable:start -->`
 - **Python:** `# <!-- conclaude-uneditable:start -->`
@@ -137,6 +139,7 @@ Any edit overlapping lines 1-10 is blocked.
 ### New Capabilities
 - **uneditable-ranges**: Core protection mechanism for inline ranges
 - **comment-syntax-c**: C/C++ comment pattern detection
+- **comment-syntax-csharp**: C# comment pattern detection
 - **comment-syntax-go**: Go-specific comment pattern detection
 - **comment-syntax-java**: Java comment pattern detection
 - **comment-syntax-python**: Python-specific comment pattern detection
@@ -217,7 +220,7 @@ Any edit overlapping lines 1-10 is blocked.
 ## Success Criteria
 
 - [ ] Configuration schema supports `uneditableRanges.enabled` and language mappings
-- [ ] Parser detects markers in C/C++, Go, Java, Python, JavaScript, Rust, Ruby, Shell, Zig, Nim, TSX, Svelte, Astro, HTML, Markdown files
+- [ ] Parser detects markers in C/C++, C#, Go, Java, Python, JavaScript, Rust, Ruby, Shell, Zig, Nim, TSX, Svelte, Astro, HTML, Markdown files
 - [ ] Nested ranges correctly merge into protected line sets
 - [ ] Edit operations overlapping protected ranges are blocked
 - [ ] Custom error messages display range info and user message

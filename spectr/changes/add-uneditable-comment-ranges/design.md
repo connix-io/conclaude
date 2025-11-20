@@ -81,6 +81,9 @@ lazy_static! {
         m.insert("cc", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         m.insert("hpp", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         m.insert("hxx", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        // C#
+        m.insert("cs", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        m.insert("csx", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         // Go
         m.insert("go", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         // Java
