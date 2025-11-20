@@ -83,6 +83,8 @@ lazy_static! {
         m.insert("hxx", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         // Go
         m.insert("go", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
+        // Java
+        m.insert("java", CommentSyntax { line_prefix: "//", block_start: Some("/*"), block_end: Some("*/") });
         // Python
         m.insert("py", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
         m.insert("pyw", CommentSyntax { line_prefix: "#", block_start: None, block_end: None });
