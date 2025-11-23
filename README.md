@@ -908,7 +908,7 @@ Configuration is loaded using native Rust YAML parsing with automatic directory 
 1. `.conclaude.yaml` - Primary configuration file
 2. `.conclaude.yml` - Alternative YAML extension
 
-The search starts from the current directory and moves up the directory tree until a configuration file is found or the project root (indicated by `package.json` presence) is reached.
+The search starts from the current directory and moves up the directory tree until a configuration file is found, the filesystem root is reached, or the maximum search depth (12 levels) is exceeded.
 
 If no configuration file is found, conclaude will display the searched locations and suggest running `conclaude init` to generate a template configuration.
 

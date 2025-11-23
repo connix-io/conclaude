@@ -748,3 +748,92 @@ notifications:
         "Error should mention showSystemEvents field name"
     );
 }
+
+#[tokio::test]
+async fn test_config_search_above_package_json() {
+    let temp_dir = tempdir().unwrap();
+
+    // Create directory structure: temp_dir/level_0/project/package.json and temp_dir/.conclaude.yaml
+    let project_dir = temp_dir.path().join("level_0").join("project");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    // Create package.json in the project directory
+    let package_json_path = project_dir.join("package.json");
+    fs::write(&package_json_path, r#"{"name": "test-project"}"#).unwrap();
+
+    // Create config file above the package.json (in temp_dir/level_0)
+    let config_path = temp_dir.path().join("level_0").join(".conclaude.yaml");
+    fs::write(
+        &config_path,
+        "stop:\n  commands:\n    - run: 'found config above package.json'\nrules:\n  preventRootAdditions: true",
+    )
+    .unwrap();
+
+    // Create a subdirectory under project to search from
+    let search_dir = project_dir.join("src");
+    fs::create_dir(&search_dir).unwrap();
+
+    // Attempt to load config - should find the config above package.json
+    let result = load_conclaude_config(Some(&search_dir)).await;
+
+    // Should successfully find and parse config despite package.json barrier
+    assert!(result.is_ok());
+    let (config, _config_path) = result.unwrap();
+    assert_eq!(config.stop.commands[0].run, "found config above package.json");
+    assert!(config.rules.prevent_root_additions);
+}
+
+#[tokio::test]
+async fn test_config_search_monorepo_nested_package_json() {
+    let temp_dir = tempdir().unwrap();
+
+    // Create monorepo structure: temp_dir/monorepo/packages/app/package.json and temp_dir/monorepo/.conclaude.yaml
+    let app_dir = temp_dir.path().join("monorepo").join("packages").join("app");
+    fs::create_dir_all(&app_dir).unwrap();
+
+    // Create package.json files at multiple levels
+    let root_package_json = temp_dir.path().join("monorepo").join("package.json");
+    fs::write(&root_package_json, r#"{"name": "monorepo"}"#).unwrap();
+
+    let app_package_json = app_dir.join("package.json");
+    fs::write(&app_package_json, r#"{"name": "app"}"#).unwrap();
+
+    // Create config file at monorepo root
+    let config_path = temp_dir.path().join("monorepo").join(".conclaude.yaml");
+    fs::write(
+        &config_path,
+        "stop:\n  commands:\n    - run: 'found monorepo config'\n  infinite: false\nrules:\n  preventRootAdditions: true",
+    )
+    .unwrap();
+
+    // Create a deep subdirectory under app to search from
+    let search_dir = app_dir.join("src").join("deep").join("dir");
+    fs::create_dir_all(&search_dir).unwrap();
+
+    // Attempt to load config - should find the config at monorepo root despite nested package.json files
+    let result = load_conclaude_config(Some(&search_dir)).await;
+
+    // Should successfully find and parse config
+    assert!(result.is_ok());
+    let (config, _config_path) = result.unwrap();
+    assert_eq!(config.stop.commands[0].run, "found monorepo config");
+    assert!(!config.stop.infinite);
+    assert!(config.rules.prevent_root_additions);
+}
+
+#[tokio::test]
+async fn test_config_search_stops_at_filesystem_root() {
+    let temp_dir = tempdir().unwrap();
+
+    // Create a directory structure and try to search from filesystem root
+    // This test ensures we don't go above the filesystem root
+    let search_dir = temp_dir.path().to_path_buf();
+
+    // Attempt to load config from the temp directory (no config should exist)
+    let result = load_conclaude_config(Some(&search_dir)).await;
+
+    // Should fail to find config (reaches filesystem root without finding config)
+    assert!(result.is_err());
+    let error_message = result.unwrap_err().to_string();
+    assert!(error_message.contains("Configuration file not found"));
+}

@@ -455,10 +455,7 @@ fn get_config_search_paths(start_dir: Option<&Path>) -> Result<Vec<PathBuf>> {
         paths.push(current_dir.join(".conclaude.yaml"));
         paths.push(current_dir.join(".conclaude.yml"));
 
-        // Check if we've reached the project root (directory containing package.json)
-        if current_dir.join("package.json").exists() {
-            break;
-        }
+
 
         // Move to parent directory first, then increment level count
         match current_dir.parent() {
