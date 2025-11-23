@@ -82,8 +82,8 @@ This isn't just wishful thinking—it's what conclaude delivers every single tim
 
 While other tools try to bolt-on AI safety as an afterthought, conclaude was built from the ground up specifically for Claude Code workflows. Here's what sets it apart:
 
-🎯 **Purpose-Built for Claude Code**: Native integration with Claude's lifecycle hooks—no hacks, no workarounds  
-⚡ **Zero Configuration Friction**: Simple YAML config that just works, powered by cosmiconfig  
+🎯 **Purpose-Built for Claude Code**: Native integration with Claude's lifecycle hooks—no hacks, no workarounds
+⚡ **Zero Configuration Friction**: Simple YAML config that just works, with automatic directory tree search
 🛡️ **Fail-Fast Protection**: Catches problems immediately, not after damage is done  
 🔄 **Extensible Hook System**: Handle PreToolUse, PostToolUse, Stop, and more lifecycle events  
 📊 **Session-Aware Logging**: Every action is tracked with session context for complete auditability  
@@ -238,12 +238,14 @@ Think of conclaude's configuration as your project's constitution—the fundamen
 
 ### How Configuration Works
 
-conclaude finds your rules automatically using [cosmiconfig](https://github.com/cosmiconfig/cosmiconfig), looking for:
+conclaude finds your rules automatically by searching up the directory tree, looking for:
 
 1. `.conclaude.yaml` - Your main configuration file (recommended)
 2. `.conclaude.yml` - Alternative YAML extension
 
-No complex setup, no environment variables to manage. Just drop a `.conclaude.yaml` file in your project root and you're protected.
+The search starts from the current directory and moves up through parent directories until a configuration file is found, the filesystem root is reached, or the maximum search depth (12 levels) is exceeded.
+
+No complex setup, no environment variables to manage. Just drop a `.conclaude.yaml` file in your project (or any parent directory) and you're protected.
 
 ### Your First Configuration
 
@@ -908,7 +910,7 @@ Configuration is loaded using native Rust YAML parsing with automatic directory 
 1. `.conclaude.yaml` - Primary configuration file
 2. `.conclaude.yml` - Alternative YAML extension
 
-The search starts from the current directory and moves up the directory tree until a configuration file is found or the project root (indicated by `package.json` presence) is reached.
+The search starts from the current directory and moves up the directory tree until a configuration file is found, the filesystem root is reached, or the maximum search depth (12 levels) is exceeded.
 
 If no configuration file is found, conclaude will display the searched locations and suggest running `conclaude init` to generate a template configuration.
 
