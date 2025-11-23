@@ -341,6 +341,81 @@ async fn test_config_search_within_level_limit() {
 }
 
 #[tokio::test]
+async fn test_config_search_exactly_at_12_level_boundary() {
+    // This test verifies the exact boundary condition for MAX_SEARCH_LEVELS = 12
+    //
+    // The implementation works as follows:
+    // 1. Check starting directory (levels_searched = 0)
+    // 2. Move to parent, increment levels_searched
+    // 3. Check if levels_searched >= 12, if so, break
+    // 4. Otherwise, check parent directory and repeat
+    //
+    // This means:
+    // - Starting dir is checked (before any moves)
+    // - Then it moves up and checks 11 more parent levels (levels_searched goes 1→11)
+    // - When levels_searched reaches 12, it breaks WITHOUT checking that level
+    // - Total directories checked: starting dir + 11 parents = 12 total
+    //
+    // So the boundary is:
+    // - Config at 11 levels up: FOUND (checked when levels_searched = 11)
+    // - Config at 12 levels up: NOT FOUND (breaks when levels_searched = 12)
+
+    let temp_dir = tempdir().unwrap();
+
+    // TEST CASE 1: Config at exactly 11 levels up (should be found - at the limit)
+    {
+        // Create 12 levels: temp_dir/level_0/level_1/.../level_10
+        let mut search_path = temp_dir.path().to_path_buf();
+        for i in 0..11 {
+            search_path = search_path.join(format!("level_{i}"));
+            fs::create_dir(&search_path).unwrap();
+        }
+
+        // Place config at temp_dir (exactly 11 parent levels from search_path)
+        let config_at_11 = temp_dir.path().join(".conclaude.yaml");
+        fs::write(
+            &config_at_11,
+            "stop:\n  commands:\n    - run: 'found at boundary'\n  infinite: false\nrules:\n  preventRootAdditions: true",
+        )
+        .unwrap();
+
+        // Search from level_10 - should find config at temp_dir (11 levels up)
+        let result = load_conclaude_config(Some(&search_path)).await;
+        assert!(result.is_ok(), "Config at exactly 11 levels up should be found (at the 12-directory limit)");
+        let (config, found_path) = result.unwrap();
+        assert_eq!(config.stop.commands[0].run, "found at boundary");
+        assert_eq!(found_path, config_at_11);
+
+        // Clean up for next test
+        fs::remove_file(&config_at_11).unwrap();
+    }
+
+    // TEST CASE 2: Config at 12 levels up (should NOT be found - beyond limit)
+    {
+        // Create 13 levels: temp_dir/deep_level_0/deep_level_1/.../deep_level_11
+        let mut search_path = temp_dir.path().to_path_buf();
+        for i in 0..12 {
+            search_path = search_path.join(format!("deep_level_{i}"));
+            fs::create_dir(&search_path).unwrap();
+        }
+
+        // Place config at temp_dir (exactly 12 parent levels from search_path)
+        let config_at_12 = temp_dir.path().join(".conclaude.yaml");
+        fs::write(
+            &config_at_12,
+            "stop:\n  commands:\n    - run: 'beyond limit'\nrules:\n  preventRootAdditions: true",
+        )
+        .unwrap();
+
+        // Search from deep_level_11 - should NOT find config at temp_dir (12 levels up)
+        let result = load_conclaude_config(Some(&search_path)).await;
+        assert!(result.is_err(), "Config at 12 levels up should NOT be found (beyond the 12-directory limit)");
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("Configuration file not found"));
+    }
+}
+
+#[tokio::test]
 async fn test_notification_config_default_disabled() {
     let temp_dir = tempdir().unwrap();
     let config_path = temp_dir.path().join(".conclaude.yaml");

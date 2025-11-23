@@ -404,7 +404,13 @@ fn validate_config_constraints(config: &ConclaudeConfig) -> Result<()> {
 }
 
 /// Load YAML configuration using native search strategies
-/// Search strategy: searches up directory tree until a config file is found
+///
+/// Search strategy: searches up directory tree from the starting directory,
+/// checking for `.conclaude.yaml` or `.conclaude.yml` in each parent directory.
+/// The search stops when either:
+/// - A config file is found, OR
+/// - The filesystem root is reached, OR
+/// - 12 directory levels have been searched
 ///
 /// # Arguments
 ///
@@ -454,8 +460,6 @@ fn get_config_search_paths(start_dir: Option<&Path>) -> Result<Vec<PathBuf>> {
         // Add .conclaude.yaml and .conclaude.yml to search paths
         paths.push(current_dir.join(".conclaude.yaml"));
         paths.push(current_dir.join(".conclaude.yml"));
-
-
 
         // Move to parent directory first, then increment level count
         match current_dir.parent() {

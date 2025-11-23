@@ -11,7 +11,7 @@ conclaude is a **Rust-based guardrail CLI for Claude Code sessions** that orches
 
 ## Tech Stack
 - **Language**: Rust (stable edition, current MSRV: TBD)
-- **Configuration**: serde (serialization) + YAML parsing via cosmiconfig
+- **Configuration**: serde (serialization) + native Rust YAML parsing
 - **Async Runtime**: tokio for I/O-bound operations
 - **CLI Parsing**: clap for command-line argument handling
 - **Schema Validation**: JSON Schema validation for configuration
@@ -56,7 +56,7 @@ conclaude is a **Rust-based guardrail CLI for Claude Code sessions** that orches
 - Hooks are executed at specific lifecycle points: session start, pre-tool-use, post-tool-use, subagent start/stop, etc.
 - Configuration drives behavior without hardcoding policies
 - File protection prevents accidental modifications to critical files (e.g., `.git/`, `node_modules/`, `Cargo.lock`)
-- Multi-project support: conclaude discovers configuration via cosmiconfig (searches up directory tree for `.conclauderc`, `conclaude.yaml`, `package.json`, etc.)
+- Multi-project support: conclaude discovers configuration by searching parent directories for `.conclaude.yaml` or `.conclaude.yml` files, continuing until reaching filesystem root or 12-level maximum depth
 
 **Key Concepts:**
 - **Hooks**: Configurable shell commands/scripts executed at session lifecycle events
@@ -74,5 +74,4 @@ conclaude is a **Rust-based guardrail CLI for Claude Code sessions** that orches
 ## External Dependencies
 - **Claude Code**: Invokes conclaude hooks during session lifecycle; receives hook outcomes (pass/fail/output)
 - **Shell/Subprocess**: Executes configured shell commands and project scripts (npm, cargo, bash, etc.)
-- **cosmiconfig**: Configuration discovery from filesystem (searches up directory tree)
 - **System Binaries**: Relies on user's PATH for executing commands (e.g., npm, cargo, python, linters)
