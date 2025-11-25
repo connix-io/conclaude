@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Breaking Changes
+
+- **Configuration consolidation**: The `rules` section has been removed and its fields consolidated into `preToolUse`. Users must migrate their configurations:
+  - `rules.preventRootAdditions` → `preToolUse.preventRootAdditions`
+  - `rules.uneditableFiles` → `preToolUse.uneditableFiles`
+  - `rules.toolUsageValidation` → `preToolUse.toolUsageValidation`
+
+### Migration Guide
+
+If you have an existing `.conclaude.yaml` with a `rules` section, update it as follows:
+
+**Before:**
+```yaml
+rules:
+  preventRootAdditions: true
+  uneditableFiles: ["Cargo.toml", "Cargo.lock"]
+  toolUsageValidation: []
+
+preToolUse:
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+```
+
+**After:**
+```yaml
+preToolUse:
+  preventRootAdditions: true
+  uneditableFiles: ["Cargo.toml", "Cargo.lock"]
+  toolUsageValidation: []
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+```
+
+Conclaude will now detect the deprecated `rules` section and display a helpful error message with migration instructions.
+
 ## [0.2.1] - 2025-11-13
 
 ### Bug Fixes
