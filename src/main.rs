@@ -303,10 +303,10 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
         match rule_name.as_str() {
             "uneditableFiles" => {
                 println!("📁 Uneditable Files:");
-                if config.rules.uneditable_files.is_empty() {
+                if config.pre_tool_use.uneditable_files.is_empty() {
                     println!("   No uneditable files configured");
                 } else {
-                    for pattern_str in &config.rules.uneditable_files {
+                    for pattern_str in &config.pre_tool_use.uneditable_files {
                         println!("   Pattern: {pattern_str}");
 
                         if show_matches {
@@ -337,9 +337,9 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
             "preventRootAdditions" => {
                 println!(
                     "🚫 Prevent Root Additions: {}",
-                    config.rules.prevent_root_additions
+                    config.pre_tool_use.prevent_root_additions
                 );
-                if config.rules.prevent_root_additions && show_matches {
+                if config.pre_tool_use.prevent_root_additions && show_matches {
                     println!("   Root directory contents:");
                     for entry in (fs::read_dir(".")?).flatten() {
                         println!("      - {}", entry.file_name().to_string_lossy());
@@ -348,10 +348,10 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
             }
             "toolUsageValidation" => {
                 println!("🔧 Tool Usage Validation Rules:");
-                if config.rules.tool_usage_validation.is_empty() {
+                if config.pre_tool_use.tool_usage_validation.is_empty() {
                     println!("   No tool usage validation rules configured");
                 } else {
-                    for rule in &config.rules.tool_usage_validation {
+                    for rule in &config.pre_tool_use.tool_usage_validation {
                         println!(
                             "   Tool: {} | Pattern: {} | Action: {}",
                             rule.tool, rule.pattern, rule.action
@@ -375,15 +375,15 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
         println!("📋 Configuration Overview:");
         println!(
             "🚫 Prevent Root Additions: {}",
-            config.rules.prevent_root_additions
+            config.pre_tool_use.prevent_root_additions
         );
         println!(
             "📁 Uneditable Files: {} patterns",
-            config.rules.uneditable_files.len()
+            config.pre_tool_use.uneditable_files.len()
         );
         println!(
             "🔧 Tool Usage Validation: {} rules",
-            config.rules.tool_usage_validation.len()
+            config.pre_tool_use.tool_usage_validation.len()
         );
         println!("♾️  Infinite Mode: {}", config.stop.infinite);
         if let Some(rounds) = config.stop.rounds {
@@ -448,15 +448,15 @@ async fn handle_validate(config_path: Option<String>) -> Result<()> {
             println!("Configuration summary:");
             println!(
                 "   Prevent root additions: {}",
-                config.rules.prevent_root_additions
+                config.pre_tool_use.prevent_root_additions
             );
             println!(
                 "   Uneditable files: {} pattern(s)",
-                config.rules.uneditable_files.len()
+                config.pre_tool_use.uneditable_files.len()
             );
             println!(
                 "   Tool usage validation: {} rule(s)",
-                config.rules.tool_usage_validation.len()
+                config.pre_tool_use.tool_usage_validation.len()
             );
             println!("   Infinite mode: {}", config.stop.infinite);
             if let Some(rounds) = config.stop.rounds {
