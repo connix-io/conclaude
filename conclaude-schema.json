@@ -59,16 +59,9 @@
         "preventGeneratedFileEdits": {
           "default": true,
           "type": "boolean"
-        }
-      },
-      "type": "object"
-    },
-    "RulesConfig": {
-      "additionalProperties": false,
-      "description": "Configuration interface for validation rules",
-      "properties": {
+        },
         "preventRootAdditions": {
-          "default": false,
+          "default": true,
           "type": "boolean"
         },
         "toolUsageValidation": {
@@ -231,16 +224,7 @@
       "default": {
         "generatedFileMessage": null,
         "preventAdditions": [],
-        "preventGeneratedFileEdits": false
-      }
-    },
-    "rules": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/RulesConfig"
-        }
-      ],
-      "default": {
+        "preventGeneratedFileEdits": true,
         "preventRootAdditions": true,
         "toolUsageValidation": [],
         "uneditableFiles": []

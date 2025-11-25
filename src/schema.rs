@@ -196,7 +196,7 @@ stop:
   commands:
     - run: "echo test"
   infinite: false
-rules:
+preToolUse:
   preventRootAdditions: true
   uneditableFiles: []
 "#;
