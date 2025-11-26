@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **preventAdditions is now functional**: Fixed the `preventAdditions` setting in `preToolUse` which was completely non-functional. The field was defined in the config schema but never enforced. Now correctly blocks Write operations to files matching configured glob patterns (e.g., `preventAdditions: ["dist/**", "build/**", "*.log"]`).
+
+- **preventRootAdditions now allows editing existing root files**: Refined semantics to distinguish between file creation (blocked) and modification (allowed). Users can now edit root-level configuration files like `Cargo.toml` and `package.json` while still preventing accidental new file creation at the repository root.
+
 ### Breaking Changes
 
 - **Configuration consolidation**: The `rules` section has been removed and its fields consolidated into `preToolUse`. Users must migrate their configurations:

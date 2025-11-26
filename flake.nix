@@ -126,6 +126,11 @@
         '';
       };
 
+      devShells.ci = pkgs.mkShell {
+        name = "ci";
+        buildInputs = [pkgs.rust-bin.stable.latest.default];
+      };
+
       formatter = let
         treefmtModule = {
           projectRootFile = "flake.nix";

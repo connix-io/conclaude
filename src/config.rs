@@ -772,6 +772,10 @@ notifications:
 "#;
 
         let result = parse_and_validate_config(valid_config, Path::new("test.yaml"));
-        assert!(result.is_ok(), "Should accept config without rules section: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Should accept config without rules section: {:?}",
+            result.err()
+        );
     }
 }

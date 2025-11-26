@@ -679,18 +679,24 @@ stop:
 
 ### PreToolUse Root Protection
 
-When `preventRootAdditions: true`, file-modifying tools are blocked at repo root:
+When `preventRootAdditions: true`, file creation is blocked at repo root while edits to existing files are allowed:
 
 ```bash
-# Blocked operations
-Write → /repo/newfile.txt          ❌ Blocked
-Edit → /repo/config.json           ❌ Blocked
+# Blocked operations (creating NEW files at root)
+Write → /repo/newfile.txt          ❌ Blocked (file doesn't exist)
+Write → /repo/debug.log            ❌ Blocked (file doesn't exist)
 
-# Allowed operations
-Write → /repo/.gitignore           ✓ Allowed (dotfile)
-Write → /repo/src/component.rs     ✓ Allowed (subdirectory)
-Read → /repo/Cargo.toml            ✓ Allowed (read-only)
+# Allowed operations (editing EXISTING files at root)
+Write → /repo/Cargo.toml           ✓ Allowed (file exists - modification)
+Edit → /repo/package.json          ✓ Allowed (Edit tool always works)
+Write → /repo/.gitignore           ✓ Allowed (file exists - modification)
+
+# Always allowed operations
+Write → /repo/src/component.rs     ✓ Allowed (subdirectory - not at root)
+Read → /repo/Cargo.toml            ✓ Allowed (read-only operation)
 ```
+
+**Key insight**: The rule is "prevent root *additions*" (new files), not "prevent root *modifications*" (existing files). This allows you to edit configuration files at the root while still preventing accidental file clutter.
 
 ### SubagentStart Hook Payload
 
@@ -1038,7 +1044,8 @@ stop:
 
 # File and directory protection rules
 preToolUse:
-  # Prevent file creation at repository root
+  # Prevent NEW file creation at repository root
+  # Existing root files (like Cargo.toml, package.json) can still be edited
   preventRootAdditions: true
 
   # Files that cannot be edited (glob patterns)
