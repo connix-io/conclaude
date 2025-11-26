@@ -124,7 +124,10 @@ fn test_generate_default_config() {
     assert!(config.contains("stop:"));
     assert!(config.contains("preToolUse:"));
     assert!(config.contains("preventRootAdditions: true"));
-    assert!(config.contains("uneditableFiles: []"));
+    // Default config now includes conclaude config files in uneditableFiles for security
+    assert!(config.contains("uneditableFiles:"));
+    assert!(config.contains(".conclaude.yml"));
+    assert!(config.contains(".conclaude.yaml"));
     assert!(config.contains("infinite: false"));
 }
 
