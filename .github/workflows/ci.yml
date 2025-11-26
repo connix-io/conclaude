@@ -33,10 +33,10 @@ jobs:
           nix flake show
 
       - name: Lint (clippy, deny warnings)
-        run: nix develop -c cargo clippy --all-targets --all-features -- -D warnings
+        run: nix develop .#ci -c cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Tests
-        run: nix develop -c cargo test --all-features -- --nocapture
+        run: nix develop .#ci -c cargo test --all-features -- --nocapture
 
       - name: Build package
         run: |
