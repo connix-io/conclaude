@@ -299,9 +299,13 @@ impl GitIgnoreChecker {
         // Collect nested .gitignore files for this specific path
         let nested_gitignores = collect_gitignore_files(&self.repo_root, &target_dir);
 
-        // If we have nested gitignores beyond the root, build a new matcher
-        // Otherwise use the base matcher we already have
-        let matcher = if nested_gitignores.len() > 1 {
+        // If we have nested gitignores that aren't already in the base matcher,
+        // build a new matcher; otherwise use the base matcher we already have.
+        let root_gitignore_path = self.repo_root.join(".gitignore");
+        let needs_nested_matcher = !nested_gitignores.is_empty()
+            && !(nested_gitignores.len() == 1 && nested_gitignores[0] == root_gitignore_path);
+
+        let matcher = if needs_nested_matcher {
             // Build a new matcher with all gitignore files including nested ones
             let mut builder = GitignoreBuilder::new(&self.repo_root);
 
@@ -703,6 +707,28 @@ mod tests {
         let (is_ignored, _) = checker.is_ignored(Path::new("a/b/c/d/data.cache"));
         assert!(is_ignored);
         let (is_ignored, _) = checker.is_ignored(Path::new("a/b/data.cache"));
+        assert!(!is_ignored);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_nested_gitignore_without_root_file() -> Result<()> {
+        // Repository has no root .gitignore, only a nested one
+        let temp_dir = TempDir::new()?;
+
+        let nested_dir = temp_dir.path().join("src");
+        fs::create_dir_all(&nested_dir)?;
+        fs::write(nested_dir.join(".gitignore"), "*.secret\n")?;
+
+        let checker = GitIgnoreChecker::new(temp_dir.path())?;
+
+        // Files under the nested directory should respect its .gitignore
+        let (is_ignored, _) = checker.is_ignored(Path::new("src/password.secret"));
+        assert!(is_ignored);
+
+        // Files outside the nested directory should not be affected
+        let (is_ignored, _) = checker.is_ignored(Path::new("password.secret"));
         assert!(!is_ignored);
 
         Ok(())
