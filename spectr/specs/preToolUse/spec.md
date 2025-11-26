@@ -7,12 +7,24 @@ TODO: Add purpose description
 ## Requirements
 
 ### Requirement: Root-Level File Addition Prevention
-The system SHALL prevent Claude from creating or modifying files at the repository root when `preventRootAdditions` is enabled.
+
+The system SHALL prevent Claude from creating **new** files at the repository root when `preventRootAdditions` is enabled. However, the system SHALL allow modifications to existing root-level files.
+
+**Previous behavior:** Blocked all file creation and modification at root level (overly restrictive).
+
+**New behavior:** Only blocks creation of new files at root; allows editing and overwriting existing root files (balanced protection).
 
 #### Scenario: Prevent root additions enabled
 - **WHEN** `preToolUse.preventRootAdditions` is set to `true`
-- **THEN** Claude SHALL NOT be allowed to create or modify files with paths that have no directory separator (e.g., `README.md`, `.env`)
-- **AND** any attempt to create/modify such files SHALL result in an error message explaining the restriction
+- **AND** the target file does NOT exist at repository root
+- **THEN** Claude SHALL NOT be allowed to create the new file
+- **AND** any attempt to create such files SHALL result in an error message explaining the restriction
+
+#### Scenario: Allow modification of existing root files
+- **WHEN** `preToolUse.preventRootAdditions` is set to `true`
+- **AND** the target file already exists at repository root
+- **THEN** Claude SHALL be allowed to modify/overwrite the existing file
+- **AND** no preventRootAdditions error SHALL be generated
 
 #### Scenario: Prevent root additions disabled
 - **WHEN** `preToolUse.preventRootAdditions` is set to `false`
@@ -22,7 +34,8 @@ The system SHALL prevent Claude from creating or modifying files at the reposito
 #### Scenario: Default behavior
 - **WHEN** `preToolUse.preventRootAdditions` is not specified in configuration
 - **THEN** the system SHALL default to `preventRootAdditions: true`
-- **AND** root-level additions SHALL be prevented by default
+- **AND** root-level file creation SHALL be prevented by default
+- **AND** existing root files may still be modified
 
 ### Requirement: File Protection via Glob Patterns
 The system SHALL prevent Claude from editing specified files using glob patterns in the `uneditableFiles` configuration.
@@ -156,3 +169,114 @@ The system SHALL enforce per-tool restrictions defined in `toolUsageValidation` 
 - **THEN** the error message SHALL include the tool name, file pattern, and custom message if provided
 - **AND** the user SHALL understand why the operation was blocked
 
+### Requirement: File Addition Prevention via Glob Patterns
+The system SHALL enforce the `preventAdditions` configuration by blocking `Write` tool operations that create NEW files at paths matching configured glob patterns. Existing files can be overwritten.
+
+**Previous behavior (BROKEN):** `preventAdditions` field existed in schema but was never checked by the hook, causing silent failure.
+
+**New behavior (FIXED):** `preventAdditions` patterns are enforced during PreToolUse hook execution for Write tool operations creating new files.
+
+#### Scenario: Exact directory pattern blocks file creation
+- **GIVEN** configuration contains `preventAdditions: ["dist"]`
+- **WHEN** Claude attempts to use Write tool to create file `dist/output.js`
+- **THEN** the operation SHALL be blocked before execution
+- **AND** error message SHALL indicate the file matches pattern `"dist"` and show the attempted path
+
+#### Scenario: Recursive directory pattern blocks nested files
+- **GIVEN** configuration contains `preventAdditions: ["build/**"]`
+- **WHEN** Claude attempts to use Write tool to create file `build/nested/deep/file.js`
+- **THEN** the operation SHALL be blocked
+- **AND** error message SHALL indicate the file matches pattern `"build/**"`
+
+#### Scenario: File extension pattern blocks files
+- **GIVEN** configuration contains `preventAdditions: ["*.log"]`
+- **WHEN** Claude attempts to use Write tool to create file `debug.log`
+- **THEN** the operation SHALL be blocked
+- **AND** error message SHALL indicate the file matches pattern `"*.log"`
+
+#### Scenario: Multiple patterns all enforced
+- **GIVEN** configuration contains `preventAdditions: ["dist/**", "build/**", "*.log"]`
+- **WHEN** Claude attempts to create any file matching any of the patterns
+- **THEN** the operation SHALL be blocked with appropriate pattern indicated
+- **AND** Claude attempts to create file not matching any pattern (e.g., `src/main.rs`)
+- **THEN** the operation SHALL be allowed to proceed
+
+#### Scenario: Non-matching paths are allowed
+- **GIVEN** configuration contains `preventAdditions: ["dist/**"]`
+- **WHEN** Claude attempts to use Write tool to create file `src/components/Button.tsx`
+- **THEN** the operation SHALL be allowed (no pattern match)
+- **AND** no error message SHALL be generated
+
+#### Scenario: Empty preventAdditions array allows all operations
+- **GIVEN** configuration contains `preventAdditions: []`
+- **WHEN** Claude attempts to use Write tool to create any file
+- **THEN** the operation SHALL be allowed (no patterns to check)
+- **AND** no preventAdditions validation SHALL occur
+
+#### Scenario: Existing files can be overwritten
+- **GIVEN** configuration contains `preventAdditions: ["docs/**"]`
+- **AND** file `docs/README.md` already exists
+- **WHEN** Claude attempts to use Write tool to overwrite `docs/README.md`
+- **THEN** the operation SHALL be allowed (file already exists)
+- **AND** preventAdditions only blocks creation of NEW files, not overwrites
+
+### Requirement: Write Tool Exclusivity for preventAdditions
+The system SHALL only apply `preventAdditions` checks to the `Write` tool, not to `Edit` or `NotebookEdit` tools.
+
+#### Scenario: Edit tool bypasses preventAdditions
+- **GIVEN** configuration contains `preventAdditions: ["dist/**"]`
+- **AND** file `dist/existing.js` already exists
+- **WHEN** Claude attempts to use Edit tool to modify `dist/existing.js`
+- **THEN** the operation SHALL NOT be blocked by preventAdditions
+- **AND** the operation may be subject to `uneditableFiles` checks but not preventAdditions
+
+#### Scenario: NotebookEdit tool bypasses preventAdditions
+- **GIVEN** configuration contains `preventAdditions: ["notebooks/**"]`
+- **AND** file `notebooks/analysis.ipynb` exists
+- **WHEN** Claude attempts to use NotebookEdit tool to modify the notebook
+- **THEN** the operation SHALL NOT be blocked by preventAdditions
+- **AND** preventAdditions validation SHALL not run for this tool
+
+### Requirement: preventAdditions Error Reporting
+The system SHALL provide clear, actionable error messages when preventAdditions blocks a file creation operation.
+
+#### Scenario: Error message includes all context
+- **WHEN** preventAdditions blocks a Write operation
+- **THEN** error message SHALL include:
+  - The tool name (`Write`)
+  - The matching glob pattern (e.g., `"dist/**"`)
+  - The attempted file path (e.g., `dist/output.js`)
+- **AND** error format SHALL be: `"Blocked {tool} operation: file matches preToolUse.preventAdditions pattern '{pattern}'. File: {path}"`
+
+#### Scenario: Diagnostic logging for debugging
+- **WHEN** preventAdditions blocks an operation
+- **THEN** a diagnostic message SHALL be logged to stderr
+- **AND** log message SHALL include: tool_name, file_path, and matching pattern
+
+### Requirement: File Existence Check for Root Additions
+
+The system SHALL check if a target file exists at the resolved path before determining whether to block a Write operation under preventRootAdditions.
+
+#### Scenario: Existence check prevents false positives
+- **GIVEN** configuration contains `preToolUse.preventRootAdditions: true`
+- **WHEN** determining whether to block a Write operation
+- **THEN** the system SHALL check if the file exists at the resolved path
+- **AND** only block if file does NOT exist at root
+
+#### Scenario: File existence allows write
+- **GIVEN** configuration contains `preToolUse.preventRootAdditions: true`
+- **AND** file `package.json` exists at root
+- **WHEN** Claude attempts to use Write tool to overwrite/modify `package.json`
+- **THEN** the operation SHALL be allowed
+- **AND** no error message SHALL be generated for preventRootAdditions
+
+#### Scenario: Non-existent file is blocked
+- **GIVEN** configuration contains `preToolUse.preventRootAdditions: true`
+- **AND** file `docker-compose.yml` does NOT exist at root
+- **WHEN** Claude attempts Write to `docker-compose.yml`
+- **THEN** the system SHALL detect file does not exist
+- **AND** the operation SHALL be blocked (new file at root)
+
+---
+
+**Summary:** preventRootAdditions now correctly allows modifications to existing root-level files while maintaining protection against creating new files at the root. This preserves the semantic meaning of "preventRootAdditions" (prevent adding/creating files at root) while enabling practical workflows that require updating configuration files.

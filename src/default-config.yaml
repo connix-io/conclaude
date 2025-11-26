@@ -45,8 +45,12 @@ preToolUse:
 
   # Files that Claude cannot edit, using glob patterns
   # Supports various glob patterns for flexible file protection
-  uneditableFiles: []
-  # Examples:
+  # By default, conclaude's own config files are protected to prevent the AI
+  # from modifying guardrail settings - this is a security best practice
+  uneditableFiles:
+    - ".conclaude.yml"   # Protect conclaude config from AI modification
+    - ".conclaude.yaml"  # Alternative config extension
+  # Additional examples:
   # uneditableFiles:
   #   - "./package.json"      # specific file
   #   - "*.md"                # file extension
