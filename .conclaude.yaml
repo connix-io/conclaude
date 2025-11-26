@@ -12,7 +12,7 @@ stop:
   # Alternative structured command format with optional custom error messages
   # Each command can have its own error message, and control output display
   commands:
-    - run: "openspec validate --all --strict"
+    - run: "spectr validate --all --strict"
       showStdout: true
       showStderr: true
       message: "OpenSpec validation failed - please fix errors before continuing"
@@ -103,7 +103,7 @@ preToolUse:
 
   # Prevent editing of auto-generated files (enabled by default)
   # Checks for common markers like "DO\ NOT\ EDIT", "Code\ generated\ by", etc.
-  preventGeneratedFileEdits: true
+  preventGeneratedFileEdits: false
 
   # Custom message when blocking auto-generated file edits
   # Available placeholders: {file_path}, {marker}
