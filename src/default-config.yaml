@@ -59,6 +59,11 @@ preToolUse:
   #   - "docs/**"             # entire directories
   #   - "{package,tsconfig}.json"  # multiple specific files
 
+  # Prevent Claude from creating or modifying files that are git-ignored
+  # When enabled, files matching patterns in .gitignore will be protected
+  # Uses your existing .gitignore as the source of truth for file protection
+  preventUpdateGitIgnored: false
+
   # Tool usage validation rules - control which tools can be used on which files
   # Allows fine-grained control over tool usage based on file patterns
   toolUsageValidation: []

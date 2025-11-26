@@ -1,4 +1,5 @@
 use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig};
+use crate::gitignore::is_path_git_ignored;
 use crate::types::{
     validate_base_payload, validate_subagent_start_payload, validate_subagent_stop_payload,
     HookResult, NotificationPayload, PostToolUsePayload, PreCompactPayload, PreToolUsePayload,
@@ -244,6 +245,19 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
     let file_modifying_tools = ["Write", "Edit", "MultiEdit", "NotebookEdit"];
 
     if file_modifying_tools.contains(&payload.tool_name.as_str()) {
+        // Check if file is git-ignored and should not be modified
+        if let Some(result) = check_git_ignored_file(&payload).await? {
+            send_notification(
+                "PreToolUse",
+                "failure",
+                Some(&format!(
+                    "Git-ignored file protection blocked tool '{}'",
+                    payload.tool_name
+                )),
+            );
+            return Ok(result);
+        }
+
         if let Some(result) = check_file_validation_rules(&payload).await? {
             send_notification(
                 "PreToolUse",
@@ -1129,6 +1143,66 @@ pub async fn check_auto_generated_file(payload: &PreToolUsePayload) -> Result<Op
         eprintln!(
             "PreToolUse blocked auto-generated file edit: tool_name={}, file_path={}, marker={}",
             payload.tool_name, file_path, marker
+        );
+
+        return Ok(Some(HookResult::blocked(message)));
+    }
+
+    Ok(None)
+}
+
+/// Check if file is git-ignored and should not be updated
+///
+/// # Errors
+///
+/// Returns an error if configuration loading fails or gitignore check fails.
+async fn check_git_ignored_file(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
+    let (config, config_path) = get_config().await?;
+
+    // Only check if the feature is enabled
+    if !config.pre_tool_use.prevent_update_git_ignored {
+        return Ok(None);
+    }
+
+    // Extract file path from tool input
+    let file_path = extract_file_path(&payload.tool_input);
+    let Some(file_path) = file_path else {
+        return Ok(None);
+    };
+
+    // Get the repository root from the config path's parent directory
+    let repo_root = config_path.parent().unwrap_or_else(|| Path::new("."));
+
+    // Resolve the file path to check
+    let cwd = std::env::current_dir().context("Failed to get current working directory")?;
+    let resolved_path = cwd.join(&file_path);
+
+    // Check if the file is git-ignored
+    let (is_ignored, pattern) = is_path_git_ignored(&resolved_path, repo_root)?;
+
+    if is_ignored {
+        let pattern_display = pattern.unwrap_or_else(|| format!("pattern in {}/.gitignore", repo_root.display()));
+
+        let message = format!(
+            "File operation blocked: Path is git-ignored\n\
+            \n\
+            File: {}\n\
+            Matched pattern in .gitignore: {}\n\
+            \n\
+            This file is protected by 'preventUpdateGitIgnored: true'\n\
+            \n\
+            To allow modifications:\n\
+            1. Remove the pattern from .gitignore\n\
+            2. Use a negation pattern (e.g., !{})\n\
+            3. Set preventUpdateGitIgnored: false in your config",
+            file_path,
+            pattern_display,
+            Path::new(&file_path).file_name().and_then(|n| n.to_str()).unwrap_or(&file_path)
+        );
+
+        eprintln!(
+            "PreToolUse blocked git-ignored file: tool_name={}, file_path={}, pattern={}",
+            payload.tool_name, file_path, pattern_display
         );
 
         return Ok(Some(HookResult::blocked(message)));

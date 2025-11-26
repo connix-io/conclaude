@@ -1,5 +1,6 @@
 // Testing GitHub Actions workflow fixes
 mod config;
+mod gitignore;
 mod hooks;
 mod schema;
 mod types;

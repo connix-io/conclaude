@@ -64,6 +64,10 @@
           "default": true,
           "type": "boolean"
         },
+        "preventUpdateGitIgnored": {
+          "default": false,
+          "type": "boolean"
+        },
         "toolUsageValidation": {
           "default": [],
           "items": {
@@ -226,6 +230,7 @@
         "preventAdditions": [],
         "preventGeneratedFileEdits": true,
         "preventRootAdditions": true,
+        "preventUpdateGitIgnored": false,
         "toolUsageValidation": [],
         "uneditableFiles": []
       }

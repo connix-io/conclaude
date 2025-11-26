@@ -1,5 +1,6 @@
 // Export modules for testing
 pub mod config;
+pub mod gitignore;
 pub mod hooks;
 
 /// Schema generation and validation utilities.
