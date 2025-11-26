@@ -4,6 +4,13 @@
 //! It wraps the `ignore` crate's gitignore functionality with a simple API focused on
 //! single-file path checking.
 //!
+//! # Limitations
+//!
+//! - Only loads `.gitignore` from the repository root directory. Nested `.gitignore` files
+//!   in subdirectories are not currently supported. This may be added in a future version.
+//! - Both new file creation (Write) and modification (Edit) of git-ignored files are blocked.
+//!   This is intentional - if a file should be ignored, Claude shouldn't create or modify it.
+//!
 //! # Examples
 //!
 //! ```rust
@@ -27,6 +34,37 @@
 use anyhow::{Context, Result};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use std::path::{Path, PathBuf};
+
+/// Find the git repository root by walking up from a starting path.
+///
+/// Looks for a `.git` directory in the starting path and each parent directory.
+/// Returns the directory containing `.git`, or None if not found.
+///
+/// # Arguments
+///
+/// * `start_path` - The path to start searching from
+///
+/// # Returns
+///
+/// Returns `Some(PathBuf)` with the repository root, or `None` if not in a git repository.
+#[must_use]
+pub fn find_git_root(start_path: &Path) -> Option<PathBuf> {
+    let mut current = if start_path.is_file() {
+        start_path.parent()?.to_path_buf()
+    } else {
+        start_path.to_path_buf()
+    };
+
+    loop {
+        if current.join(".git").exists() {
+            return Some(current);
+        }
+        match current.parent() {
+            Some(parent) => current = parent.to_path_buf(),
+            None => return None,
+        }
+    }
+}
 
 /// A checker for git-ignore patterns.
 ///
@@ -95,7 +133,7 @@ impl GitIgnoreChecker {
     ///
     /// # Returns
     ///
-    /// Returns `true` if the path is ignored by gitignore patterns, `false` otherwise.
+    /// Returns `(bool, Option<String>)` - whether the path is ignored and the matching pattern if found.
     ///
     /// # Examples
     ///
@@ -105,11 +143,12 @@ impl GitIgnoreChecker {
     ///
     /// # fn example() -> anyhow::Result<()> {
     /// let checker = GitIgnoreChecker::new(Path::new("/path/to/repo"))?;
-    /// let is_ignored = checker.is_ignored(Path::new("node_modules/foo.js"));
+    /// let (is_ignored, pattern) = checker.is_ignored(Path::new("node_modules/foo.js"));
     /// # Ok(())
     /// # }
     /// ```
-    pub fn is_ignored(&self, path: &Path) -> bool {
+    #[must_use]
+    pub fn is_ignored(&self, path: &Path) -> (bool, Option<String>) {
         // Convert to relative path if it's absolute
         let relative_path = if path.is_absolute() {
             match path.strip_prefix(&self.repo_root) {
@@ -127,19 +166,23 @@ impl GitIgnoreChecker {
         // We check the parent components as directories to handle nested paths like node_modules/foo.js
 
         // First check if this exact path is ignored as a file
-        if self.gitignore.matched(relative_path, false).is_ignore() {
-            return true;
+        let file_match = self.gitignore.matched(relative_path, false);
+        if file_match.is_ignore() {
+            let pattern = file_match.inner().map(|g| g.original().to_string());
+            return (true, pattern);
         }
 
         // Then check each parent directory component
         // This handles cases like "node_modules/" ignoring "node_modules/foo.js"
         for ancestor in relative_path.ancestors().skip(1) {
-            if self.gitignore.matched(ancestor, true).is_ignore() {
-                return true;
+            let dir_match = self.gitignore.matched(ancestor, true);
+            if dir_match.is_ignore() {
+                let pattern = dir_match.inner().map(|g| g.original().to_string());
+                return (true, pattern);
             }
         }
 
-        false
+        (false, None)
     }
 }
 
@@ -180,17 +223,7 @@ impl GitIgnoreChecker {
 /// ```
 pub fn is_path_git_ignored(path: &Path, repo_root: &Path) -> Result<(bool, Option<String>)> {
     let checker = GitIgnoreChecker::new(repo_root)?;
-    let is_ignored = checker.is_ignored(path);
-
-    // If ignored, try to get the matching pattern for better error messages
-    let pattern = if is_ignored {
-        // The ignore crate doesn't directly expose which pattern matched,
-        // but we can provide the gitignore file location as context
-        Some(format!("matched by {}/.gitignore", repo_root.display()))
-    } else {
-        None
-    };
-
+    let (is_ignored, pattern) = checker.is_ignored(path);
     Ok((is_ignored, pattern))
 }
 
@@ -213,14 +246,25 @@ mod tests {
         let temp_dir = create_test_repo("node_modules/\n*.log\ntarget/\n")?;
         let checker = GitIgnoreChecker::new(temp_dir.path())?;
 
-        // Should be ignored
-        assert!(checker.is_ignored(Path::new("node_modules/foo.js")));
-        assert!(checker.is_ignored(Path::new("debug.log")));
-        assert!(checker.is_ignored(Path::new("target/release/app")));
+        // Should be ignored (with pattern)
+        let (is_ignored, pattern) = checker.is_ignored(Path::new("node_modules/foo.js"));
+        assert!(is_ignored);
+        assert_eq!(pattern, Some("node_modules/".to_string()));
+
+        let (is_ignored, pattern) = checker.is_ignored(Path::new("debug.log"));
+        assert!(is_ignored);
+        assert_eq!(pattern, Some("*.log".to_string()));
+
+        let (is_ignored, _) = checker.is_ignored(Path::new("target/release/app"));
+        assert!(is_ignored);
 
         // Should not be ignored
-        assert!(!checker.is_ignored(Path::new("src/main.rs")));
-        assert!(!checker.is_ignored(Path::new("README.md")));
+        let (is_ignored, pattern) = checker.is_ignored(Path::new("src/main.rs"));
+        assert!(!is_ignored);
+        assert!(pattern.is_none());
+
+        let (is_ignored, _) = checker.is_ignored(Path::new("README.md"));
+        assert!(!is_ignored);
 
         Ok(())
     }
@@ -231,8 +275,10 @@ mod tests {
         let checker = GitIgnoreChecker::new(temp_dir.path())?;
 
         // With no .gitignore, nothing should be ignored
-        assert!(!checker.is_ignored(Path::new("node_modules/foo.js")));
-        assert!(!checker.is_ignored(Path::new("any/file.txt")));
+        let (is_ignored, _) = checker.is_ignored(Path::new("node_modules/foo.js"));
+        assert!(!is_ignored);
+        let (is_ignored, _) = checker.is_ignored(Path::new("any/file.txt"));
+        assert!(!is_ignored);
 
         Ok(())
     }
@@ -243,11 +289,14 @@ mod tests {
         let checker = GitIgnoreChecker::new(temp_dir.path())?;
 
         // Regular .log files should be ignored
-        assert!(checker.is_ignored(Path::new("debug.log")));
-        assert!(checker.is_ignored(Path::new("error.log")));
+        let (is_ignored, _) = checker.is_ignored(Path::new("debug.log"));
+        assert!(is_ignored);
+        let (is_ignored, _) = checker.is_ignored(Path::new("error.log"));
+        assert!(is_ignored);
 
         // important.log should NOT be ignored (negation pattern)
-        assert!(!checker.is_ignored(Path::new("important.log")));
+        let (is_ignored, _) = checker.is_ignored(Path::new("important.log"));
+        assert!(!is_ignored);
 
         Ok(())
     }
@@ -278,9 +327,12 @@ mod tests {
         let temp_dir = create_test_repo("build/\n")?;
         let checker = GitIgnoreChecker::new(temp_dir.path())?;
 
-        assert!(checker.is_ignored(Path::new("build/output.js")));
-        assert!(checker.is_ignored(Path::new("build/nested/file.txt")));
-        assert!(!checker.is_ignored(Path::new("src/build.rs")));
+        let (is_ignored, _) = checker.is_ignored(Path::new("build/output.js"));
+        assert!(is_ignored);
+        let (is_ignored, _) = checker.is_ignored(Path::new("build/nested/file.txt"));
+        assert!(is_ignored);
+        let (is_ignored, _) = checker.is_ignored(Path::new("src/build.rs"));
+        assert!(!is_ignored);
 
         Ok(())
     }
@@ -300,8 +352,32 @@ mod tests {
         let checker = GitIgnoreChecker::new(temp_dir.path())?;
 
         // Should still work with valid patterns
-        assert!(checker.is_ignored(Path::new("test.log")));
-        assert!(!checker.is_ignored(Path::new("test.rs")));
+        let (is_ignored, _) = checker.is_ignored(Path::new("test.log"));
+        assert!(is_ignored);
+        let (is_ignored, _) = checker.is_ignored(Path::new("test.rs"));
+        assert!(!is_ignored);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_find_git_root() -> Result<()> {
+        // Test that find_git_root correctly locates .git directory
+        let temp_dir = TempDir::new()?;
+        let git_dir = temp_dir.path().join(".git");
+        fs::create_dir(&git_dir)?;
+
+        // From repo root
+        assert_eq!(find_git_root(temp_dir.path()), Some(temp_dir.path().to_path_buf()));
+
+        // From subdirectory
+        let sub_dir = temp_dir.path().join("src/nested");
+        fs::create_dir_all(&sub_dir)?;
+        assert_eq!(find_git_root(&sub_dir), Some(temp_dir.path().to_path_buf()));
+
+        // Non-git directory
+        let non_git = TempDir::new()?;
+        assert_eq!(find_git_root(non_git.path()), None);
 
         Ok(())
     }

@@ -66,6 +66,7 @@
         },
         "preventUpdateGitIgnored": {
           "default": false,
+          "description": "Block Claude from modifying or creating files that match .gitignore patterns",
           "type": "boolean"
         },
         "toolUsageValidation": {

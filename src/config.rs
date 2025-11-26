@@ -70,6 +70,7 @@ pub struct PreToolUseConfig {
     pub prevent_root_additions: bool,
     #[serde(default, rename = "uneditableFiles")]
     pub uneditable_files: Vec<String>,
+    /// Block Claude from modifying or creating files that match .gitignore patterns
     #[serde(default, rename = "preventUpdateGitIgnored")]
     pub prevent_update_git_ignored: bool,
     #[serde(default, rename = "toolUsageValidation")]
