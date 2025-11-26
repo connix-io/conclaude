@@ -119,7 +119,7 @@ The system SHALL provide clear, actionable error messages when blocking git-igno
 - **WHEN** a file operation is blocked due to git-ignore
 - **THEN** the error message SHALL clearly state that `preventUpdateGitIgnored` setting is enforcing this restriction
 
-### Requirement: Configuration Validation
+### Requirement: Git-Ignored File Configuration Validation
 The system SHALL validate the `preventUpdateGitIgnore` boolean field.
 
 #### Scenario: Valid boolean value
@@ -137,7 +137,7 @@ The system SHALL validate the `preventUpdateGitIgnore` boolean field.
 - **THEN** the system SHALL default to `false`
 - **AND** no validation error SHALL occur
 
-### Requirement: Combined File Protection Policies
+### Requirement: Git-Ignored Combined Protection Policies
 The system SHALL enforce `preventUpdateGitIgnored` alongside existing file protection mechanisms.
 
 #### Scenario: preventUpdateGitIgnored with preventRootAdditions

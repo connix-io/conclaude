@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Database Configuration Options
 The system SHALL extend configuration with database-related settings for persistent state management.

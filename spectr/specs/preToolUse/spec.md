@@ -2,7 +2,7 @@
 
 ## Purpose
 
-TODO: Add purpose description
+Define the PreToolUse hook validation rules that control file protection policies, including root-level file addition prevention, glob pattern-based file protection via uneditableFiles, tool usage validation rules, and preventAdditions enforcement.
 
 ## Requirements
 

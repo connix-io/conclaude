@@ -1,6 +1,6 @@
 # Hook Execution Spec Deltas
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Rounds Mode State Persistence
 
@@ -47,10 +47,3 @@ The system SHALL display progress messages showing current round and maximum rou
 - **THEN** the message format is "Round {current}/{max} completed, continuing..."
 - **AND** the message is logged at INFO level
 
-## REMOVED Requirements
-
-### Requirement: Static Atomic Counter for Rounds
-
-**Reason**: Static atomic counters reset across process invocations, making them unsuitable for persistent round counting in a hook-based architecture where each invocation is a separate process.
-
-**Migration**: Replace all uses of `static ROUND_COUNT: AtomicU32` with tmpfs file-based state management using the session ID as the key.

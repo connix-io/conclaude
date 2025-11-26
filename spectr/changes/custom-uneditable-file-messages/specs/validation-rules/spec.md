@@ -4,7 +4,7 @@
 
 Define the structure and behavior of the `uneditableFiles` validation rule to support context-aware error messaging.
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Uneditable File Rule Structure
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-TODO: Add purpose description
+Define the configuration file discovery behavior for conclaude, including upward directory traversal, multiple file extension support, and search depth limits to locate `.conclaude.yaml` or `.conclaude.yml` configuration files.
 
 ## Requirements
 

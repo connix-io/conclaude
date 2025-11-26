@@ -28,7 +28,7 @@ The system SHALL enforce command timeouts during execution and provide clear err
 - **AND** success or failure SHALL be determined by the command's exit code
 - **AND** timeout logic SHALL not interfere with normal command completion
 
-### Requirement: Configuration Validation
+### Requirement: Timeout Configuration Validation
 The system SHALL validate timeout values in the configuration to ensure they are properly formatted and reasonable.
 
 #### Scenario: Valid timeout value

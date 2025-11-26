@@ -214,10 +214,3 @@ The system SHALL validate commandPattern and matchMode fields in the configurati
 - **AND** SHALL indicate which rule contains the invalid pattern
 - **AND** SHALL prevent the configuration from being used
 
-## MODIFIED Requirements
-
-None. This change adds new capabilities without modifying existing requirements.
-
-## REMOVED Requirements
-
-None. This change maintains full backward compatibility.
