@@ -14,7 +14,7 @@ stop:
   commands:
     - run: "echo test"
       maxOutputLines: 1
-rules:
+preToolUse:
   preventRootAdditions: true
 "#,
         r#"
@@ -22,7 +22,7 @@ stop:
   commands:
     - run: "echo test"
       maxOutputLines: 100
-rules:
+preToolUse:
   preventRootAdditions: true
 "#,
         r#"
@@ -30,7 +30,7 @@ stop:
   commands:
     - run: "echo test"
       maxOutputLines: 10000
-rules:
+preToolUse:
   preventRootAdditions: true
 "#,
     ];
@@ -59,7 +59,7 @@ stop:
   commands:
     - run: "echo test"
       maxOutputLines: 0
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -83,7 +83,7 @@ stop:
     - run: "echo hello"
       showStdout: true
       showStderr: true
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -113,7 +113,7 @@ stop:
       showStdout: false
       showStderr: true
       maxOutputLines: 10
-rules:
+preToolUse:
   preventRootAdditions: true
 "#,
             false,
@@ -129,7 +129,7 @@ stop:
       showStdout: true
       showStderr: false
       maxOutputLines: 20
-rules:
+preToolUse:
   preventRootAdditions: true
 "#,
             true,
@@ -145,7 +145,7 @@ stop:
       showStdout: false
       showStderr: false
       maxOutputLines: 5
-rules:
+preToolUse:
   preventRootAdditions: true
 "#,
             false,
@@ -161,7 +161,7 @@ stop:
       showStdout: true
       showStderr: true
       maxOutputLines: 15
-rules:
+preToolUse:
   preventRootAdditions: true
 "#,
             true,
@@ -217,7 +217,7 @@ stop:
     - run: "echo third"
       showStdout: true
       # no maxOutputLines
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -240,7 +240,7 @@ fn test_empty_commands_array() {
     let config_content = r#"
 stop:
   commands: []
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -266,7 +266,7 @@ stop:
     - run: "echo second"
       showStdout: true
       maxOutputLines: 100
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -289,7 +289,7 @@ fn test_minimal_command_config() {
 stop:
   commands:
     - run: "echo minimal"
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -317,7 +317,7 @@ stop:
     - run: "echo test"
       showStdout: true
       maxOutputLines: null
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -390,11 +390,10 @@ stop:
       showStdout: true
   infinite: false
   rounds: null
-rules:
+preToolUse:
   preventRootAdditions: true
   uneditableFiles:
     - "package-lock.json"
-preToolUse:
   preventAdditions: []
   preventGeneratedFileEdits: true
 notifications:
@@ -443,7 +442,7 @@ notifications:
     assert_eq!(config.stop.commands[2].max_output_lines, None);
 
     // Verify other sections
-    assert!(config.rules.prevent_root_additions);
+    assert!(config.pre_tool_use.prevent_root_additions);
     assert!(config.notifications.enabled);
 }
 
@@ -455,7 +454,7 @@ stop:
   commands:
     - run: "echo test"
       unknownField: "should fail"
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -489,7 +488,7 @@ stop:
   commands:
     - run: "echo test"
       maxOutputLines: {}
-rules:
+preToolUse:
   preventRootAdditions: true
 "#,
             value
@@ -552,7 +551,7 @@ stop:
     - run: "echo test"
       showStdout: true
       maxOutputLines: 75
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -582,7 +581,7 @@ stop:
   commands:
     - run: "echo test"
       max_output_lines: 10
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -598,7 +597,7 @@ stop:
   commands:
     - run: "echo test"
       maxOutputLines: 10
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -624,7 +623,7 @@ stop:
     - run: "bash -c 'echo STDOUT_TEST_OUTPUT && echo STDERR_TEST_OUTPUT >&2 && exit 1'"
       showStdout: false
       showStderr: true
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -730,7 +729,7 @@ stop:
     - run: "bash -c 'echo STDOUT_TEST_OUTPUT && echo STDERR_TEST_OUTPUT >&2 && exit 1'"
       showStdout: true
       showStderr: false
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -836,7 +835,7 @@ stop:
     - run: "bash -c 'echo STDOUT_TEST_OUTPUT && echo STDERR_TEST_OUTPUT >&2 && exit 1'"
       showStdout: false
       showStderr: false
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -938,7 +937,7 @@ stop:
     - run: "bash -c 'echo STDOUT_TEST_OUTPUT && echo STDERR_TEST_OUTPUT >&2 && exit 1'"
       showStdout: true
       showStderr: true
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 

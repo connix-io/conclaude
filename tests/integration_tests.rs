@@ -48,7 +48,7 @@ fn test_cli_init_command() {
         fs::read_to_string(temp_path.join(".conclaude.yaml")).expect("Failed to read config file");
     assert!(config_content.contains("# yaml-language-server:"));
     assert!(config_content.contains("stop:"));
-    assert!(config_content.contains("rules:"));
+    assert!(config_content.contains("preToolUse:"));
     assert!(config_content.contains("preventRootAdditions: true"));
 
     // Verify Claude settings file content
@@ -145,13 +145,12 @@ stop:
     - run: "echo test"
   infinite: false
   rounds: 5
-rules:
+preToolUse:
   preventRootAdditions: true
   uneditableFiles:
     - "*.lock"
     - "package-lock.json"
   toolUsageValidation: []
-preToolUse:
   preventAdditions: []
   preventGeneratedFileEdits: true
 notifications:
@@ -248,7 +247,7 @@ fn test_validate_with_invalid_yaml_syntax() {
 stop:
   commands:
     - run: "echo test"
-rules:
+preToolUse:
 preventRootAdditions: true
 "#;
 
@@ -301,7 +300,7 @@ stop:
     - run: "echo test"
   unknownField: "should fail"
   anotherBadField: 123
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -357,7 +356,7 @@ stop:
   commands:
     - run: "echo test"
   infinite: "true"
-rules:
+preToolUse:
   preventRootAdditions: "yes"
 "#;
 
@@ -413,7 +412,7 @@ stop:
   commands:
     - run: "test"
       maxOutputLines: 50000
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -469,7 +468,7 @@ stop:
   commands:
     - run: "echo test"
   rounds: 0
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -518,7 +517,7 @@ fn test_validate_with_custom_config_path_file() {
 stop:
   commands:
     - run: "echo custom"
-rules:
+preToolUse:
   preventRootAdditions: false
 "#;
 
@@ -560,7 +559,7 @@ fn test_validate_with_custom_config_path_directory() {
 stop:
   commands:
     - run: "echo directory test"
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -641,7 +640,7 @@ stop:
     - run: "echo test"
   infinite: true
   rounds: 10
-rules:
+preToolUse:
   preventRootAdditions: false
   uneditableFiles:
     - "*.lock"

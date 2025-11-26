@@ -37,18 +37,6 @@ pub struct StopConfig {
     pub rounds: Option<u32>,
 }
 
-/// Configuration interface for validation rules
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, FieldList)]
-#[serde(deny_unknown_fields)]
-pub struct RulesConfig {
-    #[serde(default, rename = "preventRootAdditions")]
-    pub prevent_root_additions: bool,
-    #[serde(default, rename = "uneditableFiles")]
-    pub uneditable_files: Vec<String>,
-    #[serde(default, rename = "toolUsageValidation")]
-    pub tool_usage_validation: Vec<ToolUsageRule>,
-}
-
 /// Tool usage validation rule
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -63,23 +51,13 @@ pub struct ToolUsageRule {
     pub match_mode: Option<String>,
 }
 
-impl Default for RulesConfig {
-    fn default() -> Self {
-        Self {
-            prevent_root_additions: true,
-            uneditable_files: Vec::new(),
-            tool_usage_validation: Vec::new(),
-        }
-    }
-}
-
 /// Default function that returns true for serde defaults
 fn default_true() -> bool {
     true
 }
 
 /// Configuration for pre tool use hooks
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, FieldList)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, FieldList)]
 #[serde(deny_unknown_fields)]
 pub struct PreToolUseConfig {
     #[serde(default, rename = "preventAdditions")]
@@ -88,6 +66,25 @@ pub struct PreToolUseConfig {
     pub prevent_generated_file_edits: bool,
     #[serde(default, rename = "generatedFileMessage")]
     pub generated_file_message: Option<String>,
+    #[serde(default = "default_true", rename = "preventRootAdditions")]
+    pub prevent_root_additions: bool,
+    #[serde(default, rename = "uneditableFiles")]
+    pub uneditable_files: Vec<String>,
+    #[serde(default, rename = "toolUsageValidation")]
+    pub tool_usage_validation: Vec<ToolUsageRule>,
+}
+
+impl Default for PreToolUseConfig {
+    fn default() -> Self {
+        Self {
+            prevent_additions: Vec::new(),
+            prevent_generated_file_edits: true,
+            generated_file_message: None,
+            prevent_root_additions: true,
+            uneditable_files: Vec::new(),
+            tool_usage_validation: Vec::new(),
+        }
+    }
 }
 
 /// Configuration for system notifications
@@ -139,8 +136,6 @@ impl NotificationsConfig {
 pub struct ConclaudeConfig {
     #[serde(default)]
     pub stop: StopConfig,
-    #[serde(default)]
-    pub rules: RulesConfig,
     #[serde(default, rename = "preToolUse")]
     pub pre_tool_use: PreToolUseConfig,
     #[serde(default)]
@@ -163,7 +158,6 @@ fn extract_unknown_field(error_msg: &str) -> Option<String> {
 fn suggest_similar_fields(unknown_field: &str, section: &str) -> Vec<String> {
     let all_fields: Vec<(&str, Vec<&str>)> = vec![
         ("stop", StopConfig::field_names()),
-        ("rules", RulesConfig::field_names()),
         ("preToolUse", PreToolUseConfig::field_names()),
         ("notifications", NotificationsConfig::field_names()),
         ("commands", StopCommand::field_names()),
@@ -277,10 +271,7 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
         parts.push("Valid field names by section:".to_string());
         parts.push("  stop: commands, infinite, infiniteMessage, rounds".to_string());
         parts.push(
-            "  rules: preventRootAdditions, uneditableFiles, toolUsageValidation".to_string(),
-        );
-        parts.push(
-            "  preToolUse: preventAdditions, preventGeneratedFileEdits, generatedFileMessage"
+            "  preToolUse: preventAdditions, preventGeneratedFileEdits, generatedFileMessage, preventRootAdditions, uneditableFiles, toolUsageValidation"
                 .to_string(),
         );
         parts.push(
@@ -440,7 +431,7 @@ pub async fn load_conclaude_config(start_dir: Option<&Path>) -> Result<(Conclaud
         .collect();
 
     let error_message = format!(
-        "Configuration file not found.\n\nSearched the following locations:\n{}\n\nCreate a .conclaude.yaml or .conclaude.yml file with stop and rules sections.\nRun 'conclaude init' to generate a template configuration.",
+        "Configuration file not found.\n\nSearched the following locations:\n{}\n\nCreate a .conclaude.yaml or .conclaude.yml file with stop and preToolUse sections.\nRun 'conclaude init' to generate a template configuration.",
         search_locations.join("\n")
     );
 
@@ -600,20 +591,14 @@ cd /tmp && echo "test""#;
         );
 
         assert_eq!(
-            RulesConfig::field_names(),
-            vec![
-                "preventRootAdditions",
-                "uneditableFiles",
-                "toolUsageValidation"
-            ]
-        );
-
-        assert_eq!(
             PreToolUseConfig::field_names(),
             vec![
                 "preventAdditions",
                 "preventGeneratedFileEdits",
-                "generatedFileMessage"
+                "generatedFileMessage",
+                "preventRootAdditions",
+                "uneditableFiles",
+                "toolUsageValidation"
             ]
         );
 
@@ -754,12 +739,39 @@ cd /tmp && echo "test""#;
     }
 
     #[test]
-    fn test_suggest_similar_fields_rules_section() {
-        // Test suggestions for rules section with camelCase field
-        let suggestions = suggest_similar_fields("preventRootAddition", "rules");
+    fn test_suggest_similar_fields_pretooluse_section() {
+        // Test suggestions for preToolUse section with camelCase field
+        let suggestions = suggest_similar_fields("preventRootAddition", "preToolUse");
         assert!(
             suggestions.contains(&"preventRootAdditions".to_string()),
             "Should suggest 'preventRootAdditions' for 'preventRootAddition'"
         );
+    }
+
+    #[test]
+    fn test_config_without_rules_section_works() {
+        // Test that configuration without rules section works normally
+        let valid_config = r#"
+preToolUse:
+  preventRootAdditions: true
+  uneditableFiles: []
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  toolUsageValidation: []
+
+stop:
+  commands: []
+  infinite: false
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+
+        let result = parse_and_validate_config(valid_config, Path::new("test.yaml"));
+        assert!(result.is_ok(), "Should accept config without rules section: {:?}", result.err());
     }
 }

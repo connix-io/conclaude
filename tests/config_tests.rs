@@ -76,7 +76,7 @@ stop:
     - run: "echo test"
   infinite: true
   infiniteMessage: "continue"
-rules:
+preToolUse:
   preventRootAdditions: false
   uneditableFiles:
     - "*.lock"
@@ -122,7 +122,7 @@ async fn test_load_config_not_found() {
 fn test_generate_default_config() {
     let config = generate_default_config();
     assert!(config.contains("stop:"));
-    assert!(config.contains("rules:"));
+    assert!(config.contains("preToolUse:"));
     assert!(config.contains("preventRootAdditions: true"));
     assert!(config.contains("uneditableFiles: []"));
     assert!(config.contains("infinite: false"));
@@ -139,7 +139,7 @@ fn test_default_config_can_be_parsed() {
     match result {
         Ok(config) => {
             // Config parsed successfully
-            assert!(config.rules.prevent_root_additions);
+            assert!(config.pre_tool_use.prevent_root_additions);
             println!("✓ Default config parsed successfully");
         }
         Err(e) => {
@@ -195,10 +195,9 @@ stop:
   infinite: false
   infiniteMessage: "continue"
   rounds: null
-rules:
+preToolUse:
   preventRootAdditions: true
   uneditableFiles: []
-preToolUse:
   preventAdditions: []
   preventGeneratedFileEdits: true
 notifications:
@@ -239,7 +238,7 @@ fn test_default_config_with_comments_removed_can_be_parsed() {
     match result {
         Ok(config) => {
             // Config parsed successfully
-            assert!(config.rules.prevent_root_additions);
+            assert!(config.pre_tool_use.prevent_root_additions);
         }
         Err(e) => {
             panic!(
@@ -267,7 +266,7 @@ fn test_default_config_without_uncommented_grep_rules_can_be_parsed() {
     match result {
         Ok(config) => {
             // Config parsed successfully
-            assert!(config.rules.prevent_root_additions);
+            assert!(config.pre_tool_use.prevent_root_additions);
         }
         Err(e) => {
             panic!("Config without grepRules should be parseable, but failed with: {}\n\nConfig content:\n{}", e, cleaned_config);
@@ -295,7 +294,7 @@ async fn test_config_search_level_limit() {
     let deep_config_path = config_dir.join(".conclaude.yaml");
     fs::write(
         &deep_config_path,
-        "stop:\n  commands:\n    - run: 'deep config'\nrules:\n  preventRootAdditions: true",
+        "stop:\n  commands:\n    - run: 'deep config'\npreToolUse:\n  preventRootAdditions: true",
     )
     .unwrap();
 
@@ -325,7 +324,7 @@ async fn test_config_search_within_level_limit() {
         .join("level_0/level_1/level_2/level_3/level_4/.conclaude.yaml");
     fs::write(
         &config_path,
-        "stop:\n  commands:\n    - run: 'found config'\n  infinite: false\nrules:\n  preventRootAdditions: true",
+        "stop:\n  commands:\n    - run: 'found config'\n  infinite: false\npreToolUse:\n  preventRootAdditions: true",
     )
     .unwrap();
 
@@ -337,7 +336,7 @@ async fn test_config_search_within_level_limit() {
     let (config, _config_path) = result.unwrap();
     assert_eq!(config.stop.commands[0].run, "found config");
     assert!(!config.stop.infinite);
-    assert!(config.rules.prevent_root_additions);
+    assert!(config.pre_tool_use.prevent_root_additions);
 }
 
 #[tokio::test]
@@ -375,7 +374,7 @@ async fn test_config_search_exactly_at_12_level_boundary() {
         let config_at_11 = temp_dir.path().join(".conclaude.yaml");
         fs::write(
             &config_at_11,
-            "stop:\n  commands:\n    - run: 'found at boundary'\n  infinite: false\nrules:\n  preventRootAdditions: true",
+            "stop:\n  commands:\n    - run: 'found at boundary'\n  infinite: false\npreToolUse:\n  preventRootAdditions: true",
         )
         .unwrap();
 
@@ -403,7 +402,7 @@ async fn test_config_search_exactly_at_12_level_boundary() {
         let config_at_12 = temp_dir.path().join(".conclaude.yaml");
         fs::write(
             &config_at_12,
-            "stop:\n  commands:\n    - run: 'beyond limit'\nrules:\n  preventRootAdditions: true",
+            "stop:\n  commands:\n    - run: 'beyond limit'\npreToolUse:\n  preventRootAdditions: true",
         )
         .unwrap();
 
@@ -448,7 +447,7 @@ async fn test_notification_config_enabled_specific_hooks() {
     let config_content = r#"
 stop:
   commands: []
-rules:
+preToolUse:
   preventRootAdditions: true
 notifications:
   enabled: true
@@ -484,7 +483,7 @@ async fn test_notification_config_enabled_wildcard() {
     let config_content = r#"
 stop:
   commands: []
-rules:
+preToolUse:
   preventRootAdditions: true
 notifications:
   enabled: true
@@ -521,7 +520,7 @@ async fn test_notification_config_enabled_empty_hooks() {
     let config_content = r#"
 stop:
   commands: []
-rules:
+preToolUse:
   preventRootAdditions: true
 notifications:
   enabled: true
@@ -588,7 +587,7 @@ stop:
   commands:
     - run: "echo test"
   unknownField: "should fail"
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -607,7 +606,7 @@ fn test_reject_unknown_fields_in_pre_tool_use_config() {
 stop:
   commands:
     - run: "echo test"
-rules:
+preToolUse:
   preventRootAdditions: true
 preToolUse:
   preventAdditions: []
@@ -630,7 +629,7 @@ stop:
   commands:
     - run: "echo test"
   grepRules: []
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -649,7 +648,7 @@ fn test_reject_grep_rules_in_pre_tool_use_config() {
 stop:
   commands:
     - run: "echo test"
-rules:
+preToolUse:
   preventRootAdditions: true
 preToolUse:
   preventAdditions: []
@@ -675,7 +674,7 @@ stop:
   commands:
     - run: "echo test"
   invalidField: "this should fail"
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -712,7 +711,7 @@ stop:
   commands:
     - run: "echo test"
   infinite: "true"
-rules:
+preToolUse:
   preventRootAdditions: true
 "#;
 
@@ -745,7 +744,7 @@ async fn test_descriptive_error_for_yaml_syntax() {
 stop:
   commands:
     - run: "echo test"
-rules:
+preToolUse:
 preventRootAdditions: true
 "#;
 
@@ -840,7 +839,7 @@ async fn test_config_search_above_package_json() {
     let config_path = temp_dir.path().join("level_0").join(".conclaude.yaml");
     fs::write(
         &config_path,
-        "stop:\n  commands:\n    - run: 'found config above package.json'\nrules:\n  preventRootAdditions: true",
+        "stop:\n  commands:\n    - run: 'found config above package.json'\npreToolUse:\n  preventRootAdditions: true",
     )
     .unwrap();
 
@@ -855,7 +854,7 @@ async fn test_config_search_above_package_json() {
     assert!(result.is_ok());
     let (config, _config_path) = result.unwrap();
     assert_eq!(config.stop.commands[0].run, "found config above package.json");
-    assert!(config.rules.prevent_root_additions);
+    assert!(config.pre_tool_use.prevent_root_additions);
 }
 
 #[tokio::test]
@@ -877,7 +876,7 @@ async fn test_config_search_monorepo_nested_package_json() {
     let config_path = temp_dir.path().join("monorepo").join(".conclaude.yaml");
     fs::write(
         &config_path,
-        "stop:\n  commands:\n    - run: 'found monorepo config'\n  infinite: false\nrules:\n  preventRootAdditions: true",
+        "stop:\n  commands:\n    - run: 'found monorepo config'\n  infinite: false\npreToolUse:\n  preventRootAdditions: true",
     )
     .unwrap();
 
@@ -893,7 +892,7 @@ async fn test_config_search_monorepo_nested_package_json() {
     let (config, _config_path) = result.unwrap();
     assert_eq!(config.stop.commands[0].run, "found monorepo config");
     assert!(!config.stop.infinite);
-    assert!(config.rules.prevent_root_additions);
+    assert!(config.pre_tool_use.prevent_root_additions);
 }
 
 #[tokio::test]

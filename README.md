@@ -126,7 +126,7 @@ You're reviewing Claude's work and find `config.json`, `temp.js`, and `debug.log
 **The conclaude Solution:**
 ```yaml
 # .conclaude.yaml
-rules:
+preToolUse:
   preventRootAdditions: true  # No more mystery files!
 ```
 
@@ -247,6 +247,8 @@ The search starts from the current directory and moves up through parent directo
 
 No complex setup, no environment variables to manage. Just drop a `.conclaude.yaml` file in your project (or any parent directory) and you're protected.
 
+> **Note on Configuration Changes**: As of recent versions, the configuration structure has been consolidated. The former `rules` section has been merged into `preToolUse` for better organization. If you're upgrading from an older version, update your configuration file by renaming `rules:` to `preToolUse:`. All file protection and validation features remain unchanged—only the section name has changed.
+
 ### Your First Configuration
 
 Here's what a real-world configuration looks like:
@@ -265,9 +267,9 @@ stop:
       message: "All tests must pass"
     - run: cargo build
       message: "Successful compilation required"
-  
+
 # File protection rules
-rules:
+preToolUse:
   preventRootAdditions: true    # Keep project root clean
   uneditableFiles:              # Protect critical files
     - "Cargo.toml"              # Don't modify package manifest
@@ -314,7 +316,7 @@ stop:
     - run: cargo build --release
       message: "Release build"
 
-rules:
+preToolUse:
   preventRootAdditions: true
   uneditableFiles:
     - "Cargo.toml"
@@ -330,8 +332,7 @@ rules:
 The complete configuration schema is defined as Rust structs with serde serialization. Key sections include:
 
 - **stop**: Commands and settings for session termination hooks
-- **rules**: File protection and validation rules
-- **preToolUse**: Pre-execution validation and controls
+- **preToolUse**: File protection, validation rules, and pre-execution controls
 - **notifications**: System notification settings for hook events
 
 The JSON schema for IDE autocomplete and validation is automatically published with each release at:
@@ -446,10 +447,10 @@ stop:
     - run: cargo build
 
 # Validation rules
-rules:
+preToolUse:
   # Block file creation at repository root
   preventRootAdditions: true
-  
+
   # Files that cannot be edited (glob patterns)
   uneditableFiles:
     - "Cargo.toml"
@@ -467,7 +468,7 @@ stop:
     - run: echo "Running development checks..."
     - run: cargo check
 
-rules:
+preToolUse:
   preventRootAdditions: false  # Allow root edits during development
   uneditableFiles:
     - "Cargo.toml"  # Still protect Cargo.toml
@@ -485,7 +486,7 @@ stop:
     - run: cargo test
     - run: cargo build --release
 
-rules:
+preToolUse:
   preventRootAdditions: true
   uneditableFiles:
     - "Cargo.toml"
@@ -506,7 +507,7 @@ stop:
   infinite: true
   infiniteMessage: "Monitoring active - press Ctrl+C to stop"
 
-rules:
+preToolUse:
   preventRootAdditions: false  # Allow file changes during development
   uneditableFiles:
     - "Cargo.toml"
@@ -1036,17 +1037,17 @@ stop:
       description: "No TODO or FIXME comments allowed"
 
 # File and directory protection rules
-rules:
+preToolUse:
   # Prevent file creation at repository root
   preventRootAdditions: true
-  
+
   # Files that cannot be edited (glob patterns)
   uneditableFiles:
     - "Cargo.toml"
     - "Cargo.lock"
     - ".env*"
     - "target/**"
-  
+
   # Tool usage validation
   toolUsageValidation:
     - tool: "Write"
@@ -1065,7 +1066,7 @@ Conclaude can validate Bash commands before execution using glob pattern matchin
 #### Configuration
 
 ```yaml
-rules:
+preToolUse:
   toolUsageValidation:
     - tool: "Bash"
       pattern: ""                       # Leave empty when using commandPattern

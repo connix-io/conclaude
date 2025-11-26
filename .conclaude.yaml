@@ -60,8 +60,8 @@ stop:
   rounds: null
   # Example: rounds: 3
 
-# Validation rules for hook processing
-rules:
+# Pre-tool-use hook configuration - runs before tools are executed
+preToolUse:
   # Prevent Claude from creating or modifying files at the repository root
   # Helps maintain clean project structure
   preventRootAdditions: true
@@ -92,8 +92,6 @@ rules:
   #     action: "block"
   #     message: "Environment files cannot be modified"
 
-# Pre-tool-use hook configuration - runs before tools are executed
-preToolUse:
   # Directories where file additions are prevented (in addition to root)
   # List of directory paths where new files cannot be created
   preventAdditions: []

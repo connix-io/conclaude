@@ -302,17 +302,17 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
         .to_string();
 
     // Check preventRootAdditions rule - only applies to Write tool
-    if config.rules.prevent_root_additions
+    if config.pre_tool_use.prevent_root_additions
         && payload.tool_name == "Write"
         && is_root_addition(&file_path, &relative_path, config_path)
     {
         let error_message = format!(
-            "Blocked {} operation: preventRootAdditions rule prevents creating files at repository root. File: {}",
+            "Blocked {} operation: preToolUse.preventRootAdditions setting prevents creating files at repository root. File: {}",
             payload.tool_name, file_path
         );
 
         eprintln!(
-            "PreToolUse blocked by preventRootAdditions rule: tool_name={}, file_path={}",
+            "PreToolUse blocked by preToolUse.preventRootAdditions setting: tool_name={}, file_path={}",
             payload.tool_name, file_path
         );
 
@@ -320,7 +320,7 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
     }
 
     // Check uneditableFiles rule
-    for pattern in &config.rules.uneditable_files {
+    for pattern in &config.pre_tool_use.uneditable_files {
         if matches_uneditable_pattern(
             &file_path,
             &relative_path,
@@ -328,12 +328,12 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
             pattern,
         )? {
             let error_message = format!(
-                "Blocked {} operation: file matches uneditable pattern '{}'. File: {}",
+                "Blocked {} operation: file matches preToolUse.uneditableFiles pattern '{}'. File: {}",
                 payload.tool_name, pattern, file_path
             );
 
             eprintln!(
-                "PreToolUse blocked by uneditableFiles rule: tool_name={}, file_path={}, pattern={}",
+                "PreToolUse blocked by preToolUse.uneditableFiles pattern: tool_name={}, file_path={}, pattern={}",
                 payload.tool_name,
                 file_path,
                 pattern
@@ -756,7 +756,7 @@ pub async fn handle_stop() -> Result<HookResult> {
     let (config, _config_path) = get_config().await?;
 
     // Snapshot root directory if preventRootAdditions is enabled
-    let root_snapshot = if config.rules.prevent_root_additions {
+    let root_snapshot = if config.pre_tool_use.prevent_root_additions {
         Some(snapshot_root_directory()?)
     } else {
         None
@@ -937,7 +937,7 @@ pub async fn handle_pre_compact() -> Result<HookResult> {
 async fn check_tool_usage_rules(payload: &PreToolUsePayload) -> Result<Option<HookResult>> {
     let (config, _config_path) = get_config().await?;
 
-    for rule in &config.rules.tool_usage_validation {
+    for rule in &config.pre_tool_use.tool_usage_validation {
         if rule.tool == payload.tool_name || rule.tool == "*" {
             // Check if this is a Bash command with a commandPattern rule
             if payload.tool_name == "Bash" && rule.command_pattern.is_some() {
@@ -963,13 +963,13 @@ async fn check_tool_usage_rules(payload: &PreToolUsePayload) -> Result<Option<Ho
                     // Handle actions based on match result
                     if rule.action == "block" && matches {
                         let message = rule.message.clone().unwrap_or_else(|| {
-                            format!("Bash command blocked by validation rule: {}", pattern)
+                            format!("Bash command blocked by preToolUse.toolUsageValidation rule: {}", pattern)
                         });
                         return Ok(Some(HookResult::blocked(message)));
                     } else if rule.action == "allow" && !matches {
                         let message = rule.message.clone().unwrap_or_else(|| {
                             format!(
-                                "Bash command blocked: does not match allow rule pattern: {}",
+                                "Bash command blocked: does not match preToolUse.toolUsageValidation allow rule pattern: {}",
                                 pattern
                             )
                         });
@@ -989,7 +989,7 @@ async fn check_tool_usage_rules(payload: &PreToolUsePayload) -> Result<Option<Ho
 
                 if (rule.action == "block" && matches) || (rule.action == "allow" && !matches) {
                     let message = rule.message.clone().unwrap_or_else(|| {
-                        format!("Tool usage blocked by validation rule: {}", rule.pattern)
+                        format!("Tool usage blocked by preToolUse.toolUsageValidation rule: {}", rule.pattern)
                     });
                     return Ok(Some(HookResult::blocked(message)));
                 }

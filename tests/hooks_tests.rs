@@ -407,11 +407,11 @@ fn test_check_generated_file_markers_within_100_lines() {
 
 #[tokio::test]
 async fn test_bash_validation_block_exact_command() -> anyhow::Result<()> {
-    use conclaude::config::{ConclaudeConfig, RulesConfig, ToolUsageRule};
+    use conclaude::config::{ConclaudeConfig, PreToolUseConfig, ToolUsageRule};
 
     // Create test configuration with block rule for exact command
     let config = ConclaudeConfig {
-        rules: RulesConfig {
+        pre_tool_use: PreToolUseConfig {
             tool_usage_validation: vec![ToolUsageRule {
                 tool: "Bash".to_string(),
                 pattern: String::new(),
@@ -445,7 +445,7 @@ async fn test_bash_validation_block_exact_command() -> anyhow::Result<()> {
         .unwrap();
 
     // Test full mode matching
-    let rule = &config.rules.tool_usage_validation[0];
+    let rule = &config.pre_tool_use.tool_usage_validation[0];
     let pattern = rule.command_pattern.as_ref().unwrap();
     let mode = rule.match_mode.as_deref().unwrap_or("full");
 
@@ -464,11 +464,11 @@ async fn test_bash_validation_block_exact_command() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_bash_validation_block_command_family() -> anyhow::Result<()> {
-    use conclaude::config::{ConclaudeConfig, RulesConfig, ToolUsageRule};
+    use conclaude::config::{ConclaudeConfig, PreToolUseConfig, ToolUsageRule};
 
     // Create test configuration with block rule for command family (prefix mode)
     let config = ConclaudeConfig {
-        rules: RulesConfig {
+        pre_tool_use: PreToolUseConfig {
             tool_usage_validation: vec![ToolUsageRule {
                 tool: "Bash".to_string(),
                 pattern: String::new(),
@@ -503,7 +503,7 @@ async fn test_bash_validation_block_command_family() -> anyhow::Result<()> {
         .and_then(|v| v.as_str())
         .unwrap();
 
-    let rule = &config.rules.tool_usage_validation[0];
+    let rule = &config.pre_tool_use.tool_usage_validation[0];
     let pattern = rule.command_pattern.as_ref().unwrap();
     let mode = rule.match_mode.as_deref().unwrap_or("full");
 
@@ -526,11 +526,11 @@ async fn test_bash_validation_block_command_family() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_bash_validation_allow_whitelist() -> anyhow::Result<()> {
-    use conclaude::config::{ConclaudeConfig, RulesConfig, ToolUsageRule};
+    use conclaude::config::{ConclaudeConfig, PreToolUseConfig, ToolUsageRule};
 
     // Create test configuration with allow rule (whitelist pattern)
     let config = ConclaudeConfig {
-        rules: RulesConfig {
+        pre_tool_use: PreToolUseConfig {
             tool_usage_validation: vec![ToolUsageRule {
                 tool: "Bash".to_string(),
                 pattern: String::new(),
@@ -564,7 +564,7 @@ async fn test_bash_validation_allow_whitelist() -> anyhow::Result<()> {
         .and_then(|v| v.as_str())
         .unwrap();
 
-    let rule = &config.rules.tool_usage_validation[0];
+    let rule = &config.pre_tool_use.tool_usage_validation[0];
     let pattern = rule.command_pattern.as_ref().unwrap();
 
     let matches_allowed = glob::Pattern::new(pattern)?.matches(command_allowed);
@@ -605,12 +605,12 @@ async fn test_bash_validation_allow_whitelist() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_bash_validation_custom_message() -> anyhow::Result<()> {
-    use conclaude::config::{ConclaudeConfig, RulesConfig, ToolUsageRule};
+    use conclaude::config::{ConclaudeConfig, PreToolUseConfig, ToolUsageRule};
 
     // Create test configuration with custom error message
     let custom_message = "DANGER: This command could delete important files!";
     let config = ConclaudeConfig {
-        rules: RulesConfig {
+        pre_tool_use: PreToolUseConfig {
             tool_usage_validation: vec![ToolUsageRule {
                 tool: "Bash".to_string(),
                 pattern: String::new(),
@@ -643,7 +643,7 @@ async fn test_bash_validation_custom_message() -> anyhow::Result<()> {
         .and_then(|v| v.as_str())
         .unwrap();
 
-    let rule = &config.rules.tool_usage_validation[0];
+    let rule = &config.pre_tool_use.tool_usage_validation[0];
     let pattern = rule.command_pattern.as_ref().unwrap();
 
     let matches = glob::Pattern::new(pattern)?.matches(command);
@@ -655,11 +655,11 @@ async fn test_bash_validation_custom_message() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_bash_validation_default_match_mode() -> anyhow::Result<()> {
-    use conclaude::config::{ConclaudeConfig, RulesConfig, ToolUsageRule};
+    use conclaude::config::{ConclaudeConfig, PreToolUseConfig, ToolUsageRule};
 
     // Create test configuration WITHOUT explicit matchMode (should default to "full")
     let config = ConclaudeConfig {
-        rules: RulesConfig {
+        pre_tool_use: PreToolUseConfig {
             tool_usage_validation: vec![ToolUsageRule {
                 tool: "Bash".to_string(),
                 pattern: String::new(),
@@ -692,7 +692,7 @@ async fn test_bash_validation_default_match_mode() -> anyhow::Result<()> {
         .and_then(|v| v.as_str())
         .unwrap();
 
-    let rule = &config.rules.tool_usage_validation[0];
+    let rule = &config.pre_tool_use.tool_usage_validation[0];
     let pattern = rule.command_pattern.as_ref().unwrap();
     let mode = rule.match_mode.as_deref().unwrap_or("full");
 
@@ -706,11 +706,11 @@ async fn test_bash_validation_default_match_mode() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_bash_validation_backward_compatible() -> anyhow::Result<()> {
-    use conclaude::config::{ConclaudeConfig, RulesConfig, ToolUsageRule};
+    use conclaude::config::{ConclaudeConfig, PreToolUseConfig, ToolUsageRule};
 
     // Create test configuration with file path rule (backward compatibility)
     let config = ConclaudeConfig {
-        rules: RulesConfig {
+        pre_tool_use: PreToolUseConfig {
             tool_usage_validation: vec![ToolUsageRule {
                 tool: "Write".to_string(),
                 pattern: ".env*".to_string(),
@@ -743,7 +743,7 @@ async fn test_bash_validation_backward_compatible() -> anyhow::Result<()> {
         .and_then(|v| v.as_str())
         .unwrap();
 
-    let rule = &config.rules.tool_usage_validation[0];
+    let rule = &config.pre_tool_use.tool_usage_validation[0];
     let pattern = &rule.pattern;
 
     let matches = glob::Pattern::new(pattern)?.matches(file_path);
@@ -756,11 +756,11 @@ async fn test_bash_validation_backward_compatible() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_bash_validation_wildcard_tool() -> anyhow::Result<()> {
-    use conclaude::config::{ConclaudeConfig, RulesConfig, ToolUsageRule};
+    use conclaude::config::{ConclaudeConfig, PreToolUseConfig, ToolUsageRule};
 
     // Create test configuration with tool: "*" (applies to all tools, including Bash)
     let config = ConclaudeConfig {
-        rules: RulesConfig {
+        pre_tool_use: PreToolUseConfig {
             tool_usage_validation: vec![ToolUsageRule {
                 tool: "*".to_string(),
                 pattern: String::new(),
@@ -793,7 +793,7 @@ async fn test_bash_validation_wildcard_tool() -> anyhow::Result<()> {
         .and_then(|v| v.as_str())
         .unwrap();
 
-    let rule = &config.rules.tool_usage_validation[0];
+    let rule = &config.pre_tool_use.tool_usage_validation[0];
     let pattern = rule.command_pattern.as_ref().unwrap();
 
     // Verify wildcard tool matches Bash
@@ -810,11 +810,11 @@ async fn test_bash_validation_wildcard_tool() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_bash_validation_prefix_mode_no_match_in_middle() -> anyhow::Result<()> {
-    use conclaude::config::{ConclaudeConfig, RulesConfig, ToolUsageRule};
+    use conclaude::config::{ConclaudeConfig, PreToolUseConfig, ToolUsageRule};
 
     // Create test configuration with prefix mode
     let config = ConclaudeConfig {
-        rules: RulesConfig {
+        pre_tool_use: PreToolUseConfig {
             tool_usage_validation: vec![ToolUsageRule {
                 tool: "Bash".to_string(),
                 pattern: String::new(),
@@ -848,7 +848,7 @@ async fn test_bash_validation_prefix_mode_no_match_in_middle() -> anyhow::Result
         .and_then(|v| v.as_str())
         .unwrap();
 
-    let rule = &config.rules.tool_usage_validation[0];
+    let rule = &config.pre_tool_use.tool_usage_validation[0];
     let pattern = rule.command_pattern.as_ref().unwrap();
     let mode = rule.match_mode.as_deref().unwrap_or("full");
 
@@ -873,11 +873,11 @@ async fn test_bash_validation_prefix_mode_no_match_in_middle() -> anyhow::Result
 
 #[tokio::test]
 async fn test_bash_validation_multiple_rules() -> anyhow::Result<()> {
-    use conclaude::config::{ConclaudeConfig, RulesConfig, ToolUsageRule};
+    use conclaude::config::{ConclaudeConfig, PreToolUseConfig, ToolUsageRule};
 
     // Create test configuration with multiple rules
     let config = ConclaudeConfig {
-        rules: RulesConfig {
+        pre_tool_use: PreToolUseConfig {
             tool_usage_validation: vec![
                 ToolUsageRule {
                     tool: "Bash".to_string(),
@@ -920,7 +920,7 @@ async fn test_bash_validation_multiple_rules() -> anyhow::Result<()> {
         .get("command")
         .and_then(|v| v.as_str())
         .unwrap();
-    let rule1 = &config.rules.tool_usage_validation[0];
+    let rule1 = &config.pre_tool_use.tool_usage_validation[0];
     let matches1 = glob::Pattern::new(rule1.command_pattern.as_ref().unwrap())?.matches(command1);
     assert!(matches1, "First rule should match rm command");
 
@@ -943,7 +943,7 @@ async fn test_bash_validation_multiple_rules() -> anyhow::Result<()> {
         .get("command")
         .and_then(|v| v.as_str())
         .unwrap();
-    let rule2 = &config.rules.tool_usage_validation[1];
+    let rule2 = &config.pre_tool_use.tool_usage_validation[1];
     let matches2 = glob::Pattern::new(rule2.command_pattern.as_ref().unwrap())?.matches(command2);
     assert!(matches2, "Second rule should match curl command");
 
