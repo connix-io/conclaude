@@ -24,6 +24,9 @@
       };
       craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.rust-bin.stable.latest.default);
 
+      cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+      version = cargoToml.package.version;
+
       src = pkgs.lib.cleanSourceWith {
         src = ./.;
         filter = path: type:
@@ -33,10 +36,9 @@
       };
 
       conclaude = craneLib.buildPackage {
-        inherit src;
+        inherit src version;
         strictDeps = true;
         pname = "conclaude";
-        version = "0.1.2";
       };
 
       rooted = exec:
