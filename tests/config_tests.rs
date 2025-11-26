@@ -380,7 +380,10 @@ async fn test_config_search_exactly_at_12_level_boundary() {
 
         // Search from level_10 - should find config at temp_dir (11 levels up)
         let result = load_conclaude_config(Some(&search_path)).await;
-        assert!(result.is_ok(), "Config at exactly 11 levels up should be found (at the 12-directory limit)");
+        assert!(
+            result.is_ok(),
+            "Config at exactly 11 levels up should be found (at the 12-directory limit)"
+        );
         let (config, found_path) = result.unwrap();
         assert_eq!(config.stop.commands[0].run, "found at boundary");
         assert_eq!(found_path, config_at_11);
@@ -408,7 +411,10 @@ async fn test_config_search_exactly_at_12_level_boundary() {
 
         // Search from deep_level_11 - should NOT find config at temp_dir (12 levels up)
         let result = load_conclaude_config(Some(&search_path)).await;
-        assert!(result.is_err(), "Config at 12 levels up should NOT be found (beyond the 12-directory limit)");
+        assert!(
+            result.is_err(),
+            "Config at 12 levels up should NOT be found (beyond the 12-directory limit)"
+        );
         let error_message = result.unwrap_err().to_string();
         assert!(error_message.contains("Configuration file not found"));
     }
@@ -853,7 +859,10 @@ async fn test_config_search_above_package_json() {
     // Should successfully find and parse config despite package.json barrier
     assert!(result.is_ok());
     let (config, _config_path) = result.unwrap();
-    assert_eq!(config.stop.commands[0].run, "found config above package.json");
+    assert_eq!(
+        config.stop.commands[0].run,
+        "found config above package.json"
+    );
     assert!(config.pre_tool_use.prevent_root_additions);
 }
 
@@ -862,7 +871,11 @@ async fn test_config_search_monorepo_nested_package_json() {
     let temp_dir = tempdir().unwrap();
 
     // Create monorepo structure: temp_dir/monorepo/packages/app/package.json and temp_dir/monorepo/.conclaude.yaml
-    let app_dir = temp_dir.path().join("monorepo").join("packages").join("app");
+    let app_dir = temp_dir
+        .path()
+        .join("monorepo")
+        .join("packages")
+        .join("app");
     fs::create_dir_all(&app_dir).unwrap();
 
     // Create package.json files at multiple levels

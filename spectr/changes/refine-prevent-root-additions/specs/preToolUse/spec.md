@@ -10,216 +10,62 @@ Refines the `preventRootAdditions` enforcement behavior to distinguish between f
 
 ## MODIFIED Requirements
 
-### Requirement: Prevention of New Root-Level Files with Write Tool
+### Requirement: Root-Level File Addition Prevention
 
-The system SHALL block `Write` tool operations that create **new** files at the repository root level when `preventRootAdditions` is enabled. However, the system SHALL allow modifications to existing root-level files.
+The system SHALL prevent Claude from creating **new** files at the repository root when `preventRootAdditions` is enabled. However, the system SHALL allow modifications to existing root-level files.
 
-**Previous behavior:** Blocked all Write operations on root-level files, including updates to existing files (overly restrictive).
+**Previous behavior:** Blocked all file creation and modification at root level (overly restrictive).
 
 **New behavior:** Only blocks creation of new files at root; allows editing and overwriting existing root files (balanced protection).
 
-#### Scenario: Block creation of new root-level file
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **AND** file `README.md` does not exist
-- **WHEN** Claude attempts to use Write tool to create `README.md` at root
-- **THEN** the operation SHALL be blocked
-- **AND** error message SHALL indicate preventRootAdditions rule prevents creating files at root
+#### Scenario: Prevent root additions enabled
+- **WHEN** `preToolUse.preventRootAdditions` is set to `true`
+- **AND** the target file does NOT exist at repository root
+- **THEN** Claude SHALL NOT be allowed to create the new file
+- **AND** any attempt to create such files SHALL result in an error message explaining the restriction
 
-#### Scenario: Allow modification of existing root-level file
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **AND** file `package.json` exists at root
-- **WHEN** Claude attempts to use Write tool to overwrite/modify `package.json`
-- **THEN** the operation SHALL be allowed
-- **AND** no error message SHALL be generated for preventRootAdditions
+#### Scenario: Allow modification of existing root files
+- **WHEN** `preToolUse.preventRootAdditions` is set to `true`
+- **AND** the target file already exists at repository root
+- **THEN** Claude SHALL be allowed to modify/overwrite the existing file
+- **AND** no preventRootAdditions error SHALL be generated
 
-#### Scenario: Allow editing existing root file with Edit tool
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **AND** file `.env` exists at root
-- **WHEN** Claude attempts to use Edit tool to modify `.env`
-- **THEN** the operation SHALL be allowed by preventRootAdditions
-- **AND** the operation may be subject to uneditableFiles checks but not preventRootAdditions
+#### Scenario: Prevent root additions disabled
+- **WHEN** `preToolUse.preventRootAdditions` is set to `false`
+- **THEN** Claude SHALL be allowed to create or modify files at the repository root
+- **AND** all file operations in subdirectories remain subject to other restrictions
 
-#### Scenario: Block creation of multiple root files
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **WHEN** Claude attempts to create `tsconfig.json` at root (new file)
-- **THEN** the operation SHALL be blocked
-- **WHEN** Claude attempts to create `.gitignore` at root (new file)
-- **THEN** the operation SHALL be blocked
-
-#### Scenario: Distinguish between new and existing root files
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **WHEN** Claude attempts to create new file `docker-compose.yml` (does not exist)
-- **THEN** the operation SHALL be blocked
-- **WHEN** the same file now exists and Claude attempts to update it
-- **THEN** the operation SHALL be allowed (modification, not addition)
-
-### Requirement: Root-Level Definition
-
-The system SHALL determine "root-level" as the directory containing the configuration file (where `.conclaude.yaml` is located).
-
-#### Scenario: Root is config directory
-- **GIVEN** configuration file `.conclaude.yaml` is at `/project/.conclaude.yaml`
-- **THEN** the repository root for preventRootAdditions checks is `/project/`
-- **WHEN** Claude attempts to create `/project/README.md`
-- **THEN** the operation SHALL be blocked (new root file)
-
-#### Scenario: File in subdirectory allowed
-- **GIVEN** configuration file at `/project/.conclaude.yaml`
-- **WHEN** Claude attempts to create `/project/src/index.ts` (in subdirectory)
-- **THEN** the operation SHALL be allowed (not at root level)
-
-### Requirement: Write Tool Exclusivity
-
-The system SHALL only apply `preventRootAdditions` checks to the `Write` tool. Edit and NotebookEdit tools are not affected by this rule.
-
-#### Scenario: Edit tool not affected by preventRootAdditions
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **WHEN** Claude uses Edit tool to modify file at root
-- **THEN** the operation SHALL NOT be blocked by preventRootAdditions
-
-#### Scenario: NotebookEdit tool not affected by preventRootAdditions
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **WHEN** Claude uses NotebookEdit tool to modify root-level notebook
-- **THEN** the operation SHALL NOT be blocked by preventRootAdditions
-
-### Requirement: File Existence Detection
-
-The system SHALL check if a file exists at the target path before determining whether to block a Write operation.
-
-#### Scenario: File existence prevents blocking
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **AND** file `Dockerfile` exists at root
-- **WHEN** Claude attempts Write to `Dockerfile`
-- **THEN** the system SHALL detect file exists
-- **AND** the operation SHALL be allowed (modification, not addition)
-
-#### Scenario: Non-existent file is blocked
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **AND** file `docker-compose.yml` does NOT exist at root
-- **WHEN** Claude attempts Write to `docker-compose.yml`
-- **THEN** the system SHALL detect file does not exist
-- **AND** the operation SHALL be blocked (new file at root)
-
-### Requirement: Error Messages for Blocked Operations
-
-The system SHALL provide clear error messages when preventRootAdditions blocks a Write operation to create a new root-level file.
-
-#### Scenario: Error message for blocked root addition
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **WHEN** Claude attempts to create new file `LICENSE` at root
-- **THEN** error message SHALL indicate:
-  - The tool name (`Write`)
-  - That preventRootAdditions rule prevented the operation
-  - The attempted file path (e.g., `LICENSE`)
-- **AND** error format SHALL be: `"Blocked Write operation: preventRootAdditions rule prevents creating files at repository root. File: LICENSE"`
-
-#### Scenario: Error message example
-- **WHEN** preventRootAdditions blocks `README.md`
-- **THEN** error message SHALL be exactly: `"Blocked Write operation: preventRootAdditions rule prevents creating files at repository root. File: README.md"`
-
-### Requirement: Interaction with Other File Protection Rules
-
-The system SHALL enforce `preventRootAdditions` alongside other file protection mechanisms independently.
-
-#### Scenario: preventRootAdditions with uneditableFiles
-- **GIVEN** configuration contains:
-  - `rules.preventRootAdditions: true`
-  - `rules.uneditableFiles: ["package.json"]`
-- **WHEN** Claude attempts to create new `README.md` at root (does not exist)
-- **THEN** the operation SHALL be blocked by preventRootAdditions
-- **WHEN** Claude attempts to edit `package.json` at root (exists)
-- **THEN** the operation SHALL be blocked by uneditableFiles (takes precedence)
-- **WHEN** Claude attempts to edit `.env` at root (exists, not in uneditableFiles)
-- **THEN** the operation SHALL be allowed
-
-#### Scenario: preventRootAdditions does not affect preventAdditions
-- **GIVEN** configuration contains:
-  - `rules.preventRootAdditions: true`
-  - `preToolUse.preventAdditions: ["dist/**"]`
-- **WHEN** Claude attempts to create `/dist/output.js`
-- **THEN** the operation SHALL be blocked by preventAdditions (not root-level)
-- **WHEN** Claude attempts to create root-level `.env`
-- **THEN** the operation SHALL be blocked by preventRootAdditions
-- **AND** both rules apply independently
-
-### Requirement: Backwards Compatibility
-
-The system SHALL maintain backwards compatibility with existing configurations using `preventRootAdditions`.
-
-#### Scenario: Existing configuration works unchanged
-- **GIVEN** configuration with `rules.preventRootAdditions: true` from previous version
-- **WHEN** updated to new version with refined semantics
-- **THEN** the configuration SHALL work unchanged
-- **AND** no migration or changes required
-- **AND** behavior becomes more permissive (allows edits)
-
-#### Scenario: No configuration changes needed
-- **GIVEN** users with preventRootAdditions enabled
-- **WHEN** they update to refined version
-- **THEN** they immediately gain ability to edit root files
-- **AND** no explicit configuration changes required
-
-### Requirement: Path Resolution and Existence Checking
-
-The system SHALL correctly resolve file paths and determine existence before making prevention decisions.
-
-#### Scenario: Relative paths resolve correctly
-- **GIVEN** configuration at `/project/.conclaude.yaml`
-- **WHEN** Claude attempts Write to `./package.json` (relative path)
-- **THEN** the path SHALL resolve to `/project/package.json`
-- **AND** if file exists, operation is allowed
-
-#### Scenario: Symlinks resolve to actual file
-- **GIVEN** configuration at `/project/.conclaude.yaml`
-- **WHEN** Claude attempts Write to symlink at root
-- **THEN** the system SHALL resolve symlink to actual location
-- **AND** existence check uses resolved path
-
-#### Scenario: Case-sensitive file systems
-- **GIVEN** configuration at `/project/.conclaude.yaml`
-- **AND** Linux environment (case-sensitive)
-- **WHEN** Claude attempts Write to `Package.json` vs `package.json`
-- **THEN** these SHALL be treated as different files
-- **AND** existence check respects OS case-sensitivity
-
-### Requirement: Edge Case Handling
-
-The system SHALL handle edge cases gracefully.
-
-#### Scenario: Parent directories created automatically
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **WHEN** Claude attempts Write to `subdir/file.txt` (parent dir doesn't exist)
-- **THEN** the operation SHALL be allowed (not at root)
-- **AND** parent directory creation is separate from preventRootAdditions
-
-#### Scenario: File without write permissions
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **AND** existing file at root with no write permissions
-- **WHEN** Claude attempts Write to modify that file
-- **THEN** preventRootAdditions SHALL allow the operation
-- **AND** the Write tool failure is OS-level permission issue, not preventRootAdditions
-
-#### Scenario: Overwrite with same contents
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
-- **AND** file `config.json` exists at root
-- **WHEN** Claude attempts Write with identical contents
-- **THEN** the operation SHALL be allowed (file exists)
-
-## REMOVED Requirements
-
-None. This change refines existing functionality, does not remove features.
+#### Scenario: Default behavior
+- **WHEN** `preToolUse.preventRootAdditions` is not specified in configuration
+- **THEN** the system SHALL default to `preventRootAdditions: true`
+- **AND** root-level file creation SHALL be prevented by default
+- **AND** existing root files may still be modified
 
 ## ADDED Requirements
 
 ### Requirement: File Existence Check for Root Additions
 
-The system SHALL check if a target file exists to distinguish between creation and modification operations.
+The system SHALL check if a target file exists at the resolved path before determining whether to block a Write operation under preventRootAdditions.
 
 #### Scenario: Existence check prevents false positives
-- **GIVEN** configuration contains `rules.preventRootAdditions: true`
+- **GIVEN** configuration contains `preToolUse.preventRootAdditions: true`
 - **WHEN** determining whether to block a Write operation
-- **THEN** the system SHALL check if the file exists
+- **THEN** the system SHALL check if the file exists at the resolved path
 - **AND** only block if file does NOT exist at root
+
+#### Scenario: File existence allows write
+- **GIVEN** configuration contains `preToolUse.preventRootAdditions: true`
+- **AND** file `package.json` exists at root
+- **WHEN** Claude attempts to use Write tool to overwrite/modify `package.json`
+- **THEN** the operation SHALL be allowed
+- **AND** no error message SHALL be generated for preventRootAdditions
+
+#### Scenario: Non-existent file is blocked
+- **GIVEN** configuration contains `preToolUse.preventRootAdditions: true`
+- **AND** file `docker-compose.yml` does NOT exist at root
+- **WHEN** Claude attempts Write to `docker-compose.yml`
+- **THEN** the system SHALL detect file does not exist
+- **AND** the operation SHALL be blocked (new file at root)
 
 ---
 
@@ -228,155 +74,4 @@ The system SHALL check if a target file exists to distinguish between creation a
 ## Related Specs
 
 - **Modifies:** `preToolUse` - Refines preventRootAdditions enforcement logic
-- **Related to:** `fix-prevent-additions-hook` - Implements preventAdditions field enforcement (separate from root-level prevention)
-- **Related to:** `consolidate-rules-config` - Future consolidation of file protection rules
 - **Works with:** `uneditableFiles` - Can be combined with preventRootAdditions for fine-grained control
-
-## Testing Strategy
-
-### Unit Tests (tests/hooks_tests.rs)
-
-Extend existing `prevent_root_additions` tests with:
-
-1. **File Existence Checks:**
-   - Test blocking creation of new root file when file doesn't exist
-   - Test allowing Write to existing root file (overwrite operation)
-   - Test allowing Edit tool on existing root file
-   - Test allowing NotebookEdit tool on root file
-
-2. **Path Resolution:**
-   - Test relative paths normalize correctly before existence check
-   - Test canonical path resolution works with symlinks
-   - Test case-sensitive file systems handle names correctly
-
-3. **Edge Cases:**
-   - Test behavior when parent directories don't exist
-   - Test behavior with files lacking write permissions
-   - Test overwrite with identical contents
-
-4. **Integration with Other Rules:**
-   - Test preventRootAdditions with uneditableFiles (both enforced)
-   - Test preventRootAdditions doesn't affect preventAdditions
-   - Test multiple protection rules apply independently
-
-### Integration Tests (tests/integration_tests.rs)
-
-1. **Full Hook Cycle:**
-   - Load config with `preventRootAdditions: true`
-   - Invoke PreToolUse hook for Write to new root file → blocked
-   - Invoke PreToolUse hook for Write to existing root file → allowed
-   - Verify error messages are clear and accurate
-
-2. **Real-World Scenarios:**
-   - Edit existing `package.json` at root → allowed
-   - Create new `README.md` at root → blocked
-   - Edit files in subdirectories → allowed
-   - Combine with other file protection rules
-
-### Manual Testing Scenarios
-
-1. **Setup:** Create test config with `rules.preventRootAdditions: true`
-2. **Test 1:** Attempt to create new root file → BLOCKED ✓
-3. **Test 2:** Attempt to edit existing root file → ALLOWED ✓
-4. **Test 3:** Attempt to create non-root file → ALLOWED ✓
-5. **Test 4:** Verify error messages are clear
-
-## Implementation Notes
-
-### File: `src/hooks.rs`
-
-**Function:** `check_file_validation_rules()` (lines 298-314)
-
-#### Current Logic (Blocks All Modifications)
-```rust
-// Current: blocks both creation AND edit of root files
-if config.rules.prevent_root_additions
-    && payload.tool_name == "Write"
-    && is_root_addition(&file_path, &relative_path, config_path)
-{
-    // Blocked!
-}
-```
-
-#### Refined Logic (Only Blocks Creation)
-```rust
-// Refined: only block Write when file doesn't exist at root
-if config.rules.prevent_root_additions
-    && payload.tool_name == "Write"
-    && is_root_addition(&file_path, &relative_path, config_path)
-    && !resolved_path.exists()  // NEW: Allow if file exists (modification, not addition)
-{
-    // Only blocked for NEW files at root
-}
-```
-
-### Key Implementation Details
-
-1. **File Existence Check:** Use `Path::exists()` on the resolved path
-2. **Path Resolution:** Ensure canonical path resolution before existence check
-3. **Error Messages:** Maintain existing error message format for backward compatibility
-4. **Performance:** Minimal overhead (single file system check)
-
-### Code Location References
-
-- **Main logic:** `src/hooks.rs:298-314` (preventRootAdditions check)
-- **Helper function:** `is_root_addition()` (unchanged)
-- **Tests:** `tests/hooks_tests.rs` (extend prevent_root_additions tests)
-
-### Comments to Add
-
-```rust
-// Check preventRootAdditions rule - only applies to Write tool for NEW files
-// File existence check allows modifications to existing root files (e.g., package.json)
-// but prevents creation of new files at root
-if config.rules.prevent_root_additions
-    && payload.tool_name == "Write"
-    && is_root_addition(&file_path, &relative_path, config_path)
-    && !resolved_path.exists()  // Allow modifications, block only new files
-{
-    // Block creation of new root-level file
-}
-```
-
-## Migration Notes
-
-### Breaking Changes
-
-**None.** This is a **non-breaking refinement** that makes the behavior more permissive.
-
-### Backward Compatibility
-
-- **Configuration:** Same `preventRootAdditions` field, no changes needed
-- **Semantics:** Behavior becomes more permissive (allows edits), not more restrictive
-- **Existing Users:** Automatically gain ability to edit root files upon upgrade
-- **Migration Required:** None
-
-### Upgrade Path
-
-1. **Update conclaude** to version containing this change
-2. **No configuration changes** required
-3. **Immediate effect:** Root-level files become editable (while creation remains blocked)
-4. **Optional:** Combine with `uneditableFiles` if specific root files should remain read-only
-
-### Version Compatibility
-
-- **Minimum Version:** This change applies to conclaude vX.X.X+
-- **Config Version:** No schema changes, existing configs work unchanged
-- **Rollback:** Safe to downgrade (will revert to blocking all root modifications)
-
-### User Communication
-
-**CHANGELOG Entry:**
-```markdown
-### Fixed
-- **preventRootAdditions now allows editing existing root files**
-  - Refined semantics to distinguish between file creation (blocked) and modification (allowed)
-  - Users can now edit root-level configuration files like `.env` and `package.json`
-  - Maintains protection against accidental root file creation
-  - No configuration changes required
-```
-
-**Documentation Updates:**
-- Update README.md with refined semantics explanation
-- Add examples showing blocked creation vs allowed modification
-- Clarify relationship with `uneditableFiles` rule
