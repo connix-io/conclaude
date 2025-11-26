@@ -44,16 +44,33 @@ preToolUse.preventUpdateGitIgnored
 
 ## Implementation Architecture
 
+### Dependency: `ignore` crate
+
+The implementation SHALL use the [`ignore`](https://crates.io/crates/ignore) crate (by BurntSushi) for gitignore pattern matching.
+
+**Rationale:**
+- Purpose-built for gitignore matching with full git semantics compliance
+- Powers `ripgrep` - battle-tested on millions of files
+- Lightweight and focused (unlike full git implementations like gitoxide)
+- Simple API: `IgnoreBuilder` for building matchers, `matched()` for checking paths
+- Handles nested `.gitignore` files automatically via directory traversal
+- Supports all gitignore features: negation, anchoring, globs, `**`, comments
+
+**Key APIs to use:**
+- `ignore::gitignore::GitignoreBuilder` - Build a matcher from `.gitignore` files
+- `ignore::gitignore::Gitignore::matched()` - Check if a path is ignored
+- Automatically handles pattern precedence and negation rules
+
 ### Module Structure
 
 ```
 src/
 ├─ config.rs          (PreToolUseConfig struct)
 ├─ gitignore.rs       (new module)
-│  ├─ GitIgnore struct
-│  ├─ load_git_ignores()
-│  ├─ is_ignored()
-│  └─ pattern matching logic
+│  ├─ GitIgnoreChecker struct (wraps ignore::gitignore::Gitignore)
+│  ├─ load_gitignore() -> uses GitignoreBuilder
+│  ├─ is_ignored(path) -> calls Gitignore::matched()
+│  └─ error handling for missing/corrupt .gitignore
 ├─ hooks.rs           (handle_pre_tool_use updated)
 └─ types.rs           (error types)
 ```
@@ -184,7 +201,7 @@ The implementation must respect git-ignore semantics:
 6. **Escaping**: Backslash escapes special characters
 7. **Whitespace**: Trailing whitespace is significant
 
-**Implementation**: Use `gitignore` crate (or similar) rather than reimplementing.
+**Implementation**: Use the `ignore` crate (by BurntSushi, powers ripgrep) for full git-compliant pattern matching.
 
 ## Backward Compatibility
 
@@ -226,8 +243,8 @@ The implementation must respect git-ignore semantics:
 
 | Risk | Mitigation |
 |------|-----------|
-| Git-ignore parsing bugs cause false positives | Use well-tested `gitignore` crate; comprehensive tests |
-| Performance regression on large files | Cache rules; profile on real repos before release |
+| Git-ignore parsing bugs cause false positives | Use well-tested `ignore` crate (powers ripgrep); comprehensive tests |
+| Performance regression on large files | `ignore` crate is optimized for speed; profile on real repos before release |
 | Confusion with `uneditableFiles` | Document differences; provide migration examples |
 | Breaking if repo isn't git-tracked | Fail open (treat as no patterns) |
 

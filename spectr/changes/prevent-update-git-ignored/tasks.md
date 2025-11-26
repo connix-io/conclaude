@@ -29,6 +29,12 @@
 
 ## Phase 2: Git-Ignore Detection Implementation
 
+### Task 2.0: Add `ignore` crate dependency
+- **Description**: Add the `ignore` crate to `Cargo.toml`
+- **Dependency**: `ignore = "0.4"` (by BurntSushi, powers ripgrep)
+- **Rationale**: Battle-tested gitignore matching with full git semantics compliance
+- **Status**: `- [ ]`
+
 ### Task 2.1: Create git-ignore parsing module
 - **Description**: Create new module `src/gitignore.rs` to handle git-ignore parsing and matching
 - **Functionality**:
@@ -36,7 +42,7 @@
   - Parse gitignore patterns respecting git semantics
   - Support negation patterns (`!`)
   - Support comments (`#`)
-- **Dependencies**: Use `gitignore` crate (or similar) for pattern matching
+- **Implementation**: Use `ignore::gitignore::GitignoreBuilder` to build matcher, `Gitignore::matched()` for checks
 - **Status**: `- [ ]`
 
 ### Task 2.2: Implement pattern matching against git-ignore rules
