@@ -302,8 +302,8 @@ impl GitIgnoreChecker {
         // If we have nested gitignores that aren't already in the base matcher,
         // build a new matcher; otherwise use the base matcher we already have.
         let root_gitignore_path = self.repo_root.join(".gitignore");
-        let needs_nested_matcher = !nested_gitignores.is_empty()
-            && !(nested_gitignores.len() == 1 && nested_gitignores[0] == root_gitignore_path);
+        let needs_nested_matcher = !(nested_gitignores.is_empty()
+            || nested_gitignores.len() == 1 && nested_gitignores[0] == root_gitignore_path);
 
         let matcher = if needs_nested_matcher {
             // Build a new matcher with all gitignore files including nested ones
