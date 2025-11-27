@@ -7,25 +7,25 @@
 - **Default**: `false`
 - **Serde attribute**: `#[serde(default, rename = "preventUpdateGitIgnored")]`
 - **Validation**: Ensure type is boolean during config loading
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 1.2: Update default-config.yaml
 - **Description**: Add `preventUpdateGitIgnored: false` to the default configuration template
 - **Location**: `src/default-config.yaml` in the `preToolUse` section
 - **Documentation**: Add inline comment explaining the setting
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 1.3: Update JSON schema
 - **Description**: Add `preventUpdateGitIgnored` field to `conclaude-schema.json`
 - **Type**: `boolean`
 - **Default**: `false`
 - **Description**: "Block Claude from modifying or creating files that match .gitignore patterns"
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 1.4: Update field lists in config.rs
 - **Description**: Add `"preventUpdateGitIgnored"` to field name lists in `config.rs`
 - **Location**: `PreToolUseConfig::field_names()` and related help text
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ## Phase 2: Git-Ignore Detection Implementation
 
@@ -33,7 +33,7 @@
 - **Description**: Add the `ignore` crate to `Cargo.toml`
 - **Dependency**: `ignore = "0.4"` (by BurntSushi, powers ripgrep)
 - **Rationale**: Battle-tested gitignore matching with full git semantics compliance
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 2.1: Create git-ignore parsing module
 - **Description**: Create new module `src/gitignore.rs` to handle git-ignore parsing and matching
@@ -43,7 +43,7 @@
   - Support negation patterns (`!`)
   - Support comments (`#`)
 - **Implementation**: Use `ignore::gitignore::GitignoreBuilder` to build matcher, `Gitignore::matched()` for checks
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 2.2: Implement pattern matching against git-ignore rules
 - **Description**: Implement pattern evaluation function `matches_gitignore(path: &Path) -> bool`
@@ -52,7 +52,7 @@
   - Respect git semantics (anchoring, wildcards, negation)
   - Handle nested `.gitignore` files
   - Return `true` if file is ignored
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 2.3: Integrate git-ignore check into preToolUse hook handler
 - **Description**: Update `handle_pre_tool_use()` in `src/hooks.rs`
@@ -62,7 +62,7 @@
   - If enabled, check if requested file path matches git-ignore patterns
   - Block operation if matched with clear error message
   - Allow operation if not matched
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ## Phase 3: Error Handling and Messages
 
@@ -73,12 +73,12 @@
   - Indication that it's git-ignored
   - The matching `.gitignore` pattern(s)
   - Suggestion to update `.gitignore` or disable setting
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 3.2: Implement error propagation to Claude
 - **Description**: Ensure error messages are properly returned to Claude via hook result
 - **Integration**: Update `HookResult` structures to include detailed error messages
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ## Phase 4: Testing
 
@@ -92,7 +92,7 @@
   - Anchored patterns (`/build`)
   - Nested `.gitignore` files
   - Comments and empty lines
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 4.2: Integration tests for preToolUse hook blocking
 - **Description**: Add tests in `tests/hooks_tests.rs`
@@ -105,7 +105,7 @@
   - Verify error messages include correct information
   - Test combined with other file protection rules
   - Test with `preventUpdateGitIgnored: false` (no blocking)
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 4.3: Configuration validation tests
 - **Description**: Add tests for configuration loading
@@ -114,14 +114,14 @@
   - Invalid non-boolean values
   - Missing field defaults to `false`
   - Multiple protection rules together
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ## Phase 5: Documentation
 
 ### Task 5.1: Update default config examples
 - **Description**: Add documented example of `preventUpdateGitIgnored` setting
 - **Location**: Inline comments in `src/default-config.yaml`
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 5.2: Create migration/usage documentation
 - **Description**: Document how users can use this setting
@@ -131,18 +131,18 @@
   - Example configurations
   - Performance considerations
 - **Location**: Documentation files (TBD based on project docs structure)
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 5.3: Update schema documentation
 - **Description**: Ensure JSON schema includes helpful descriptions
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ## Phase 6: Validation and Integration
 
 ### Task 6.1: Run configuration schema validation
 - **Description**: Validate configurations against updated schema
 - **Command**: `openspec validate prevent-update-git-ignored --strict`
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 6.2: Manual testing with real repositories
 - **Description**: Test setting with actual repositories containing `.gitignore`
@@ -150,12 +150,12 @@
   - Repository with standard `.gitignore` (node_modules, dist, .env)
   - Repository with complex nested patterns
   - Verify no false positives or false negatives
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ### Task 6.3: Verify no performance regression
 - **Description**: Test that `preventUpdateGitIgnored: false` has zero performance impact
 - **Measurement**: Profile file operation performance
-- **Status**: `- [ ]`
+- **Status**: `- [x]`
 
 ## Notes
 

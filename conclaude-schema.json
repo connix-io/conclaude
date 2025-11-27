@@ -64,6 +64,11 @@
           "default": true,
           "type": "boolean"
         },
+        "preventUpdateGitIgnored": {
+          "default": false,
+          "description": "Block Claude from modifying or creating files that match .gitignore patterns",
+          "type": "boolean"
+        },
         "toolUsageValidation": {
           "default": [],
           "items": {
@@ -226,6 +231,7 @@
         "preventAdditions": [],
         "preventGeneratedFileEdits": true,
         "preventRootAdditions": true,
+        "preventUpdateGitIgnored": false,
         "toolUsageValidation": [],
         "uneditableFiles": []
       }

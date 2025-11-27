@@ -70,6 +70,9 @@ pub struct PreToolUseConfig {
     pub prevent_root_additions: bool,
     #[serde(default, rename = "uneditableFiles")]
     pub uneditable_files: Vec<String>,
+    /// Block Claude from modifying or creating files that match .gitignore patterns
+    #[serde(default, rename = "preventUpdateGitIgnored")]
+    pub prevent_update_git_ignored: bool,
     #[serde(default, rename = "toolUsageValidation")]
     pub tool_usage_validation: Vec<ToolUsageRule>,
 }
@@ -82,6 +85,7 @@ impl Default for PreToolUseConfig {
             generated_file_message: None,
             prevent_root_additions: true,
             uneditable_files: Vec::new(),
+            prevent_update_git_ignored: false,
             tool_usage_validation: Vec::new(),
         }
     }
@@ -271,7 +275,7 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
         parts.push("Valid field names by section:".to_string());
         parts.push("  stop: commands, infinite, infiniteMessage, rounds".to_string());
         parts.push(
-            "  preToolUse: preventAdditions, preventGeneratedFileEdits, generatedFileMessage, preventRootAdditions, uneditableFiles, toolUsageValidation"
+            "  preToolUse: preventAdditions, preventGeneratedFileEdits, generatedFileMessage, preventRootAdditions, uneditableFiles, preventUpdateGitIgnored, toolUsageValidation"
                 .to_string(),
         );
         parts.push(
@@ -598,6 +602,7 @@ cd /tmp && echo "test""#;
                 "generatedFileMessage",
                 "preventRootAdditions",
                 "uneditableFiles",
+                "preventUpdateGitIgnored",
                 "toolUsageValidation"
             ]
         );
