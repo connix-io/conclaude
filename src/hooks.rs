@@ -1218,8 +1218,17 @@ async fn execute_subagent_stop_commands(
             );
 
             if cmd_config.show_stdout && !stdout.trim().is_empty() {
-                let stdout_display = stdout
-                    .trim()
+                let stdout_content = if let Some(max_lines) = cmd_config.max_output_lines {
+                    let (truncated, is_truncated, omitted) = truncate_output(&stdout, max_lines);
+                    if is_truncated {
+                        format!("{}\n... ({} lines omitted)", truncated, omitted)
+                    } else {
+                        truncated
+                    }
+                } else {
+                    stdout.trim().to_string()
+                };
+                let stdout_display = stdout_content
                     .lines()
                     .map(|line| format!("    {}", line))
                     .collect::<Vec<_>>()
@@ -1228,8 +1237,17 @@ async fn execute_subagent_stop_commands(
             }
 
             if cmd_config.show_stderr && !stderr.trim().is_empty() {
-                let stderr_display = stderr
-                    .trim()
+                let stderr_content = if let Some(max_lines) = cmd_config.max_output_lines {
+                    let (truncated, is_truncated, omitted) = truncate_output(&stderr, max_lines);
+                    if is_truncated {
+                        format!("{}\n... ({} lines omitted)", truncated, omitted)
+                    } else {
+                        truncated
+                    }
+                } else {
+                    stderr.trim().to_string()
+                };
+                let stderr_display = stderr_content
                     .lines()
                     .map(|line| format!("    {}", line))
                     .collect::<Vec<_>>()
