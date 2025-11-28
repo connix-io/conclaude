@@ -72,6 +72,18 @@ pub struct PostToolUsePayload {
     pub tool_response: serde_json::Value,
 }
 
+/// Payload for `PermissionRequest` hook - fired when Claude requests permission to execute a tool.
+/// Allows granting or denying permission based on the tool and its parameters.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PermissionRequestPayload {
+    #[serde(flatten)]
+    pub base: BasePayload,
+    /// Name of the tool requesting permission (e.g., "Edit", "Bash", "Read")
+    pub tool_name: String,
+    /// Input parameters for the tool requesting permission
+    pub tool_input: HashMap<String, serde_json::Value>,
+}
+
 /// Payload for Notification hook - fired when Claude sends system notifications.
 /// Used for displaying messages or alerts to the user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -180,6 +192,8 @@ pub enum HookPayload {
     PreToolUse(PreToolUsePayload),
     #[serde(rename = "PostToolUse")]
     PostToolUse(PostToolUsePayload),
+    #[serde(rename = "PermissionRequest")]
+    PermissionRequest(PermissionRequestPayload),
     #[serde(rename = "Notification")]
     Notification(NotificationPayload),
     #[serde(rename = "Stop")]
@@ -205,6 +219,7 @@ impl HookPayload {
         match self {
             HookPayload::PreToolUse(p) => &p.base.session_id,
             HookPayload::PostToolUse(p) => &p.base.session_id,
+            HookPayload::PermissionRequest(p) => &p.base.session_id,
             HookPayload::Notification(p) => &p.base.session_id,
             HookPayload::Stop(p) => &p.base.session_id,
             HookPayload::SubagentStart(p) => &p.base.session_id,
@@ -222,6 +237,7 @@ impl HookPayload {
         match self {
             HookPayload::PreToolUse(p) => &p.base.transcript_path,
             HookPayload::PostToolUse(p) => &p.base.transcript_path,
+            HookPayload::PermissionRequest(p) => &p.base.transcript_path,
             HookPayload::Notification(p) => &p.base.transcript_path,
             HookPayload::Stop(p) => &p.base.transcript_path,
             HookPayload::SubagentStart(p) => &p.base.transcript_path,
@@ -239,6 +255,7 @@ impl HookPayload {
         match self {
             HookPayload::PreToolUse(p) => &p.base.hook_event_name,
             HookPayload::PostToolUse(p) => &p.base.hook_event_name,
+            HookPayload::PermissionRequest(p) => &p.base.hook_event_name,
             HookPayload::Notification(p) => &p.base.hook_event_name,
             HookPayload::Stop(p) => &p.base.hook_event_name,
             HookPayload::SubagentStart(p) => &p.base.hook_event_name,
@@ -269,6 +286,26 @@ pub fn validate_base_payload(base: &BasePayload) -> Result<(), String> {
     if base.cwd.is_empty() {
         return Err("Missing required field: cwd".to_string());
     }
+    Ok(())
+}
+
+/// Validates that a PermissionRequestPayload contains all required fields.
+///
+/// # Errors
+///
+/// Returns an error if any required field is missing or empty (after trimming whitespace).
+#[allow(dead_code)]
+pub fn validate_permission_request_payload(
+    payload: &PermissionRequestPayload,
+) -> Result<(), String> {
+    // First validate the base payload
+    validate_base_payload(&payload.base)?;
+
+    // Validate tool_name
+    if payload.tool_name.trim().is_empty() {
+        return Err("tool_name cannot be empty".to_string());
+    }
+
     Ok(())
 }
 

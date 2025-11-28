@@ -119,3 +119,53 @@ notifications:
 
   # Show system event notifications (session start/end, configuration loaded)
   showSystemEvents: true
+
+# Permission request hook configuration - controls tool permission decisions
+# This hook is fired when Claude requests permission to use a tool
+# Use this to automatically approve or deny tool usage based on rules
+#
+# permissionRequest:
+#   # Default decision when a tool doesn't match any rule: "allow" or "deny"
+#   # Recommended: "deny" for security (whitelist approach)
+#   default: deny
+#
+#   # Tools to explicitly allow (supports glob patterns)
+#   # These patterns are checked AFTER deny patterns
+#   allow:
+#     - "Read"       # Exact match - allows only "Read" tool
+#     - "Glob"       # Exact match - allows only "Glob" tool
+#     - "Grep"       # Exact match - allows file content search
+#     - "Edit"       # Exact match - allows file editing
+#     - "Write"      # Exact match - allows file writing
+#     - "Task"       # Exact match - allows subagent tasks
+#     - "Bash"       # Exact match - allows bash commands
+#
+#   # Tools to explicitly deny (supports glob patterns)
+#   # Deny patterns take precedence over allow patterns
+#   deny:
+#     - "BashOutput"   # Block reading background process output
+#     - "KillShell"    # Block terminating background shells
+#
+# Pattern examples:
+#   - "Bash"      # Exact match - only "Bash"
+#   - "*"         # Wildcard - matches any tool
+#   - "Edit*"     # Prefix match - matches "Edit", "EditFile", etc.
+#   - "*Read"     # Suffix match - matches "Read", "FileRead", etc.
+#
+# Common configurations:
+#
+# Whitelist approach (recommended for security):
+# permissionRequest:
+#   default: deny
+#   allow:
+#     - "Read"
+#     - "Glob"
+#     - "Grep"
+#     - "Edit"
+#
+# Blacklist approach (more permissive):
+# permissionRequest:
+#   default: allow
+#   deny:
+#     - "BashOutput"
+#     - "KillShell"

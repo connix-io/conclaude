@@ -313,3 +313,167 @@ fn test_validate_subagent_stop_payload_whitespace_agent_transcript_path() {
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), "agent_transcript_path cannot be empty");
 }
+
+#[test]
+fn test_permission_request_payload_deserialization() {
+    let json = r#"{
+        "session_id": "test_session",
+        "transcript_path": "/path/to/transcript",
+        "hook_event_name": "PermissionRequest",
+        "cwd": "/current/dir",
+        "permission_mode": "default",
+        "tool_name": "Bash",
+        "tool_input": {"command": "ls -la"}
+    }"#;
+
+    let payload: PermissionRequestPayload = serde_json::from_str(json).unwrap();
+    assert_eq!(payload.base.session_id, "test_session");
+    assert_eq!(payload.base.transcript_path, "/path/to/transcript");
+    assert_eq!(payload.base.hook_event_name, "PermissionRequest");
+    assert_eq!(payload.base.cwd, "/current/dir");
+    assert_eq!(payload.base.permission_mode, Some("default".to_string()));
+    assert_eq!(payload.tool_name, "Bash");
+    assert_eq!(
+        payload.tool_input.get("command"),
+        Some(&serde_json::Value::String("ls -la".to_string()))
+    );
+}
+
+#[test]
+fn test_permission_request_payload_serialization() {
+    let mut tool_input = HashMap::new();
+    tool_input.insert(
+        "command".to_string(),
+        serde_json::Value::String("ls -la".to_string()),
+    );
+
+    let payload = PermissionRequestPayload {
+        base: BasePayload {
+            session_id: "test_session".to_string(),
+            transcript_path: "/path/to/transcript".to_string(),
+            hook_event_name: "PermissionRequest".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
+        },
+        tool_name: "Bash".to_string(),
+        tool_input,
+    };
+
+    let json = serde_json::to_string(&payload).unwrap();
+    assert!(json.contains("test_session"));
+    assert!(json.contains("PermissionRequest"));
+    assert!(json.contains("Bash"));
+    assert!(json.contains("ls -la"));
+}
+
+#[test]
+fn test_validate_permission_request_payload_valid() {
+    let mut tool_input = HashMap::new();
+    tool_input.insert(
+        "command".to_string(),
+        serde_json::Value::String("ls -la".to_string()),
+    );
+
+    let payload = PermissionRequestPayload {
+        base: BasePayload {
+            session_id: "test_session".to_string(),
+            transcript_path: "/path/to/transcript".to_string(),
+            hook_event_name: "PermissionRequest".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
+        },
+        tool_name: "Bash".to_string(),
+        tool_input,
+    };
+    assert!(validate_permission_request_payload(&payload).is_ok());
+}
+
+#[test]
+fn test_validate_permission_request_payload_empty_tool_name() {
+    let mut tool_input = HashMap::new();
+    tool_input.insert(
+        "command".to_string(),
+        serde_json::Value::String("ls -la".to_string()),
+    );
+
+    let payload = PermissionRequestPayload {
+        base: BasePayload {
+            session_id: "test_session".to_string(),
+            transcript_path: "/path/to/transcript".to_string(),
+            hook_event_name: "PermissionRequest".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
+        },
+        tool_name: String::new(),
+        tool_input,
+    };
+    let result = validate_permission_request_payload(&payload);
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err(), "tool_name cannot be empty");
+}
+
+#[test]
+fn test_validate_permission_request_payload_whitespace_tool_name() {
+    let mut tool_input = HashMap::new();
+    tool_input.insert(
+        "command".to_string(),
+        serde_json::Value::String("ls -la".to_string()),
+    );
+
+    let payload = PermissionRequestPayload {
+        base: BasePayload {
+            session_id: "test_session".to_string(),
+            transcript_path: "/path/to/transcript".to_string(),
+            hook_event_name: "PermissionRequest".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
+        },
+        tool_name: "   ".to_string(),
+        tool_input,
+    };
+    let result = validate_permission_request_payload(&payload);
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err(), "tool_name cannot be empty");
+}
+
+#[test]
+fn test_hook_payload_permission_request_variant() {
+    let mut tool_input = HashMap::new();
+    tool_input.insert(
+        "command".to_string(),
+        serde_json::Value::String("ls -la".to_string()),
+    );
+
+    let payload = PermissionRequestPayload {
+        base: BasePayload {
+            session_id: "test_session".to_string(),
+            transcript_path: "/path/to/transcript".to_string(),
+            hook_event_name: "PermissionRequest".to_string(),
+            cwd: "/current/dir".to_string(),
+            permission_mode: Some("default".to_string()),
+        },
+        tool_name: "Bash".to_string(),
+        tool_input: tool_input.clone(),
+    };
+
+    // Wrap in HookPayload enum
+    let hook_payload = HookPayload::PermissionRequest(payload.clone());
+
+    // Verify we can pattern match on the variant
+    match &hook_payload {
+        HookPayload::PermissionRequest(p) => {
+            assert_eq!(p.base.session_id, "test_session");
+            assert_eq!(p.base.hook_event_name, "PermissionRequest");
+            assert_eq!(p.tool_name, "Bash");
+            assert_eq!(
+                p.tool_input.get("command"),
+                Some(&serde_json::Value::String("ls -la".to_string()))
+            );
+        }
+        _ => panic!("Expected PermissionRequest variant"),
+    }
+
+    // Verify the helper methods work correctly
+    assert_eq!(hook_payload.session_id(), "test_session");
+    assert_eq!(hook_payload.transcript_path(), "/path/to/transcript");
+}
