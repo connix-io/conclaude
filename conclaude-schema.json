@@ -200,6 +200,68 @@
       },
       "type": "object"
     },
+    "SubagentStopCommand": {
+      "additionalProperties": false,
+      "description": "Configuration for individual subagent stop commands with optional messages",
+      "properties": {
+        "maxOutputLines": {
+          "default": null,
+          "format": "uint32",
+          "maximum": 10000.0,
+          "minimum": 1.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "message": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "run": {
+          "type": "string"
+        },
+        "showStderr": {
+          "default": null,
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "showStdout": {
+          "default": null,
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "run"
+      ],
+      "type": "object"
+    },
+    "SubagentStopConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for subagent stop hooks with pattern-based command execution",
+      "properties": {
+        "commands": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/definitions/SubagentStopCommand"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "description": "Map of agent ID patterns to lists of commands to execute when matching subagents stop. Patterns support glob syntax: \"*\" matches all, \"coder\" exact match, \"test*\" prefix, \"*coder\" suffix.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "ToolUsageRule": {
       "additionalProperties": false,
       "description": "Tool usage validation rule",
@@ -322,6 +384,16 @@
         "infinite": false,
         "infiniteMessage": null,
         "rounds": null
+      }
+    },
+    "subagentStop": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/SubagentStopConfig"
+        }
+      ],
+      "default": {
+        "commands": {}
       }
     }
   },
