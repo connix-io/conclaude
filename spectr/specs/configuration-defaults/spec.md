@@ -2,7 +2,7 @@
 
 ## Purpose
 
-TODO: Add purpose description
+Define default configuration values and security protections applied when initializing conclaude, including automatic protection of config files from AI modification to preserve guardrail settings.
 
 ## Requirements
 

@@ -112,6 +112,20 @@ pub struct NotificationsConfig {
     pub show_system_events: bool,
 }
 
+/// Configuration for permission request hooks
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, FieldList)]
+#[serde(deny_unknown_fields)]
+pub struct PermissionRequestConfig {
+    /// Default action when a tool is requested: "allow" or "deny"
+    pub default: String,
+    /// Tools to explicitly allow (supports glob patterns)
+    #[serde(default)]
+    pub allow: Option<Vec<String>>,
+    /// Tools to explicitly deny (supports glob patterns)
+    #[serde(default)]
+    pub deny: Option<Vec<String>>,
+}
+
 fn default_show_system_events() -> bool {
     true
 }
@@ -144,6 +158,8 @@ pub struct ConclaudeConfig {
     pub pre_tool_use: PreToolUseConfig,
     #[serde(default)]
     pub notifications: NotificationsConfig,
+    #[serde(default, rename = "permissionRequest")]
+    pub permission_request: Option<PermissionRequestConfig>,
 }
 
 /// Extract the field name from an unknown field error message
@@ -164,6 +180,7 @@ fn suggest_similar_fields(unknown_field: &str, section: &str) -> Vec<String> {
         ("stop", StopConfig::field_names()),
         ("preToolUse", PreToolUseConfig::field_names()),
         ("notifications", NotificationsConfig::field_names()),
+        ("permissionRequest", PermissionRequestConfig::field_names()),
         ("commands", StopCommand::field_names()),
     ];
 
@@ -282,6 +299,7 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
             "  notifications: enabled, hooks, showErrors, showSuccess, showSystemEvents"
                 .to_string(),
         );
+        parts.push("  permissionRequest: default, allow, deny".to_string());
         parts.push("  commands: run, message, showStdout, showStderr, maxOutputLines".to_string());
     } else if base_error.contains("invalid type") {
         parts.push(String::new());
@@ -391,6 +409,31 @@ fn validate_config_constraints(config: &ConclaudeConfig) -> Result<()> {
                  For a valid configuration template, run:\n\
                    conclaude init"
                 .to_string();
+            return Err(anyhow::anyhow!(error_msg));
+        }
+    }
+
+    // Validate permissionRequest.default if specified
+    if let Some(permission_request) = &config.permission_request {
+        let default_value = permission_request.default.to_lowercase();
+        if default_value != "allow" && default_value != "deny" {
+            let error_msg = format!(
+                "Validation failed for permissionRequest.default\n\n\
+                 Error: Invalid value '{}'\n\n\
+                 ✅ Valid values: \"allow\" or \"deny\"\n\n\
+                 Common causes:\n\
+                   • Typo in value (check spelling)\n\
+                   • Using a value other than allow or deny\n\n\
+                 Example valid configurations:\n\
+                   permissionRequest:\n\
+                     default: allow    # allow all tools by default\n\
+                   \n\
+                   permissionRequest:\n\
+                     default: deny     # deny all tools by default\n\n\
+                 For a valid configuration template, run:\n\
+                   conclaude init",
+                permission_request.default
+            );
             return Err(anyhow::anyhow!(error_msg));
         }
     }
@@ -781,6 +824,139 @@ notifications:
             result.is_ok(),
             "Should accept config without rules section: {:?}",
             result.err()
+        );
+    }
+
+    #[test]
+    fn test_permission_request_valid_config() {
+        // Test valid permissionRequest configuration
+        let config_yaml = r#"
+permissionRequest:
+  default: allow
+  allow:
+    - Read
+    - Write
+  deny:
+    - Bash
+
+stop:
+  commands: []
+  infinite: false
+
+preToolUse:
+  preventRootAdditions: true
+  uneditableFiles: []
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  toolUsageValidation: []
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+
+        let result = parse_and_validate_config(config_yaml, Path::new("test.yaml"));
+        assert!(
+            result.is_ok(),
+            "Valid permissionRequest config should parse: {:?}",
+            result.err()
+        );
+
+        let config = result.unwrap();
+        assert!(
+            config.permission_request.is_some(),
+            "permission_request should be populated"
+        );
+        let pr = config.permission_request.unwrap();
+        assert_eq!(pr.default, "allow");
+        assert_eq!(pr.allow.as_ref().unwrap().len(), 2);
+        assert_eq!(pr.deny.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_permission_request_invalid_default() {
+        // Test that invalid default value is rejected
+        let config_yaml = r#"
+permissionRequest:
+  default: invalid_value
+
+stop:
+  commands: []
+  infinite: false
+
+preToolUse:
+  preventRootAdditions: true
+  uneditableFiles: []
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  toolUsageValidation: []
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+
+        let result = parse_and_validate_config(config_yaml, Path::new("test.yaml"));
+        assert!(
+            result.is_err(),
+            "Invalid default value should fail validation"
+        );
+        let error = result.err().unwrap().to_string();
+        assert!(
+            error.contains("allow") && error.contains("deny"),
+            "Error message should mention valid values"
+        );
+    }
+
+    #[test]
+    fn test_permission_request_optional() {
+        // Test that permissionRequest is optional
+        let config_yaml = r#"
+stop:
+  commands: []
+  infinite: false
+
+preToolUse:
+  preventRootAdditions: true
+  uneditableFiles: []
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  toolUsageValidation: []
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+
+        let result = parse_and_validate_config(config_yaml, Path::new("test.yaml"));
+        assert!(
+            result.is_ok(),
+            "Config without permissionRequest should parse: {:?}",
+            result.err()
+        );
+
+        let config = result.unwrap();
+        assert!(
+            config.permission_request.is_none(),
+            "permission_request should be None when not specified"
+        );
+    }
+
+    #[test]
+    fn test_permission_request_field_list() {
+        // Test that PermissionRequestConfig field names are correct
+        assert_eq!(
+            PermissionRequestConfig::field_names(),
+            vec!["default", "allow", "deny"]
         );
     }
 }

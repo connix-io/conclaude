@@ -38,6 +38,42 @@
       },
       "type": "object"
     },
+    "PermissionRequestConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for permission request hooks",
+      "properties": {
+        "allow": {
+          "default": null,
+          "description": "Tools to explicitly allow (supports glob patterns)",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "default": {
+          "description": "Default action when a tool is requested: \"allow\" or \"deny\"",
+          "type": "string"
+        },
+        "deny": {
+          "default": null,
+          "description": "Tools to explicitly deny (supports glob patterns)",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "default"
+      ],
+      "type": "object"
+    },
     "PreToolUseConfig": {
       "additionalProperties": false,
       "description": "Configuration for pre tool use hooks",
@@ -219,6 +255,17 @@
         "showSuccess": false,
         "showSystemEvents": false
       }
+    },
+    "permissionRequest": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PermissionRequestConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "preToolUse": {
       "allOf": [

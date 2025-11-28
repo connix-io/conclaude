@@ -1,9 +1,10 @@
 use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig};
 use crate::gitignore::{find_git_root, is_path_git_ignored};
 use crate::types::{
-    validate_base_payload, validate_subagent_start_payload, validate_subagent_stop_payload,
-    HookResult, NotificationPayload, PostToolUsePayload, PreCompactPayload, PreToolUsePayload,
-    SessionEndPayload, SessionStartPayload, StopPayload, SubagentStartPayload, SubagentStopPayload,
+    validate_base_payload, validate_permission_request_payload, validate_subagent_start_payload,
+    validate_subagent_stop_payload, HookResult, NotificationPayload, PermissionRequestPayload,
+    PostToolUsePayload, PreCompactPayload, PreToolUsePayload, SessionEndPayload,
+    SessionStartPayload, StopPayload, SubagentStartPayload, SubagentStopPayload,
     UserPromptSubmitPayload,
 };
 use anyhow::{Context, Result};
@@ -291,6 +292,104 @@ pub async fn handle_pre_tool_use() -> Result<HookResult> {
         Some(&format!("Tool '{}' approved", payload.tool_name)),
     );
     Ok(HookResult::success())
+}
+
+/// Handles `PermissionRequest` hook events fired when Claude requests permission to execute a tool.
+///
+/// # Errors
+///
+/// Returns an error if payload validation fails or configuration loading fails.
+pub async fn handle_permission_request() -> Result<HookResult> {
+    let payload: PermissionRequestPayload = read_payload_from_stdin()?;
+
+    validate_permission_request_payload(&payload).map_err(|e| anyhow::anyhow!(e))?;
+
+    println!(
+        "Processing PermissionRequest hook: session_id={}, tool_name={}",
+        payload.base.session_id, payload.tool_name
+    );
+
+    let (config, _config_path) = get_config().await?;
+
+    // If no permission_request config section exists, default to permissive mode (allow)
+    let Some(permission_config) = &config.permission_request else {
+        send_notification(
+            "PermissionRequest",
+            "success",
+            Some(&format!("Tool '{}' allowed (no config)", payload.tool_name)),
+        );
+        return Ok(HookResult::success());
+    };
+
+    // Check deny patterns first (deny takes precedence)
+    if let Some(deny_patterns) = &permission_config.deny {
+        for pattern_str in deny_patterns {
+            let pattern = Pattern::new(pattern_str)
+                .with_context(|| format!("Invalid glob pattern in deny list: {}", pattern_str))?;
+            if pattern.matches(&payload.tool_name) {
+                let message = format!(
+                    "Tool '{}' blocked by permissionRequest.deny pattern: {}",
+                    payload.tool_name, pattern_str
+                );
+                eprintln!(
+                    "PermissionRequest blocked by deny pattern: tool_name={}, pattern={}",
+                    payload.tool_name, pattern_str
+                );
+                send_notification(
+                    "PermissionRequest",
+                    "failure",
+                    Some(&format!("Tool '{}' denied", payload.tool_name)),
+                );
+                return Ok(HookResult::blocked(message));
+            }
+        }
+    }
+
+    // Check allow patterns second
+    if let Some(allow_patterns) = &permission_config.allow {
+        for pattern_str in allow_patterns {
+            let pattern = Pattern::new(pattern_str)
+                .with_context(|| format!("Invalid glob pattern in allow list: {}", pattern_str))?;
+            if pattern.matches(&payload.tool_name) {
+                send_notification(
+                    "PermissionRequest",
+                    "success",
+                    Some(&format!("Tool '{}' allowed", payload.tool_name)),
+                );
+                return Ok(HookResult::success());
+            }
+        }
+    }
+
+    // No patterns matched - use default setting
+    let default_action = permission_config.default.to_lowercase();
+    if default_action == "allow" {
+        send_notification(
+            "PermissionRequest",
+            "success",
+            Some(&format!(
+                "Tool '{}' allowed by default",
+                payload.tool_name
+            )),
+        );
+        Ok(HookResult::success())
+    } else {
+        // default is "deny"
+        let message = format!(
+            "Tool '{}' blocked by permissionRequest.default setting",
+            payload.tool_name
+        );
+        eprintln!(
+            "PermissionRequest blocked by default: tool_name={}",
+            payload.tool_name
+        );
+        send_notification(
+            "PermissionRequest",
+            "failure",
+            Some(&format!("Tool '{}' denied by default", payload.tool_name)),
+        );
+        Ok(HookResult::blocked(message))
+    }
 }
 
 /// Check file validation rules for file-modifying tools

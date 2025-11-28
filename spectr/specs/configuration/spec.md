@@ -2,7 +2,7 @@
 
 ## Purpose
 
-TODO: Add purpose description
+Define automatic field list generation and error suggestion behavior for YAML configuration parsing, ensuring compile-time synchronization between struct definitions and user-facing field name suggestions.
 
 ## Requirements
 

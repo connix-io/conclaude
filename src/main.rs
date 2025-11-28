@@ -8,9 +8,9 @@ mod types;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use hooks::{
-    handle_hook_result, handle_notification, handle_post_tool_use, handle_pre_compact,
-    handle_pre_tool_use, handle_session_end, handle_session_start, handle_stop,
-    handle_subagent_start, handle_subagent_stop, handle_user_prompt_submit,
+    handle_hook_result, handle_notification, handle_permission_request, handle_post_tool_use,
+    handle_pre_compact, handle_pre_tool_use, handle_session_end, handle_session_start,
+    handle_stop, handle_subagent_start, handle_subagent_stop, handle_user_prompt_submit,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -56,6 +56,9 @@ enum Commands {
     /// Process `PostToolUse` hook - fired after tool execution
     #[clap(name = "PostToolUse")]
     PostToolUse,
+    /// Process `PermissionRequest` hook - fired when tool requests permission
+    #[clap(name = "PermissionRequest")]
+    PermissionRequest,
     /// Process Notification hook - fired for system notifications
     #[clap(name = "Notification")]
     Notification,
@@ -111,6 +114,7 @@ async fn main() -> Result<()> {
         } => handle_init(config_path, claude_path, force, schema_url).await,
         Commands::PreToolUse => handle_hook_result(handle_pre_tool_use).await,
         Commands::PostToolUse => handle_hook_result(handle_post_tool_use).await,
+        Commands::PermissionRequest => handle_hook_result(handle_permission_request).await,
         Commands::Notification => handle_hook_result(handle_notification).await,
         Commands::UserPromptSubmit => handle_hook_result(handle_user_prompt_submit).await,
         Commands::SessionStart => handle_hook_result(handle_session_start).await,
@@ -236,6 +240,7 @@ async fn handle_init(
         "UserPromptSubmit",
         "PreToolUse",
         "PostToolUse",
+        "PermissionRequest",
         "Notification",
         "Stop",
         "SubagentStart",
