@@ -47,17 +47,28 @@ preToolUse:
   # Supports various glob patterns for flexible file protection
   # By default, conclaude's own config files are protected to prevent the AI
   # from modifying guardrail settings - this is a security best practice
+  #
+  # Two formats are supported:
+  # 1. Simple string patterns: "*.lock"
+  # 2. Detailed objects with custom messages: { pattern: "*.lock", message: "..." }
   uneditableFiles:
     - ".conclaude.yml"   # Protect conclaude config from AI modification
     - ".conclaude.yaml"  # Alternative config extension
   # Additional examples:
   # uneditableFiles:
+  #   # Simple patterns (backward compatible)
   #   - "./package.json"      # specific file
   #   - "*.md"                # file extension
   #   - "src/**/*.ts"         # nested patterns
-  #   - ".env*"               # environment files
   #   - "docs/**"             # entire directories
-  #   - "{package,tsconfig}.json"  # multiple specific files
+  #
+  #   # Detailed patterns with custom error messages
+  #   - pattern: "*.lock"
+  #     message: "Lock files are auto-generated. Run 'npm install' to update."
+  #   - pattern: ".env*"
+  #     message: "Environment files contain secrets. Use .env.example instead."
+  #   - pattern: "{package,tsconfig}.json"
+  #     message: "Configuration files require team review before changes."
 
   # Prevent Claude from creating or modifying files that are git-ignored
   # When enabled, files matching patterns in .gitignore will be protected

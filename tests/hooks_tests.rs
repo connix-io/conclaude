@@ -2443,13 +2443,13 @@ fn test_prevent_additions_and_uneditable_files_both_checked() {
     // Test that both preventAdditions and uneditableFiles are checked independently
     // A file can be blocked by either rule
 
-    use conclaude::config::{ConclaudeConfig, PreToolUseConfig};
+    use conclaude::config::{ConclaudeConfig, PreToolUseConfig, UnEditableFileRule};
 
     // Create config with both preventAdditions and uneditableFiles
     let config = ConclaudeConfig {
         pre_tool_use: PreToolUseConfig {
             prevent_additions: vec!["dist/**".to_string()],
-            uneditable_files: vec![".env*".to_string()],
+            uneditable_files: vec![UnEditableFileRule::Simple(".env*".to_string())],
             ..Default::default()
         },
         ..Default::default()
@@ -2461,8 +2461,8 @@ fn test_prevent_additions_and_uneditable_files_both_checked() {
         matches_uneditable_pattern(file_1, file_1, &format!("/path/{}", file_1), pattern)
             .unwrap_or(false)
     });
-    let matches_uneditable = config.pre_tool_use.uneditable_files.iter().any(|pattern| {
-        matches_uneditable_pattern(file_1, file_1, &format!("/path/{}", file_1), pattern)
+    let matches_uneditable = config.pre_tool_use.uneditable_files.iter().any(|rule| {
+        matches_uneditable_pattern(file_1, file_1, &format!("/path/{}", file_1), rule.pattern())
             .unwrap_or(false)
     });
     assert!(
@@ -2480,8 +2480,8 @@ fn test_prevent_additions_and_uneditable_files_both_checked() {
         matches_uneditable_pattern(file_2, file_2, &format!("/path/{}", file_2), pattern)
             .unwrap_or(false)
     });
-    let matches_uneditable_2 = config.pre_tool_use.uneditable_files.iter().any(|pattern| {
-        matches_uneditable_pattern(file_2, file_2, &format!("/path/{}", file_2), pattern)
+    let matches_uneditable_2 = config.pre_tool_use.uneditable_files.iter().any(|rule| {
+        matches_uneditable_pattern(file_2, file_2, &format!("/path/{}", file_2), rule.pattern())
             .unwrap_or(false)
     });
     assert!(
@@ -2499,8 +2499,8 @@ fn test_prevent_additions_and_uneditable_files_both_checked() {
         matches_uneditable_pattern(file_3, file_3, &format!("/path/{}", file_3), pattern)
             .unwrap_or(false)
     });
-    let matches_uneditable_3 = config.pre_tool_use.uneditable_files.iter().any(|pattern| {
-        matches_uneditable_pattern(file_3, file_3, &format!("/path/{}", file_3), pattern)
+    let matches_uneditable_3 = config.pre_tool_use.uneditable_files.iter().any(|rule| {
+        matches_uneditable_pattern(file_3, file_3, &format!("/path/{}", file_3), rule.pattern())
             .unwrap_or(false)
     });
     assert!(

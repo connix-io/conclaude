@@ -115,7 +115,7 @@
         "uneditableFiles": {
           "default": [],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/UnEditableFileRule"
           },
           "type": "array"
         }
@@ -238,6 +238,34 @@
         "tool"
       ],
       "type": "object"
+    },
+    "UnEditableFileRule": {
+      "anyOf": [
+        {
+          "description": "Detailed format with pattern and optional custom message",
+          "properties": {
+            "message": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Simple format: just a glob pattern string",
+          "type": "string"
+        }
+      ],
+      "description": "Configuration for an uneditable file rule.\n\nSupports two formats: - Simple: `\"*.lock\"` - Matches files with generic error message - Detailed: `{pattern: \"*.lock\", message: \"...\"}` - Custom error message\n\nThe `#[serde(untagged)]` attribute allows serde to automatically handle both plain string patterns and detailed object configurations."
     }
   },
   "description": "Configuration schema for Conclaude - Claude Code hook handler",

@@ -51,6 +51,50 @@ pub struct ToolUsageRule {
     pub match_mode: Option<String>,
 }
 
+/// Configuration for an uneditable file rule.
+///
+/// Supports two formats:
+/// - Simple: `"*.lock"` - Matches files with generic error message
+/// - Detailed: `{pattern: "*.lock", message: "..."}` - Custom error message
+///
+/// The `#[serde(untagged)]` attribute allows serde to automatically handle both
+/// plain string patterns and detailed object configurations.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum UnEditableFileRule {
+    /// Detailed format with pattern and optional custom message
+    #[serde(rename_all = "camelCase")]
+    Detailed {
+        pattern: String,
+        #[serde(default)]
+        message: Option<String>,
+    },
+    /// Simple format: just a glob pattern string
+    Simple(String),
+}
+
+impl UnEditableFileRule {
+    /// Extract the pattern from either variant
+    #[must_use]
+    pub fn pattern(&self) -> &str {
+        match self {
+            UnEditableFileRule::Simple(pattern) => pattern,
+            UnEditableFileRule::Detailed { pattern, .. } => pattern,
+        }
+    }
+
+    /// Get the custom message if present (only from Detailed variant)
+    #[must_use]
+    pub fn message(&self) -> Option<&str> {
+        match self {
+            UnEditableFileRule::Detailed {
+                message: Some(msg), ..
+            } => Some(msg),
+            _ => None,
+        }
+    }
+}
+
 /// Default function that returns true for serde defaults
 fn default_true() -> bool {
     true
@@ -69,7 +113,7 @@ pub struct PreToolUseConfig {
     #[serde(default = "default_true", rename = "preventRootAdditions")]
     pub prevent_root_additions: bool,
     #[serde(default, rename = "uneditableFiles")]
-    pub uneditable_files: Vec<String>,
+    pub uneditable_files: Vec<UnEditableFileRule>,
     /// Block Claude from modifying or creating files that match .gitignore patterns
     #[serde(default, rename = "preventUpdateGitIgnored")]
     pub prevent_update_git_ignored: bool,
@@ -958,5 +1002,252 @@ notifications:
             PermissionRequestConfig::field_names(),
             vec!["default", "allow", "deny"]
         );
+    }
+
+    #[test]
+    fn test_uneditable_file_rule_simple_string_format() {
+        // Test that simple string patterns deserialize correctly
+        let yaml = r#"
+preToolUse:
+  uneditableFiles:
+    - "*.lock"
+    - ".env"
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  preventRootAdditions: true
+  toolUsageValidation: []
+
+stop:
+  commands: []
+  infinite: false
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+        let config: ConclaudeConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.pre_tool_use.uneditable_files.len(), 2);
+
+        // Verify patterns extracted correctly
+        assert_eq!(
+            config.pre_tool_use.uneditable_files[0].pattern(),
+            "*.lock"
+        );
+        assert_eq!(config.pre_tool_use.uneditable_files[1].pattern(), ".env");
+
+        // Verify no custom messages
+        assert!(config.pre_tool_use.uneditable_files[0].message().is_none());
+        assert!(config.pre_tool_use.uneditable_files[1].message().is_none());
+    }
+
+    #[test]
+    fn test_uneditable_file_rule_detailed_object_format() {
+        // Test that detailed objects with pattern and message deserialize correctly
+        let yaml = r#"
+preToolUse:
+  uneditableFiles:
+    - pattern: "*.lock"
+      message: "Lock files are auto-generated. Run 'npm install' to update."
+    - pattern: ".env"
+      message: "Environment files contain secrets."
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  preventRootAdditions: true
+  toolUsageValidation: []
+
+stop:
+  commands: []
+  infinite: false
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+        let config: ConclaudeConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.pre_tool_use.uneditable_files.len(), 2);
+
+        // Verify patterns extracted correctly
+        assert_eq!(
+            config.pre_tool_use.uneditable_files[0].pattern(),
+            "*.lock"
+        );
+        assert_eq!(config.pre_tool_use.uneditable_files[1].pattern(), ".env");
+
+        // Verify custom messages
+        assert_eq!(
+            config.pre_tool_use.uneditable_files[0].message(),
+            Some("Lock files are auto-generated. Run 'npm install' to update.")
+        );
+        assert_eq!(
+            config.pre_tool_use.uneditable_files[1].message(),
+            Some("Environment files contain secrets.")
+        );
+    }
+
+    #[test]
+    fn test_uneditable_file_rule_mixed_format() {
+        // Test that arrays can mix both simple strings and detailed objects
+        let yaml = r#"
+preToolUse:
+  uneditableFiles:
+    - "*.lock"
+    - pattern: ".env"
+      message: "Secrets must not be committed."
+    - "package.json"
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  preventRootAdditions: true
+  toolUsageValidation: []
+
+stop:
+  commands: []
+  infinite: false
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+        let config: ConclaudeConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.pre_tool_use.uneditable_files.len(), 3);
+
+        // First is simple format
+        assert_eq!(
+            config.pre_tool_use.uneditable_files[0].pattern(),
+            "*.lock"
+        );
+        assert!(config.pre_tool_use.uneditable_files[0].message().is_none());
+
+        // Second is detailed format with message
+        assert_eq!(config.pre_tool_use.uneditable_files[1].pattern(), ".env");
+        assert_eq!(
+            config.pre_tool_use.uneditable_files[1].message(),
+            Some("Secrets must not be committed.")
+        );
+
+        // Third is simple format
+        assert_eq!(
+            config.pre_tool_use.uneditable_files[2].pattern(),
+            "package.json"
+        );
+        assert!(config.pre_tool_use.uneditable_files[2].message().is_none());
+    }
+
+    #[test]
+    fn test_uneditable_file_rule_detailed_without_message() {
+        // Test that detailed format without message field works (message is optional)
+        let yaml = r#"
+preToolUse:
+  uneditableFiles:
+    - pattern: "*.lock"
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  preventRootAdditions: true
+  toolUsageValidation: []
+
+stop:
+  commands: []
+  infinite: false
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+        let config: ConclaudeConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.pre_tool_use.uneditable_files.len(), 1);
+        assert_eq!(
+            config.pre_tool_use.uneditable_files[0].pattern(),
+            "*.lock"
+        );
+        assert!(config.pre_tool_use.uneditable_files[0].message().is_none());
+    }
+
+    #[test]
+    fn test_uneditable_file_rule_backward_compatibility() {
+        // Test that existing configs with simple string format still work
+        let yaml = r#"
+preToolUse:
+  preventRootAdditions: true
+  uneditableFiles:
+    - "*.lock"
+    - ".env"
+    - "package-lock.json"
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  toolUsageValidation: []
+
+stop:
+  commands: []
+  infinite: false
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+
+        let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
+        assert!(
+            result.is_ok(),
+            "Backward compatible config should parse: {:?}",
+            result.err()
+        );
+
+        let config = result.unwrap();
+        assert_eq!(config.pre_tool_use.uneditable_files.len(), 3);
+
+        // Verify all patterns are extracted correctly
+        let patterns: Vec<&str> = config
+            .pre_tool_use
+            .uneditable_files
+            .iter()
+            .map(|r| r.pattern())
+            .collect();
+        assert_eq!(patterns, vec!["*.lock", ".env", "package-lock.json"]);
+    }
+
+    #[test]
+    fn test_uneditable_file_rule_pattern_extraction() {
+        // Test the pattern() method for both variants
+        let simple = UnEditableFileRule::Simple("*.txt".to_string());
+        assert_eq!(simple.pattern(), "*.txt");
+
+        let detailed = UnEditableFileRule::Detailed {
+            pattern: "*.md".to_string(),
+            message: Some("Custom message".to_string()),
+        };
+        assert_eq!(detailed.pattern(), "*.md");
+    }
+
+    #[test]
+    fn test_uneditable_file_rule_message_extraction() {
+        // Test the message() method for all cases
+        let simple = UnEditableFileRule::Simple("*.txt".to_string());
+        assert!(simple.message().is_none());
+
+        let detailed_with_msg = UnEditableFileRule::Detailed {
+            pattern: "*.md".to_string(),
+            message: Some("Custom message".to_string()),
+        };
+        assert_eq!(detailed_with_msg.message(), Some("Custom message"));
+
+        let detailed_without_msg = UnEditableFileRule::Detailed {
+            pattern: "*.md".to_string(),
+            message: None,
+        };
+        assert!(detailed_without_msg.message().is_none());
     }
 }
