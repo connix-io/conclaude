@@ -371,21 +371,21 @@ Critical Path: 1.1 → 1.2 → 2.1 → 2.2 → 2.3 → 4.1, 4.2 → 4.7
 
 ## Success Criteria
 
-- [ ] UnEditableFileRule enum defined correctly
-- [ ] RulesConfig updated to use new type
-- [ ] Code compiles without errors
-- [ ] Both simple and detailed formats deserialize correctly
-- [ ] Mixed format arrays work
-- [ ] Custom messages display when provided
-- [ ] Generic messages display when not provided
-- [ ] All tests pass
-- [ ] cargo clippy passes with no warnings
-- [ ] Backward compatibility verified with existing configs
-- [ ] JSON schema updated and valid
-- [ ] Example configurations documented
-- [ ] Doc comments added
-- [ ] openspec validate passes
-- [ ] No functional regressions in existing behavior
+- [x] UnEditableFileRule enum defined correctly
+- [x] RulesConfig updated to use new type
+- [x] Code compiles without errors
+- [x] Both simple and detailed formats deserialize correctly
+- [x] Mixed format arrays work
+- [x] Custom messages display when provided
+- [x] Generic messages display when not provided
+- [x] All tests pass
+- [x] cargo clippy passes with no warnings
+- [x] Backward compatibility verified with existing configs
+- [x] JSON schema updated and valid
+- [x] Example configurations documented
+- [x] Doc comments added
+- [x] openspec validate passes
+- [x] No functional regressions in existing behavior
 
 ## Notes
 

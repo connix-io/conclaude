@@ -436,17 +436,23 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
     }
 
     // Check uneditableFiles rule
-    for pattern in &config.pre_tool_use.uneditable_files {
+    for rule in &config.pre_tool_use.uneditable_files {
+        let pattern = rule.pattern();
         if matches_uneditable_pattern(
             &file_path,
             &relative_path,
             &resolved_path.to_string_lossy(),
             pattern,
         )? {
-            let error_message = format!(
-                "Blocked {} operation: file matches preToolUse.uneditableFiles pattern '{}'. File: {}",
-                payload.tool_name, pattern, file_path
-            );
+            // Use custom message if provided, otherwise use generic message
+            let error_message = if let Some(custom_msg) = rule.message() {
+                custom_msg.to_string()
+            } else {
+                format!(
+                    "Blocked {} operation: file matches preToolUse.uneditableFiles pattern '{}'. File: {}",
+                    payload.tool_name, pattern, file_path
+                )
+            };
 
             eprintln!(
                 "PreToolUse blocked by preToolUse.uneditableFiles pattern: tool_name={}, file_path={}, pattern={}",

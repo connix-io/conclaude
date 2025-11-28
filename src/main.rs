@@ -312,8 +312,12 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
                 if config.pre_tool_use.uneditable_files.is_empty() {
                     println!("   No uneditable files configured");
                 } else {
-                    for pattern_str in &config.pre_tool_use.uneditable_files {
+                    for rule in &config.pre_tool_use.uneditable_files {
+                        let pattern_str = rule.pattern();
                         println!("   Pattern: {pattern_str}");
+                        if let Some(msg) = rule.message() {
+                            println!("   Message: {msg}");
+                        }
 
                         if show_matches {
                             let pattern = Pattern::new(pattern_str)?;
