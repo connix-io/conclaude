@@ -138,6 +138,7 @@ struct ClaudeHookConfig {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ClaudeHookMatcher {
+    #[serde(default)]
     matcher: String,
     hooks: Vec<ClaudeHookConfig>,
 }
