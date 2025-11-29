@@ -36,6 +36,63 @@ stop:
   rounds: null
   # Example: rounds: 3
 
+# Subagent stop hook configuration - runs when subagents are about to stop
+# This hook allows configuring different commands for different subagent names
+# using pattern matching. Commands run when a subagent finishes its work.
+subagentStop:
+  # Map of subagent name patterns to command configurations
+  # Each key is a glob pattern that matches against the subagent name
+  # Commands are executed in the order they appear when pattern matches
+  commands: {}
+  # Examples:
+  # commands:
+  #   # Exact match - only runs for subagent named "coder"
+  #   coder:
+  #     - run: "npm run lint"
+  #       showStdout: true
+  #       showStderr: true
+  #       message: "Linting failed - please fix errors before continuing"
+  #       maxOutputLines: 100
+  #
+  #   # Glob pattern - runs for any subagent name starting with "test"
+  #   test*:
+  #     - run: "npm test"
+  #       showStdout: true
+  #       showStderr: true
+  #       message: "Tests failed - please fix failing tests"
+  #
+  #   # Wildcard - runs for ALL subagents
+  #   "*":
+  #     - run: "echo 'Subagent {subagent_name} completed'"
+  #       showStdout: true
+  #
+  # Pattern matching rules:
+  #   - Patterns are matched in the order they appear in the configuration
+  #   - First matching pattern's commands are executed
+  #   - Use "*" to match all subagents (put last as fallback)
+  #   - Glob patterns support: *, ?, [abc], [a-z], {foo,bar}
+  #
+  # Command options (same as stop hook):
+  #   - run: (required) Command to execute
+  #   - showStdout: (optional) Show stdout to user/Claude (default: false)
+  #   - showStderr: (optional) Show stderr to user/Claude (default: false)
+  #   - message: (optional) Custom error message on non-zero exit
+  #   - maxOutputLines: (optional) Limit output lines (1-10000)
+  #
+  # Environment variables available in commands:
+  #   - CONCLAUDE_AGENT_ID             - The subagent's identifier
+  #   - CONCLAUDE_AGENT_TRANSCRIPT_PATH - Path to subagent's transcript
+  #   - CONCLAUDE_SESSION_ID           - Current session ID
+  #   - CONCLAUDE_TRANSCRIPT_PATH      - Main transcript file path
+  #   - CONCLAUDE_HOOK_EVENT           - Always "SubagentStop"
+  #   - CONCLAUDE_CWD                  - Current working directory
+  #
+  # Example with environment variable:
+  # commands:
+  #   coder:
+  #     - run: "echo 'Coder subagent ${CONCLAUDE_AGENT_ID} finished'"
+  #       showStdout: true
+
 # Pre-tool-use hook configuration - runs before tools are executed
 # All file protection rules are consolidated in this section
 preToolUse:
@@ -64,7 +121,7 @@ preToolUse:
   #
   #   # Detailed patterns with custom error messages
   #   - pattern: "*.lock"
-  #     message: "Lock files are auto-generated. Run 'npm install' to update."
+  #     message: "Lock files are automatically created. Run 'npm install' to update."
   #   - pattern: ".env*"
   #     message: "Environment files contain secrets. Use .env.example instead."
   #   - pattern: "{package,tsconfig}.json"
