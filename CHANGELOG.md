@@ -5,48 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.2] - 2025-11-29
 
-### Fixed
+### Features
 
-- **preventAdditions is now functional**: Fixed the `preventAdditions` setting in `preToolUse` which was completely non-functional. The field was defined in the config schema but never enforced. Now correctly blocks Write operations to files matching configured glob patterns (e.g., `preventAdditions: ["dist/**", "build/**", "*.log"]`).
+- Add agent_id and agent_transcript_path to SubagentStop payload (#80) ([12cb9ee](https://github.com/connix-io/conclaude/commit/12cb9ee15e3f1ec6459d0e4fed166ae9b1e77310))
+- Add SubagentStart hook support and tool_use_id field (#83) ([d945cea](https://github.com/connix-io/conclaude/commit/d945cea0eac8fc352216b70a79f23478fa163e87))
+- Enhance refine-prevent-root-additions spec delta with complete sections (#87) ([857c615](https://github.com/connix-io/conclaude/commit/857c615f5535dd051fd3a25622ad981c3b750db5))
+- [**breaking**] Consolidate rules configuration into preToolUse section (#99) ([a075723](https://github.com/connix-io/conclaude/commit/a075723d3f87ef88d709b2ed1afb0f2b618f5026))
+- Add .conclaude.yml and .conclaude.yaml to default uneditableFiles (#102) ([0596d9c](https://github.com/connix-io/conclaude/commit/0596d9c519f27fbbe686796f743994f27da9664f))
+- Add preventUpdateGitIgnored setting to protect git-ignored files (#103) ([80a3491](https://github.com/connix-io/conclaude/commit/80a3491ece4b6c15733d9daa859ff102daf479be))
+- Implement permission request hook with configuration system (#105) ([4eed513](https://github.com/connix-io/conclaude/commit/4eed5130c864f9600981e303374d06b60e06fd17))
+- Implement custom uneditable file messages (#106) ([e84d1ad](https://github.com/connix-io/conclaude/commit/e84d1adfe4e24bb4ada01e1c46e1685222a2efc5))
+- Implement subagent stop commands with pattern matching (#107) ([0b93b8e](https://github.com/connix-io/conclaude/commit/0b93b8ec52979e94550b5786b2fa99bdacd0a44a))
 
-- **preventRootAdditions now allows editing existing root files**: Refined semantics to distinguish between file creation (blocked) and modification (allowed). Users can now edit root-level configuration files like `Cargo.toml` and `package.json` while still preventing accidental new file creation at the repository root.
+### Bug Fixes
 
-### Breaking Changes
+- Implement preventAdditions enforcement in preToolUse hook (#100) ([9307ecb](https://github.com/connix-io/conclaude/commit/9307ecb7e72bf9e2b4444f1f4969327fd1ac76d4))
+- Read version from Cargo.toml in flake.nix (#101) ([96007b6](https://github.com/connix-io/conclaude/commit/96007b6b3d8e5a76fd809349d00da0fd9f229745))
+- Fix spectr specs ([22e0512](https://github.com/connix-io/conclaude/commit/22e05126761b3b0a4070fa44f7beedc40c2be778))
+- Fix conclaude spec validation on stop hook to use spectr not openspec ([39c3663](https://github.com/connix-io/conclaude/commit/39c36632493a0dce13fc5d21956b5a577202ba65))
+- Make matcher field optional in ClaudeHookMatcher (#108) ([19ae5d3](https://github.com/connix-io/conclaude/commit/19ae5d392c1552479965536940f5432d5bb5ea5e))
 
-- **Configuration consolidation**: The `rules` section has been removed and its fields consolidated into `preToolUse`. Users must migrate their configurations:
-  - `rules.preventRootAdditions` → `preToolUse.preventRootAdditions`
-  - `rules.uneditableFiles` → `preToolUse.uneditableFiles`
-  - `rules.toolUsageValidation` → `preToolUse.toolUsageValidation`
+### Refactoring
 
-### Migration Guide
+- Rename openspec directory to spectr (#92) ([16be778](https://github.com/connix-io/conclaude/commit/16be778ce8932fedecd40772da093c167b04baac))
 
-If you have an existing `.conclaude.yaml` with a `rules` section, update it as follows:
+### Miscellaneous Tasks
 
-**Before:**
-```yaml
-rules:
-  preventRootAdditions: true
-  uneditableFiles: ["Cargo.toml", "Cargo.lock"]
-  toolUsageValidation: []
-
-preToolUse:
-  preventAdditions: []
-  preventGeneratedFileEdits: true
-```
-
-**After:**
-```yaml
-preToolUse:
-  preventRootAdditions: true
-  uneditableFiles: ["Cargo.toml", "Cargo.lock"]
-  toolUsageValidation: []
-  preventAdditions: []
-  preventGeneratedFileEdits: true
-```
-
-Conclaude will now detect the deprecated `rules` section and display a helpful error message with migration instructions.
+- **release:** Update CHANGELOG.md for v0.2.1 ([ab0a736](https://github.com/connix-io/conclaude/commit/ab0a736af505f851f01f4af08b26b886e2b46e51))
+- Archive add-tool-use-id-field spec and update canonical specs (#91) ([246ef32](https://github.com/connix-io/conclaude/commit/246ef32ff35e2d338639f8796f63a08f93186994))
+- Archive add-subagent-start-hook change (#88) ([41f8c35](https://github.com/connix-io/conclaude/commit/41f8c355ead6306ec4f5d0248780e87ed9e74590))
+- Archive add-subagent-start-hook change and create subagent-hooks spec (#90) ([f4f93c2](https://github.com/connix-io/conclaude/commit/f4f93c247f812a472bb924d04f3d6a61eaad2f41))
 
 ## [0.2.1] - 2025-11-13
 
