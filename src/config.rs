@@ -21,6 +21,9 @@ pub struct StopCommand {
     #[serde(default, rename = "maxOutputLines")]
     #[schemars(range(min = 1, max = 10000))]
     pub max_output_lines: Option<u32>,
+    #[serde(default)]
+    #[schemars(range(min = 1, max = 3600))]
+    pub timeout: Option<u64>,
 }
 
 /// Configuration for individual subagent stop commands with optional messages
@@ -37,6 +40,9 @@ pub struct SubagentStopCommand {
     #[serde(default, rename = "maxOutputLines")]
     #[schemars(range(min = 1, max = 10000))]
     pub max_output_lines: Option<u32>,
+    #[serde(default)]
+    #[schemars(range(min = 1, max = 3600))]
+    pub timeout: Option<u64>,
 }
 
 /// Configuration for subagent stop hooks with pattern-based command execution
@@ -375,8 +381,8 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
                 .to_string(),
         );
         parts.push("  permissionRequest: default, allow, deny".to_string());
-        parts.push("  commands (stop): run, message, showStdout, showStderr, maxOutputLines".to_string());
-        parts.push("  commands (subagentStop): run, message, showStdout, showStderr, maxOutputLines".to_string());
+        parts.push("  commands (stop): run, message, showStdout, showStderr, maxOutputLines, timeout".to_string());
+        parts.push("  commands (subagentStop): run, message, showStdout, showStderr, maxOutputLines, timeout".to_string());
     } else if base_error.contains("invalid type") {
         parts.push(String::new());
         parts.push("Type mismatch detected. Common causes:".to_string());
@@ -467,6 +473,28 @@ fn validate_config_constraints(config: &ConclaudeConfig) -> Result<()> {
                 return Err(anyhow::anyhow!(error_msg));
             }
         }
+
+        // Validate timeout range (1-3600)
+        if let Some(timeout) = command.timeout {
+            if !(1..=3600).contains(&timeout) {
+                let error_msg = format!(
+                    "Range validation failed for stop.commands[{idx}].timeout\n\n\
+                     Error: Value {timeout} is out of valid range\n\n\
+                     ✅ Valid range: 1 to 3600 seconds (1 second to 1 hour)\n\n\
+                     Common causes:\n\
+                       • Value is too large (maximum is 3600 seconds / 1 hour)\n\
+                       • Value is too small (minimum is 1 second)\n\
+                       • Using a negative number\n\n\
+                     Example valid configurations:\n\
+                       timeout: 30       # 30 seconds\n\
+                       timeout: 300      # 5 minutes\n\
+                       timeout: 3600     # maximum allowed (1 hour)\n\n\
+                     For a valid configuration template, run:\n\
+                       conclaude init"
+                );
+                return Err(anyhow::anyhow!(error_msg));
+            }
+        }
     }
 
     // Validate rounds if specified
@@ -550,6 +578,28 @@ fn validate_config_constraints(config: &ConclaudeConfig) -> Result<()> {
                            maxOutputLines: 100      # default, good for most cases\n\
                            maxOutputLines: 1000     # for verbose output\n\
                            maxOutputLines: 10000    # maximum allowed\n\n\
+                         For a valid configuration template, run:\n\
+                           conclaude init"
+                    );
+                    return Err(anyhow::anyhow!(error_msg));
+                }
+            }
+
+            // Validate timeout range (1-3600)
+            if let Some(timeout) = command.timeout {
+                if !(1..=3600).contains(&timeout) {
+                    let error_msg = format!(
+                        "Range validation failed for subagentStop.commands[\"{pattern}\"][{idx}].timeout\n\n\
+                         Error: Value {timeout} is out of valid range\n\n\
+                         ✅ Valid range: 1 to 3600 seconds (1 second to 1 hour)\n\n\
+                         Common causes:\n\
+                           • Value is too large (maximum is 3600 seconds / 1 hour)\n\
+                           • Value is too small (minimum is 1 second)\n\
+                           • Using a negative number\n\n\
+                         Example valid configurations:\n\
+                           timeout: 30       # 30 seconds\n\
+                           timeout: 300      # 5 minutes\n\
+                           timeout: 3600     # maximum allowed (1 hour)\n\n\
                          For a valid configuration template, run:\n\
                            conclaude init"
                     );
@@ -789,7 +839,8 @@ cd /tmp && echo "test""#;
                 "message",
                 "showStdout",
                 "showStderr",
-                "maxOutputLines"
+                "maxOutputLines",
+                "timeout"
             ]
         );
     }
@@ -1326,5 +1377,151 @@ notifications:
             message: None,
         };
         assert!(detailed_without_msg.message().is_none());
+    }
+
+    #[test]
+    fn test_stop_command_timeout_parsing() {
+        let yaml = r#"
+stop:
+  commands:
+    - run: "sleep 10"
+      timeout: 30
+    - run: "echo hello"
+preToolUse:
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  preventRootAdditions: true
+  uneditableFiles: []
+  toolUsageValidation: []
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+        let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
+        assert!(result.is_ok(), "Config with timeout should parse: {:?}", result.err());
+
+        let config = result.unwrap();
+        assert_eq!(config.stop.commands.len(), 2);
+        assert_eq!(config.stop.commands[0].timeout, Some(30));
+        assert_eq!(config.stop.commands[1].timeout, None);
+    }
+
+    #[test]
+    fn test_stop_command_timeout_invalid_too_large() {
+        let yaml = r#"
+stop:
+  commands:
+    - run: "echo test"
+      timeout: 3601
+preToolUse:
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  preventRootAdditions: true
+  uneditableFiles: []
+  toolUsageValidation: []
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+        let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
+        assert!(result.is_err(), "Config with timeout > 3600 should fail validation");
+        let error = result.err().unwrap().to_string();
+        assert!(error.contains("timeout") || error.contains("3600"), "Error should mention timeout issue: {}", error);
+    }
+
+    #[test]
+    fn test_stop_command_timeout_invalid_zero() {
+        let yaml = r#"
+stop:
+  commands:
+    - run: "echo test"
+      timeout: 0
+preToolUse:
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  preventRootAdditions: true
+  uneditableFiles: []
+  toolUsageValidation: []
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+        let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
+        assert!(result.is_err(), "Config with timeout = 0 should fail validation");
+    }
+
+    #[test]
+    fn test_subagent_stop_command_timeout_parsing() {
+        let yaml = r#"
+subagentStop:
+  commands:
+    "*":
+      - run: "npm run lint"
+        timeout: 60
+stop:
+  commands: []
+preToolUse:
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  preventRootAdditions: true
+  uneditableFiles: []
+  toolUsageValidation: []
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+        let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
+        assert!(result.is_ok(), "Config with subagent timeout should parse: {:?}", result.err());
+
+        let config = result.unwrap();
+        let cmds = config.subagent_stop.commands.get("*").unwrap();
+        assert_eq!(cmds.len(), 1);
+        assert_eq!(cmds[0].timeout, Some(60));
+    }
+
+    #[test]
+    fn test_timeout_backward_compatibility() {
+        let yaml = r#"
+stop:
+  commands:
+    - run: "echo hello"
+      message: "Testing"
+      showStdout: true
+preToolUse:
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  preventRootAdditions: true
+  uneditableFiles: []
+  toolUsageValidation: []
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+        let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
+        assert!(result.is_ok(), "Config without timeout should still parse: {:?}", result.err());
+
+        let config = result.unwrap();
+        assert_eq!(config.stop.commands[0].timeout, None);
+    }
+
+    #[test]
+    fn test_stop_command_field_list_includes_timeout() {
+        let fields = StopCommand::field_names();
+        assert!(fields.contains(&"timeout"), "StopCommand field_names should include 'timeout'");
     }
 }
