@@ -1,5 +1,6 @@
 // Testing GitHub Actions workflow fixes
 mod config;
+mod database;
 mod gitignore;
 mod hooks;
 mod schema;
@@ -12,6 +13,7 @@ use hooks::{
     handle_pre_compact, handle_pre_tool_use, handle_session_end, handle_session_start,
     handle_stop, handle_subagent_start, handle_subagent_stop, handle_user_prompt_submit,
 };
+use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
 use std::fs;
 use std::path::PathBuf;
 
@@ -99,6 +101,32 @@ enum Commands {
         #[arg(long)]
         config_path: Option<String>,
     },
+    /// Database management commands
+    Db {
+        #[command(subcommand)]
+        command: DbCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum DbCommands {
+    /// Show database information
+    Status,
+    /// Delete old records
+    Cleanup {
+        /// Delete records older than specified days
+        #[arg(long, required = true)]
+        older_than: u64,
+    },
+    /// Query hook executions
+    Query {
+        /// Filter by session ID
+        #[arg(long)]
+        session: Option<String>,
+        /// Limit number of results
+        #[arg(long, default_value = "100")]
+        limit: u64,
+    },
 }
 
 #[tokio::main]
@@ -125,6 +153,13 @@ async fn main() -> Result<()> {
         Commands::PreCompact => handle_hook_result(handle_pre_compact).await,
         Commands::Visualize { rule, show_matches } => handle_visualize(rule, show_matches).await,
         Commands::Validate { config_path } => handle_validate(config_path).await,
+        Commands::Db { command } => match command {
+            DbCommands::Status => handle_db_status().await,
+            DbCommands::Cleanup { older_than } => handle_db_cleanup(older_than).await,
+            DbCommands::Query { session, limit } => {
+                handle_db_query(session.as_deref(), limit).await
+            }
+        },
     }
 }
 
@@ -482,4 +517,167 @@ async fn handle_validate(config_path: Option<String>) -> Result<()> {
             std::process::exit(1);
         }
     }
+}
+
+/// Handles database status command to show database information.
+///
+/// # Errors
+///
+/// Returns an error if database connection fails or queries fail.
+async fn handle_db_status() -> Result<()> {
+    use database::{get_connection, get_database_path};
+    use database::entities::hook_execution;
+
+    println!("📊 Database Status");
+    println!();
+
+    // Show database path
+    let db_path = get_database_path()?;
+    println!("📁 Database file: {}", db_path.display());
+
+    // Show file size if it exists
+    if db_path.exists() {
+        let metadata = fs::metadata(&db_path)?;
+        let size_bytes = metadata.len();
+        let size_kb = size_bytes as f64 / 1024.0;
+        let size_mb = size_kb / 1024.0;
+
+        if size_mb >= 1.0 {
+            println!("💾 File size: {:.2} MB", size_mb);
+        } else {
+            println!("💾 File size: {:.2} KB", size_kb);
+        }
+    } else {
+        println!("💾 File size: Database does not exist yet");
+    }
+
+    // Get database connection (will create if doesn't exist)
+    let db = get_connection().await?;
+
+    // Count total records
+    let total_count = hook_execution::Entity::find().count(db).await?;
+    println!("📝 Total records: {}", total_count);
+
+    // Count records from last 24 hours
+    let now = chrono::Utc::now();
+    let twenty_four_hours_ago = now - chrono::Duration::hours(24);
+
+    let recent_count = hook_execution::Entity::find()
+        .filter(hook_execution::Column::CreatedAt.gte(twenty_four_hours_ago))
+        .count(db)
+        .await?;
+    println!("🕐 Records (last 24h): {}", recent_count);
+
+    Ok(())
+}
+
+/// Handles database cleanup command to delete old records.
+///
+/// # Errors
+///
+/// Returns an error if database connection fails or deletion fails.
+async fn handle_db_cleanup(older_than_days: u64) -> Result<()> {
+    use database::get_connection;
+    use database::entities::hook_execution;
+    use sea_orm::EntityTrait;
+
+    println!("🧹 Database Cleanup");
+    println!();
+
+    let db = get_connection().await?;
+
+    // Calculate cutoff date
+    let now = chrono::Utc::now();
+    let cutoff_date = now - chrono::Duration::days(older_than_days as i64);
+
+    println!("Deleting records older than {} days (before {})...", older_than_days, cutoff_date);
+
+    // Count records to be deleted
+    let count_to_delete = hook_execution::Entity::find()
+        .filter(hook_execution::Column::CreatedAt.lt(cutoff_date))
+        .count(db)
+        .await?;
+
+    if count_to_delete == 0 {
+        println!("✅ No records found to delete.");
+        return Ok(());
+    }
+
+    println!("⚠️  Will delete {} record(s)", count_to_delete);
+
+    // Delete the records
+    let result = hook_execution::Entity::delete_many()
+        .filter(hook_execution::Column::CreatedAt.lt(cutoff_date))
+        .exec(db)
+        .await?;
+
+    println!("✅ Deleted {} record(s)", result.rows_affected);
+
+    Ok(())
+}
+
+/// Handles database query command to display hook executions.
+///
+/// # Errors
+///
+/// Returns an error if database connection fails or query fails.
+async fn handle_db_query(session_id: Option<&str>, limit: u64) -> Result<()> {
+    use database::get_connection;
+    use database::entities::hook_execution;
+
+    println!("🔍 Hook Executions");
+    if let Some(sid) = session_id {
+        println!("   Filtered by session: {}", sid);
+    }
+    println!("   Limit: {}", limit);
+    println!();
+
+    let db = get_connection().await?;
+
+    // Build query
+    let mut query = hook_execution::Entity::find();
+
+    // Apply session filter if provided
+    if let Some(sid) = session_id {
+        query = query.filter(hook_execution::Column::SessionId.eq(sid));
+    }
+
+    // Apply ordering and limit
+    let results = query
+        .order_by_desc(hook_execution::Column::CreatedAt)
+        .limit(limit)
+        .all(db)
+        .await?;
+
+    if results.is_empty() {
+        println!("No records found.");
+        return Ok(());
+    }
+
+    // Display results
+    println!("{:<6} {:<20} {:<18} {:<12} {:<10} {:<20}",
+             "ID", "Session", "Hook Type", "Agent", "Status", "Created At");
+    println!("{}", "-".repeat(100));
+
+    for record in &results {
+        let created_str = record.created_at.format("%Y-%m-%d %H:%M:%S").to_string();
+        let session_short = if record.session_id.len() > 20 {
+            format!("{}...", &record.session_id[..17])
+        } else {
+            record.session_id.clone()
+        };
+
+        println!("{:<6} {:<20} {:<18} {:<12} {:<10} {:<20}",
+                 record.id,
+                 session_short,
+                 record.hook_type,
+                 record.agent_id,
+                 record.status,
+                 created_str);
+    }
+
+    println!();
+    println!("Showing {} record(s)", results.len());
+
+    Ok(())
 }

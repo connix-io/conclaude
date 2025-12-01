@@ -1,4 +1,5 @@
 use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig, SubagentStopConfig};
+use crate::database::{get_connection, HookExecutionActiveModel};
 use crate::gitignore::{find_git_root, is_path_git_ignored};
 use crate::types::{
     validate_base_payload, validate_permission_request_payload, validate_subagent_start_payload,
@@ -10,6 +11,7 @@ use crate::types::{
 use anyhow::{Context, Result};
 use glob::Pattern;
 use notify_rust::{Notification, Urgency};
+use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -77,6 +79,58 @@ async fn get_config() -> Result<&'static (ConclaudeConfig, std::path::PathBuf)> 
     } else {
         let config = load_conclaude_config(None).await?;
         Ok(CACHED_CONFIG.get_or_init(|| config))
+    }
+}
+
+/// Parameters for logging hook execution to the database
+struct HookExecutionLog {
+    session_id: String,
+    hook_type: String,
+    agent_id: String,
+    agent_transcript_path: String,
+    cwd: String,
+    status: String,
+    duration_ms: Option<i64>,
+    error_message: Option<String>,
+    payload_json: Option<String>,
+}
+
+/// Log hook execution to the database
+///
+/// This function creates a database record for a hook execution. It handles errors
+/// gracefully by logging warnings without failing the hook execution.
+///
+/// # Arguments
+///
+/// * `log_data` - The hook execution log data to record
+async fn log_hook_execution(log_data: HookExecutionLog) {
+    // Get database connection, handling errors gracefully
+    let db = match get_connection().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            eprintln!("Warning: Failed to get database connection for logging: {}", e);
+            return;
+        }
+    };
+
+    // Create the active model for insertion
+    let hook_execution = HookExecutionActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        session_id: Set(log_data.session_id),
+        hook_type: Set(log_data.hook_type),
+        agent_id: Set(log_data.agent_id),
+        agent_transcript_path: Set(log_data.agent_transcript_path),
+        cwd: Set(log_data.cwd),
+        status: Set(log_data.status),
+        duration_ms: Set(log_data.duration_ms),
+        error_message: Set(log_data.error_message),
+        payload_json: Set(log_data.payload_json),
+        created_at: Set(chrono::Utc::now()),
+    };
+
+    // Insert into database, handling errors gracefully
+    if let Err(e) = hook_execution.insert(db).await {
+        eprintln!("Warning: Failed to log hook execution to database: {}", e);
     }
 }
 
@@ -998,8 +1052,8 @@ pub async fn handle_stop() -> Result<HookResult> {
 /// # Errors
 ///
 /// Returns an error if payload validation fails or configuration loading fails.
-#[allow(clippy::unused_async)]
 pub async fn handle_subagent_start() -> Result<HookResult> {
+    let start_time = std::time::Instant::now();
     let payload: SubagentStartPayload = read_payload_from_stdin()?;
 
     // Validate the payload including agent_id, subagent_type, and agent_transcript_path fields
@@ -1025,6 +1079,31 @@ pub async fn handle_subagent_start() -> Result<HookResult> {
         "success",
         Some(&format!("Subagent '{}' started", payload.agent_id)),
     );
+
+    // Serialize payload to JSON for logging
+    let payload_json = match serde_json::to_string(&payload) {
+        Ok(json) => Some(json),
+        Err(e) => {
+            eprintln!("Warning: Failed to serialize payload to JSON: {}", e);
+            None
+        }
+    };
+
+    // Calculate duration and log to database
+    let duration_ms = start_time.elapsed().as_millis() as i64;
+    log_hook_execution(HookExecutionLog {
+        session_id: payload.base.session_id.clone(),
+        hook_type: "SubagentStart".to_string(),
+        agent_id: payload.agent_id.clone(),
+        agent_transcript_path: payload.agent_transcript_path.clone(),
+        cwd: payload.base.cwd.clone(),
+        status: "success".to_string(),
+        duration_ms: Some(duration_ms),
+        error_message: None,
+        payload_json,
+    })
+    .await;
+
     Ok(HookResult::success())
 }
 
@@ -1313,6 +1392,7 @@ async fn execute_subagent_stop_commands(
 ///
 /// Returns an error if payload validation fails or configuration loading fails.
 pub async fn handle_subagent_stop() -> Result<HookResult> {
+    let start_time = std::time::Instant::now();
     let payload: SubagentStopPayload = read_payload_from_stdin()?;
 
     // Validate the payload including agent_id and agent_transcript_path fields
@@ -1368,6 +1448,31 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
         "success",
         Some(&format!("Subagent '{}' completed", payload.agent_id)),
     );
+
+    // Serialize payload to JSON for logging
+    let payload_json = match serde_json::to_string(&payload) {
+        Ok(json) => Some(json),
+        Err(e) => {
+            eprintln!("Warning: Failed to serialize payload to JSON: {}", e);
+            None
+        }
+    };
+
+    // Calculate duration and log to database
+    let duration_ms = start_time.elapsed().as_millis() as i64;
+    log_hook_execution(HookExecutionLog {
+        session_id: payload.base.session_id.clone(),
+        hook_type: "SubagentStop".to_string(),
+        agent_id: payload.agent_id.clone(),
+        agent_transcript_path: payload.agent_transcript_path.clone(),
+        cwd: payload.base.cwd.clone(),
+        status: "success".to_string(),
+        duration_ms: Some(duration_ms),
+        error_message: None,
+        payload_json,
+    })
+    .await;
+
     Ok(HookResult::success())
 }
 

@@ -3,6 +3,26 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "definitions": {
+    "DatabaseConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for database logging",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "description": "Whether database logging is enabled",
+          "type": "boolean"
+        },
+        "path": {
+          "default": null,
+          "description": "Optional custom path to the database file (overrides platform defaults)",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "NotificationsConfig": {
       "additionalProperties": false,
       "description": "Configuration for system notifications",
@@ -332,6 +352,17 @@
   },
   "description": "Configuration schema for Conclaude - Claude Code hook handler",
   "properties": {
+    "database": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/DatabaseConfig"
+        }
+      ],
+      "default": {
+        "enabled": true,
+        "path": null
+      }
+    },
     "notifications": {
       "allOf": [
         {

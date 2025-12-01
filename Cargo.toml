@@ -3,7 +3,7 @@ members = [".", "conclaude-field-derive"]
 
 [package]
 name = "conclaude"
-version = "0.2.1"
+version = "0.2.3"
 edition = "2021"
 description = "Claude Code hook handler CLI tool that processes hook events and manages lifecycle hooks for tool usage, session management, and transcript processing"
 license = "MIT"
@@ -44,6 +44,8 @@ schemars = { version = "0.8", features = ["derive"] }
 regex = "1.10"
 walkdir = "2.4"
 notify-rust = "4.10"
+sea-orm = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
+sea-orm-migration = "1.1"
 conclaude-field-derive = { path = "conclaude-field-derive" }
 
 [dev-dependencies]

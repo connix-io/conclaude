@@ -126,6 +126,32 @@ fn default_true() -> bool {
     true
 }
 
+/// Default function for database enabled field
+fn default_database_enabled() -> bool {
+    true
+}
+
+/// Configuration for database logging
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, FieldList)]
+#[serde(deny_unknown_fields)]
+pub struct DatabaseConfig {
+    /// Whether database logging is enabled
+    #[serde(default = "default_database_enabled")]
+    pub enabled: bool,
+    /// Optional custom path to the database file (overrides platform defaults)
+    #[serde(default)]
+    pub path: Option<String>,
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            path: None,
+        }
+    }
+}
+
 /// Configuration for pre tool use hooks
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, FieldList)]
 #[serde(deny_unknown_fields)]
@@ -232,6 +258,8 @@ pub struct ConclaudeConfig {
     pub notifications: NotificationsConfig,
     #[serde(default, rename = "permissionRequest")]
     pub permission_request: Option<PermissionRequestConfig>,
+    #[serde(default)]
+    pub database: DatabaseConfig,
 }
 
 /// Extract the field name from an unknown field error message
@@ -254,6 +282,7 @@ fn suggest_similar_fields(unknown_field: &str, section: &str) -> Vec<String> {
         ("preToolUse", PreToolUseConfig::field_names()),
         ("notifications", NotificationsConfig::field_names()),
         ("permissionRequest", PermissionRequestConfig::field_names()),
+        ("database", DatabaseConfig::field_names()),
         ("commands", StopCommand::field_names()),
         ("subagentStopCommands", SubagentStopCommand::field_names()),
     ];
@@ -375,6 +404,7 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
                 .to_string(),
         );
         parts.push("  permissionRequest: default, allow, deny".to_string());
+        parts.push("  database: enabled, path".to_string());
         parts.push("  commands (stop): run, message, showStdout, showStderr, maxOutputLines".to_string());
         parts.push("  commands (subagentStop): run, message, showStdout, showStderr, maxOutputLines".to_string());
     } else if base_error.contains("invalid type") {
@@ -511,6 +541,56 @@ fn validate_config_constraints(config: &ConclaudeConfig) -> Result<()> {
                 permission_request.default
             );
             return Err(anyhow::anyhow!(error_msg));
+        }
+    }
+
+    // Validate database configuration
+    if let Some(ref path) = config.database.path {
+        if path.is_empty() {
+            let error_msg = "Validation failed for database.path\n\n\
+                 Error: Path cannot be empty\n\n\
+                 Common causes:\n\
+                   • Using an empty string for the path\n\
+                   • Remove the path field to use platform defaults\n\n\
+                 Example valid configurations:\n\
+                   database:\n\
+                     enabled: true\n\
+                     path: \"/custom/path/conclaude.db\"    # custom path\n\
+                   \n\
+                   database:\n\
+                     enabled: true                          # uses platform defaults\n\n\
+                 For a valid configuration template, run:\n\
+                   conclaude init"
+                .to_string();
+            return Err(anyhow::anyhow!(error_msg));
+        }
+
+        // Check if parent directory exists (if path is absolute)
+        let path_buf = PathBuf::from(path);
+        if path_buf.is_absolute() {
+            if let Some(parent) = path_buf.parent() {
+                if !parent.exists() {
+                    let error_msg = format!(
+                        "Validation failed for database.path\n\n\
+                         Error: Parent directory does not exist: {}\n\n\
+                         Common causes:\n\
+                           • Directory path does not exist\n\
+                           • Typo in directory path\n\
+                           • Need to create the directory first\n\n\
+                         Example valid configurations:\n\
+                           database:\n\
+                             enabled: true\n\
+                             path: \"/custom/path/conclaude.db\"    # ensure /custom/path exists\n\
+                           \n\
+                           database:\n\
+                             enabled: true                          # uses platform defaults\n\n\
+                         For a valid configuration template, run:\n\
+                           conclaude init",
+                        parent.display()
+                    );
+                    return Err(anyhow::anyhow!(error_msg));
+                }
+            }
         }
     }
 
@@ -1294,6 +1374,213 @@ notifications:
             .map(|r| r.pattern())
             .collect();
         assert_eq!(patterns, vec!["*.lock", ".env", "package-lock.json"]);
+    }
+
+    #[test]
+    fn test_database_config_defaults() {
+        // Test that database config has correct defaults
+        let config = DatabaseConfig::default();
+        assert!(config.enabled, "Database should be enabled by default");
+        assert!(config.path.is_none(), "Path should be None by default");
+    }
+
+    #[test]
+    fn test_database_config_with_custom_path() {
+        // Test that database config can be parsed with custom path
+        let yaml = r#"
+database:
+  enabled: true
+  path: "/tmp/custom.db"
+
+stop:
+  commands: []
+  infinite: false
+
+preToolUse:
+  preventRootAdditions: true
+  uneditableFiles: []
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  toolUsageValidation: []
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+
+        let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
+        assert!(
+            result.is_ok(),
+            "Database config with custom path should parse: {:?}",
+            result.err()
+        );
+
+        let config = result.unwrap();
+        assert!(config.database.enabled);
+        assert_eq!(config.database.path, Some("/tmp/custom.db".to_string()));
+    }
+
+    #[test]
+    fn test_database_config_disabled() {
+        // Test that database can be disabled
+        let yaml = r#"
+database:
+  enabled: false
+
+stop:
+  commands: []
+  infinite: false
+
+preToolUse:
+  preventRootAdditions: true
+  uneditableFiles: []
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  toolUsageValidation: []
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+
+        let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
+        assert!(
+            result.is_ok(),
+            "Database config disabled should parse: {:?}",
+            result.err()
+        );
+
+        let config = result.unwrap();
+        assert!(!config.database.enabled);
+        assert!(config.database.path.is_none());
+    }
+
+    #[test]
+    fn test_database_config_empty_path_fails() {
+        // Test that empty path string fails validation
+        let yaml = r#"
+database:
+  enabled: true
+  path: ""
+
+stop:
+  commands: []
+  infinite: false
+
+preToolUse:
+  preventRootAdditions: true
+  uneditableFiles: []
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  toolUsageValidation: []
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+
+        let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
+        assert!(
+            result.is_err(),
+            "Database config with empty path should fail validation"
+        );
+        let error = result.err().unwrap().to_string();
+        assert!(
+            error.contains("Path cannot be empty"),
+            "Error should mention empty path"
+        );
+    }
+
+    #[test]
+    fn test_database_config_nonexistent_parent_fails() {
+        // Test that path with non-existent parent directory fails validation
+        let yaml = r#"
+database:
+  enabled: true
+  path: "/nonexistent/directory/that/does/not/exist/test.db"
+
+stop:
+  commands: []
+  infinite: false
+
+preToolUse:
+  preventRootAdditions: true
+  uneditableFiles: []
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  toolUsageValidation: []
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+
+        let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
+        assert!(
+            result.is_err(),
+            "Database config with non-existent parent should fail validation"
+        );
+        let error = result.err().unwrap().to_string();
+        assert!(
+            error.contains("Parent directory does not exist"),
+            "Error should mention parent directory"
+        );
+    }
+
+    #[test]
+    fn test_database_config_optional() {
+        // Test that database config is optional and uses defaults
+        let yaml = r#"
+stop:
+  commands: []
+  infinite: false
+
+preToolUse:
+  preventRootAdditions: true
+  uneditableFiles: []
+  preventAdditions: []
+  preventGeneratedFileEdits: true
+  toolUsageValidation: []
+
+notifications:
+  enabled: false
+  hooks: []
+  showErrors: false
+  showSuccess: false
+  showSystemEvents: true
+"#;
+
+        let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
+        assert!(
+            result.is_ok(),
+            "Config without database section should parse: {:?}",
+            result.err()
+        );
+
+        let config = result.unwrap();
+        assert!(config.database.enabled, "Should use default enabled=true");
+        assert!(config.database.path.is_none(), "Should use default path=None");
+    }
+
+    #[test]
+    fn test_database_field_list() {
+        // Test that DatabaseConfig field names are correct
+        assert_eq!(
+            DatabaseConfig::field_names(),
+            vec!["enabled", "path"]
+        );
     }
 
     #[test]
