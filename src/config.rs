@@ -49,6 +49,34 @@ pub struct SubagentStopConfig {
     pub commands: std::collections::HashMap<String, Vec<SubagentStopCommand>>,
 }
 
+/// Configuration for a single message in the prompt prefix blocking queue
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, FieldList)]
+#[serde(deny_unknown_fields)]
+pub struct PromptPrefixBlockingMessage {
+    /// The message text to send to Claude
+    pub text: String,
+    /// Number of times to send this message before advancing to the next (default: 1)
+    #[serde(default = "default_times")]
+    pub times: u32,
+}
+
+/// Default function for times field (returns 1)
+fn default_times() -> u32 {
+    1
+}
+
+/// Configuration for prompt-prefix-based stop blocking
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, FieldList)]
+#[serde(deny_unknown_fields)]
+pub struct PromptPrefixBlockingConfig {
+    /// Glob patterns to match against the first 100 characters of the initial prompt (case-sensitive)
+    #[serde(default)]
+    pub prefixes: Vec<String>,
+    /// Messages to send when blocking, processed in order
+    #[serde(default)]
+    pub messages: Vec<PromptPrefixBlockingMessage>,
+}
+
 /// Configuration interface for stop hook commands
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, FieldList)]
 #[serde(deny_unknown_fields)]
@@ -61,6 +89,9 @@ pub struct StopConfig {
     pub infinite_message: Option<String>,
     #[serde(default)]
     pub rounds: Option<u32>,
+    /// Prompt-prefix-based stop blocking configuration
+    #[serde(default, rename = "promptPrefixBlocking")]
+    pub prompt_prefix_blocking: Option<PromptPrefixBlockingConfig>,
 }
 
 /// Tool usage validation rule
@@ -285,6 +316,8 @@ fn suggest_similar_fields(unknown_field: &str, section: &str) -> Vec<String> {
         ("database", DatabaseConfig::field_names()),
         ("commands", StopCommand::field_names()),
         ("subagentStopCommands", SubagentStopCommand::field_names()),
+        ("promptPrefixBlocking", PromptPrefixBlockingConfig::field_names()),
+        ("promptPrefixBlockingMessage", PromptPrefixBlockingMessage::field_names()),
     ];
 
     // Find the section's valid fields
@@ -393,7 +426,7 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
         parts.push("  • Using camelCase vs snake_case incorrectly (use camelCase)".to_string());
         parts.push(String::new());
         parts.push("Valid field names by section:".to_string());
-        parts.push("  stop: commands, infinite, infiniteMessage, rounds".to_string());
+        parts.push("  stop: commands, infinite, infiniteMessage, rounds, promptPrefixBlocking".to_string());
         parts.push("  subagentStop: commands".to_string());
         parts.push(
             "  preToolUse: preventAdditions, preventGeneratedFileEdits, generatedFileMessage, preventRootAdditions, uneditableFiles, preventUpdateGitIgnored, toolUsageValidation"
@@ -407,6 +440,8 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
         parts.push("  database: enabled, path".to_string());
         parts.push("  commands (stop): run, message, showStdout, showStderr, maxOutputLines".to_string());
         parts.push("  commands (subagentStop): run, message, showStdout, showStderr, maxOutputLines".to_string());
+        parts.push("  promptPrefixBlocking: prefixes, messages".to_string());
+        parts.push("  promptPrefixBlocking.messages: text, times".to_string());
     } else if base_error.contains("invalid type") {
         parts.push(String::new());
         parts.push("Type mismatch detected. Common causes:".to_string());
@@ -835,7 +870,7 @@ cd /tmp && echo "test""#;
         // Verify that the generated field_names() methods return the correct field names
         assert_eq!(
             StopConfig::field_names(),
-            vec!["commands", "infinite", "infiniteMessage", "rounds"]
+            vec!["commands", "infinite", "infiniteMessage", "rounds", "promptPrefixBlocking"]
         );
 
         assert_eq!(
@@ -871,6 +906,17 @@ cd /tmp && echo "test""#;
                 "showStderr",
                 "maxOutputLines"
             ]
+        );
+
+        // New prompt prefix blocking config types
+        assert_eq!(
+            PromptPrefixBlockingConfig::field_names(),
+            vec!["prefixes", "messages"]
+        );
+
+        assert_eq!(
+            PromptPrefixBlockingMessage::field_names(),
+            vec!["text", "times"]
         );
     }
 

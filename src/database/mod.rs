@@ -11,3 +11,5 @@ pub mod migrations;
 pub use connection::{get_connection, get_database_path};
 #[allow(unused_imports)]
 pub use entities::{HookExecution, HookExecutionActiveModel};
+#[allow(unused_imports)]
+pub use entities::{PromptPrefixSession, PromptPrefixSessionActiveModel};

@@ -970,6 +970,7 @@ config.stop.run → extract_bash_commands() → tokio::process::Command → sequ
 - **Command Validation**: Run custom validation commands (tests, linting, builds)
 - **Infinite Mode**: Continuous monitoring for long development sessions
 - **Rounds Mode**: Run validation for a specific number of iterations
+- **Prompt Prefix Blocking**: Signal extended work sessions via keywords in your prompt (e.g., "ULTRATHINK")
 - **Grep Rules**: Content-based validation using pattern matching
 - **Tool Usage Validation**: Control which tools can operate on which files
 
@@ -1035,7 +1036,21 @@ stop:
   
   # Rounds mode - run for specific iterations
   rounds: 3
-  
+
+  # Prompt-prefix-based stop blocking (requires database.enabled: true)
+  # Blocks Stop hooks based on patterns in the initial prompt (first 100 chars)
+  promptPrefixBlocking:
+    prefixes:
+      - "ULTRATHINK*"      # Matches prompts starting with "ULTRATHINK"
+      - "*DEEP_WORK*"      # Matches prompts containing "DEEP_WORK" anywhere
+    messages:
+      - text: "Keep working. Focus on quality and completeness."
+        times: 3           # Send this message 3 times before advancing
+      - text: "Continue with the implementation."
+        times: 2
+      - text: "Final push - ensure tests pass and code is clean."
+                           # times defaults to 1 if not specified
+
   # Content validation rules
   grepRules:
     - filePattern: "**/*.rs"
@@ -1196,6 +1211,67 @@ preToolUse:
     - "examples/"
 
 ```
+
+### Prompt Prefix Blocking
+
+Prompt prefix blocking allows you to signal extended work sessions by including keywords in your initial prompt. When Claude tries to stop, conclaude intercepts it and sends a configurable message queue instead, keeping Claude focused on the task.
+
+**How it works:**
+1. On your first prompt submission, conclaude captures the first 100 characters
+2. When Claude tries to stop, conclaude checks if any prefix patterns match
+3. If matched, the current message from the queue is sent to keep Claude working
+4. Each message can be sent multiple times before advancing to the next
+5. When all messages are exhausted, Claude is allowed to stop normally
+
+**Configuration:**
+
+```yaml
+stop:
+  promptPrefixBlocking:
+    # Glob patterns to match (case-sensitive)
+    prefixes:
+      - "ULTRATHINK*"        # Matches "ULTRATHINK help me..."
+      - "*DEEP_WORK*"        # Matches "Start DEEP_WORK on..."
+      - "FOCUS_MODE*"        # Matches "FOCUS_MODE: implement..."
+
+    # Message queue (processed in order)
+    messages:
+      - text: "Keep working. Focus on quality and thoroughness."
+        times: 3             # Send this 3 times before advancing
+      - text: "Continue implementation. Document your decisions."
+        times: 2
+      - text: "Final push - ensure tests pass and code is clean."
+        # times defaults to 1
+
+# Required: Enable database for session state persistence
+database:
+  enabled: true
+```
+
+**Usage Example:**
+
+Start your session with a keyword prefix:
+```
+You: "ULTRATHINK help me refactor the authentication module"
+```
+
+Claude works, then tries to stop. Instead of stopping, it receives:
+```
+"Keep working. Focus on quality and thoroughness."
+```
+...and continues working. This message is sent 3 times total before advancing to the next message.
+
+**Pattern Syntax:**
+- `ULTRATHINK*` - Matches prompts starting with "ULTRATHINK"
+- `*DEEP_WORK*` - Matches "DEEP_WORK" anywhere in first 100 chars
+- `MODE?` - `?` matches exactly one character
+- `[ABC]` - Character class matches A, B, or C
+
+**Important Notes:**
+- Requires `database.enabled: true` for session state persistence
+- Pattern matching is case-sensitive
+- Only the first 100 characters of the initial prompt are stored
+- The feature is silently disabled if database is not enabled
 
 ### Environment Variables
 

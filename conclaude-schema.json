@@ -142,6 +142,50 @@
       },
       "type": "object"
     },
+    "PromptPrefixBlockingConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for prompt-prefix-based stop blocking",
+      "properties": {
+        "messages": {
+          "default": [],
+          "description": "Messages to send when blocking, processed in order",
+          "items": {
+            "$ref": "#/definitions/PromptPrefixBlockingMessage"
+          },
+          "type": "array"
+        },
+        "prefixes": {
+          "default": [],
+          "description": "Glob patterns to match against the first 100 characters of the initial prompt (case-sensitive)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "PromptPrefixBlockingMessage": {
+      "additionalProperties": false,
+      "description": "Configuration for a single message in the prompt prefix blocking queue",
+      "properties": {
+        "text": {
+          "description": "The message text to send to Claude",
+          "type": "string"
+        },
+        "times": {
+          "default": 1,
+          "description": "Number of times to send this message before advancing to the next (default: 1)",
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    },
     "StopCommand": {
       "additionalProperties": false,
       "description": "Configuration for individual stop commands with optional messages",
@@ -207,6 +251,18 @@
             "string",
             "null"
           ]
+        },
+        "promptPrefixBlocking": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PromptPrefixBlockingConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Prompt-prefix-based stop blocking configuration"
         },
         "rounds": {
           "default": null,
@@ -414,6 +470,7 @@
         "commands": [],
         "infinite": false,
         "infiniteMessage": null,
+        "promptPrefixBlocking": null,
         "rounds": null
       }
     },

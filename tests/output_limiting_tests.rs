@@ -527,6 +527,7 @@ fn test_stop_config_round_trip() {
         infinite: false,
         infinite_message: None,
         rounds: None,
+        prompt_prefix_blocking: None,
     };
 
     let yaml = serde_yaml::to_string(&original).unwrap();

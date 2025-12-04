@@ -36,6 +36,37 @@ stop:
   rounds: null
   # Example: rounds: 3
 
+  # Prompt-prefix-based stop blocking configuration
+  # When configured, allows blocking the Stop hook based on patterns matching
+  # the first 100 characters of the initial prompt in a session.
+  # This is useful for signaling extended work sessions via keywords like "ULTRATHINK".
+  #
+  # promptPrefixBlocking:
+  #   # Glob patterns to match against the first 100 characters of the initial prompt
+  #   # Matching is case-sensitive and uses glob syntax
+  #   prefixes:
+  #     - "ULTRATHINK*"           # Matches "ULTRATHINK", "ULTRATHINK help me", etc.
+  #     - "*DEEP_WORK*"           # Matches anywhere in first 100 chars
+  #
+  #   # Messages to send when blocking the Stop hook
+  #   # Each message can specify how many times it should be sent before advancing
+  #   messages:
+  #     - text: "Keep working on the task. Focus on quality and completeness."
+  #       times: 3                # Send this message 3 times before moving to next
+  #     - text: "Continue with the implementation. Document your decisions."
+  #       times: 2                # Send this message 2 times
+  #     - text: "Final push - ensure tests pass and code is clean."
+  #                               # times defaults to 1 if not specified
+  #
+  # How it works:
+  # 1. On UserPromptSubmit, the first 100 chars of the prompt are stored in the database
+  # 2. On Stop hook, if prefix patterns match, the current message is returned to block
+  # 3. Each time Stop is blocked, times_remaining decrements for the current message
+  # 4. When times_remaining hits 0, queue_position advances to the next message
+  # 5. When all messages are exhausted, the Stop hook proceeds normally
+  #
+  # Note: Requires database.enabled: true for session state persistence
+
 # Subagent stop hook configuration - runs when subagents are about to stop
 # This hook allows configuring different commands for different subagent names
 # using pattern matching. Commands run when a subagent finishes its work.

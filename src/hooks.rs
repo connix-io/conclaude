@@ -1,5 +1,5 @@
 use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig, SubagentStopConfig};
-use crate::database::{get_connection, HookExecutionActiveModel};
+use crate::database::{get_connection, HookExecutionActiveModel, PromptPrefixSession, PromptPrefixSessionActiveModel};
 use crate::gitignore::{find_git_root, is_path_git_ignored};
 use crate::types::{
     validate_base_payload, validate_permission_request_payload, validate_subagent_start_payload,
@@ -11,7 +11,7 @@ use crate::types::{
 use anyhow::{Context, Result};
 use glob::Pattern;
 use notify_rust::{Notification, Urgency};
-use sea_orm::{ActiveModelTrait, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -701,7 +701,6 @@ pub async fn handle_notification() -> Result<HookResult> {
 /// # Errors
 ///
 /// Returns an error if payload validation fails or configuration loading fails.
-#[allow(clippy::unused_async)]
 pub async fn handle_user_prompt_submit() -> Result<HookResult> {
     let payload: UserPromptSubmitPayload = read_payload_from_stdin()?;
 
@@ -716,9 +715,193 @@ pub async fn handle_user_prompt_submit() -> Result<HookResult> {
         payload.base.session_id
     );
 
+    // Store initial prompt for prompt prefix blocking if configured
+    let (config, _config_path) = get_config().await?;
+
+    if let Some(ref prefix_config) = config.stop.prompt_prefix_blocking {
+        // Only proceed if we have prefixes configured and database is enabled
+        if !prefix_config.prefixes.is_empty() && config.database.enabled {
+            let initial_times = prefix_config.messages.first().map(|m| m.times).unwrap_or(1);
+            if let Err(e) = store_initial_prompt_if_first(&payload.base.session_id, &payload.prompt, initial_times).await {
+                eprintln!("Warning: Failed to store initial prompt: {}", e);
+            }
+        } else if !prefix_config.prefixes.is_empty() && !config.database.enabled {
+            eprintln!("Warning: promptPrefixBlocking is configured but database.enabled is false - prompt prefix blocking will not work");
+        }
+    }
+
     // Send notification for user prompt submission
     send_notification("UserPromptSubmit", "success", Some("User input received"));
     Ok(HookResult::success())
+}
+
+/// Store the initial prompt for a session if this is the first prompt
+///
+/// This function is idempotent - it will only store the prompt if no record exists
+/// for this session_id. This ensures we capture the first prompt in a session.
+async fn store_initial_prompt_if_first(session_id: &str, prompt: &str, initial_times: u32) -> Result<()> {
+    let db = get_connection().await?;
+
+    // Check if a record already exists for this session
+    use crate::database::entities::prompt_prefix_session::Column;
+    let existing = PromptPrefixSession::find()
+        .filter(Column::SessionId.eq(session_id))
+        .one(db)
+        .await
+        .context("Failed to query prompt_prefix_sessions")?;
+
+    if existing.is_some() {
+        // Already have a record for this session, skip
+        return Ok(());
+    }
+
+    // Take first 100 characters of the prompt
+    let initial_prompt: String = prompt.chars().take(100).collect();
+
+    let now = chrono::Utc::now();
+    let new_record = PromptPrefixSessionActiveModel {
+        session_id: Set(session_id.to_string()),
+        initial_prompt: Set(initial_prompt),
+        queue_position: Set(0),
+        times_remaining: Set(initial_times as i32),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+
+    new_record.insert(db).await.context("Failed to insert prompt_prefix_session")?;
+
+    Ok(())
+}
+
+/// Check if prompt prefix blocking should block the Stop hook
+///
+/// This function:
+/// 1. Checks if prompt_prefix_blocking is configured
+/// 2. Queries the database for the session's initial prompt
+/// 3. Matches the prompt against configured prefixes
+/// 4. If matched and messages remain, returns the current message and updates state
+/// 5. Returns None when all messages are exhausted (silent completion)
+async fn check_prompt_prefix_blocking(session_id: &str, config: &ConclaudeConfig) -> Result<Option<HookResult>> {
+    let Some(ref prefix_config) = config.stop.prompt_prefix_blocking else {
+        return Ok(None);
+    };
+
+    // Skip if no prefixes configured or database is disabled
+    if prefix_config.prefixes.is_empty() || !config.database.enabled {
+        return Ok(None);
+    }
+
+    // Skip if no messages configured
+    if prefix_config.messages.is_empty() {
+        return Ok(None);
+    }
+
+    let db = get_connection().await?;
+
+    // Query the session record
+    use crate::database::entities::prompt_prefix_session::Column;
+    let session_record = PromptPrefixSession::find()
+        .filter(Column::SessionId.eq(session_id))
+        .one(db)
+        .await
+        .context("Failed to query prompt_prefix_sessions")?;
+
+    let Some(record) = session_record else {
+        // No record for this session - skip prefix blocking
+        return Ok(None);
+    };
+
+    // Check if the initial prompt matches any configured prefix patterns
+    let matches_prefix = check_prefix_match(&record.initial_prompt, &prefix_config.prefixes)?;
+
+    if !matches_prefix {
+        // Prompt doesn't match any prefixes - skip blocking
+        return Ok(None);
+    }
+
+    // Check if we've exhausted all messages
+    let queue_position = record.queue_position as usize;
+    if queue_position >= prefix_config.messages.len() {
+        // All messages exhausted - allow stop to proceed (silent completion)
+        return Ok(None);
+    }
+
+    // Get the current message
+    let current_message = &prefix_config.messages[queue_position];
+
+    // If times_remaining is 0 or less, advance to next message
+    if record.times_remaining <= 0 {
+        // This shouldn't happen normally, but handle it gracefully
+        let next_position = queue_position + 1;
+        if next_position >= prefix_config.messages.len() {
+            return Ok(None);
+        }
+        // Advance and set times_remaining for next message
+        let next_times = prefix_config.messages.get(next_position).map(|m| m.times).unwrap_or(1);
+        update_prompt_prefix_session(session_id, next_position as i32, next_times as i32).await?;
+        return Ok(Some(HookResult::blocked(prefix_config.messages[next_position].text.clone())));
+    }
+
+    // Decrement times_remaining
+    let new_times_remaining = record.times_remaining - 1;
+
+    if new_times_remaining > 0 {
+        // Still more times to send this message
+        update_prompt_prefix_session(session_id, queue_position as i32, new_times_remaining).await?;
+    } else {
+        // Exhausted this message, advance to next
+        let next_position = queue_position + 1;
+        if next_position >= prefix_config.messages.len() {
+            // This was the last send of the last message - update and allow next stop to pass
+            update_prompt_prefix_session(session_id, next_position as i32, 0).await?;
+        } else {
+            // Set up next message
+            let next_times = prefix_config.messages.get(next_position).map(|m| m.times).unwrap_or(1);
+            update_prompt_prefix_session(session_id, next_position as i32, next_times as i32).await?;
+        }
+    }
+
+    // Return the current message to block the stop
+    Ok(Some(HookResult::blocked(current_message.text.clone())))
+}
+
+/// Check if the initial prompt matches any of the configured prefix patterns
+fn check_prefix_match(initial_prompt: &str, prefixes: &[String]) -> Result<bool> {
+    for pattern_str in prefixes {
+        let pattern = Pattern::new(pattern_str)
+            .with_context(|| format!("Invalid glob pattern in promptPrefixBlocking.prefixes: {}", pattern_str))?;
+        if pattern.matches(initial_prompt) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Update the prompt prefix session record with new queue position and times remaining
+async fn update_prompt_prefix_session(session_id: &str, queue_position: i32, times_remaining: i32) -> Result<()> {
+    let db = get_connection().await?;
+
+    use crate::database::entities::prompt_prefix_session::Column;
+    use sea_orm::IntoActiveModel;
+
+    let session_record = PromptPrefixSession::find()
+        .filter(Column::SessionId.eq(session_id))
+        .one(db)
+        .await
+        .context("Failed to query prompt_prefix_sessions for update")?;
+
+    let Some(record) = session_record else {
+        return Err(anyhow::anyhow!("Session record not found for update: {}", session_id));
+    };
+
+    let mut active_model = record.into_active_model();
+    active_model.queue_position = Set(queue_position);
+    active_model.times_remaining = Set(times_remaining);
+    active_model.updated_at = Set(chrono::Utc::now());
+
+    active_model.update(db).await.context("Failed to update prompt_prefix_session")?;
+
+    Ok(())
 }
 
 /// Handles `SessionStart` hook events when a new Claude session begins.
@@ -966,6 +1149,16 @@ pub async fn handle_stop() -> Result<HookResult> {
     );
 
     let (config, _config_path) = get_config().await?;
+
+    // Check prompt prefix blocking BEFORE commands - avoid wasted command execution
+    if let Some(result) = check_prompt_prefix_blocking(&payload.base.session_id, config).await? {
+        send_notification(
+            "Stop",
+            "success",
+            Some(&result.message.clone().unwrap_or_else(|| "Prompt prefix blocking active".to_string())),
+        );
+        return Ok(result);
+    }
 
     // Snapshot root directory if preventRootAdditions is enabled
     let root_snapshot = if config.pre_tool_use.prevent_root_additions {
@@ -2072,6 +2265,7 @@ mod tests {
                 infinite: false,
                 infinite_message: None,
                 rounds: None,
+                prompt_prefix_blocking: None,
             },
             ..Default::default()
         };
@@ -2108,6 +2302,7 @@ mod tests {
                 infinite: false,
                 infinite_message: None,
                 rounds: None,
+                prompt_prefix_blocking: None,
             },
             ..Default::default()
         };
@@ -2727,5 +2922,174 @@ mod tests {
 
         let collected = collect_subagent_stop_commands(&config, &matching_patterns).unwrap();
         assert!(collected.is_empty());
+    }
+
+    // ==========================================
+    // Prompt Prefix Blocking Tests
+    // ==========================================
+
+    #[test]
+    fn test_check_prefix_match_exact_match() {
+        let initial_prompt = "ULTRATHINK help me implement this feature";
+        let prefixes = vec!["ULTRATHINK*".to_string()];
+        assert!(check_prefix_match(initial_prompt, &prefixes).unwrap());
+    }
+
+    #[test]
+    fn test_check_prefix_match_wildcard_anywhere() {
+        let initial_prompt = "Please help me with DEEP_WORK on this task";
+        let prefixes = vec!["*DEEP_WORK*".to_string()];
+        assert!(check_prefix_match(initial_prompt, &prefixes).unwrap());
+    }
+
+    #[test]
+    fn test_check_prefix_match_no_match() {
+        let initial_prompt = "Just a normal prompt without keywords";
+        let prefixes = vec!["ULTRATHINK*".to_string(), "*DEEP_WORK*".to_string()];
+        assert!(!check_prefix_match(initial_prompt, &prefixes).unwrap());
+    }
+
+    #[test]
+    fn test_check_prefix_match_case_sensitive() {
+        // Case-sensitive: "ultrathink" should NOT match "ULTRATHINK*"
+        let initial_prompt = "ultrathink help me";
+        let prefixes = vec!["ULTRATHINK*".to_string()];
+        assert!(!check_prefix_match(initial_prompt, &prefixes).unwrap());
+    }
+
+    #[test]
+    fn test_check_prefix_match_multiple_patterns() {
+        // Should match if any pattern matches
+        let initial_prompt = "FOCUS_MODE: implement feature";
+        let prefixes = vec![
+            "ULTRATHINK*".to_string(),
+            "FOCUS_MODE*".to_string(),
+        ];
+        assert!(check_prefix_match(initial_prompt, &prefixes).unwrap());
+    }
+
+    #[test]
+    fn test_check_prefix_match_empty_prefixes() {
+        let initial_prompt = "Any prompt text";
+        let prefixes: Vec<String> = vec![];
+        assert!(!check_prefix_match(initial_prompt, &prefixes).unwrap());
+    }
+
+    #[test]
+    fn test_check_prefix_match_empty_prompt() {
+        let initial_prompt = "";
+        let prefixes = vec!["ULTRATHINK*".to_string()];
+        assert!(!check_prefix_match(initial_prompt, &prefixes).unwrap());
+    }
+
+    #[test]
+    fn test_check_prefix_match_exact_pattern() {
+        // Exact match without wildcards
+        let initial_prompt = "EXACT";
+        let prefixes = vec!["EXACT".to_string()];
+        assert!(check_prefix_match(initial_prompt, &prefixes).unwrap());
+    }
+
+    #[test]
+    fn test_check_prefix_match_question_mark_wildcard() {
+        // ? matches exactly one character
+        let initial_prompt = "MODE1 task";
+        let prefixes = vec!["MODE? *".to_string()];
+        assert!(check_prefix_match(initial_prompt, &prefixes).unwrap());
+
+        let initial_prompt2 = "MODE12 task";
+        assert!(!check_prefix_match(initial_prompt2, &prefixes).unwrap());
+    }
+
+    #[test]
+    fn test_check_prefix_match_character_class() {
+        // [abc] matches one of the characters
+        let initial_prompt = "MODEA task";
+        let prefixes = vec!["MODE[ABC] *".to_string()];
+        assert!(check_prefix_match(initial_prompt, &prefixes).unwrap());
+
+        let initial_prompt2 = "MODED task";
+        assert!(!check_prefix_match(initial_prompt2, &prefixes).unwrap());
+    }
+
+    // Test prompt_prefix_blocking config parsing
+    #[test]
+    fn test_prompt_prefix_blocking_config_parsing() {
+        use crate::config::{PromptPrefixBlockingConfig, PromptPrefixBlockingMessage};
+
+        let config = PromptPrefixBlockingConfig {
+            prefixes: vec!["ULTRATHINK*".to_string()],
+            messages: vec![
+                PromptPrefixBlockingMessage {
+                    text: "Keep working".to_string(),
+                    times: 3,
+                },
+                PromptPrefixBlockingMessage {
+                    text: "Final push".to_string(),
+                    times: 1,
+                },
+            ],
+        };
+
+        assert_eq!(config.prefixes.len(), 1);
+        assert_eq!(config.messages.len(), 2);
+        assert_eq!(config.messages[0].times, 3);
+        assert_eq!(config.messages[1].times, 1);
+    }
+
+    #[test]
+    fn test_prompt_prefix_blocking_config_defaults() {
+        use crate::config::PromptPrefixBlockingConfig;
+
+        let config: PromptPrefixBlockingConfig = Default::default();
+        assert!(config.prefixes.is_empty());
+        assert!(config.messages.is_empty());
+    }
+
+    #[test]
+    fn test_prompt_prefix_blocking_message_times_default() {
+        // Test that times defaults to 1 when parsing YAML without times field
+        let yaml = r#"
+text: "Keep working"
+"#;
+        let message: crate::config::PromptPrefixBlockingMessage =
+            serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(message.times, 1);
+        assert_eq!(message.text, "Keep working");
+    }
+
+    #[test]
+    fn test_prompt_prefix_blocking_message_explicit_times() {
+        let yaml = r#"
+text: "Keep working"
+times: 5
+"#;
+        let message: crate::config::PromptPrefixBlockingMessage =
+            serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(message.times, 5);
+    }
+
+    #[test]
+    fn test_stop_config_with_prompt_prefix_blocking() {
+        use crate::config::{StopConfig, PromptPrefixBlockingConfig, PromptPrefixBlockingMessage};
+
+        let config = StopConfig {
+            commands: vec![],
+            infinite: false,
+            infinite_message: None,
+            rounds: None,
+            prompt_prefix_blocking: Some(PromptPrefixBlockingConfig {
+                prefixes: vec!["TEST*".to_string()],
+                messages: vec![PromptPrefixBlockingMessage {
+                    text: "Continue".to_string(),
+                    times: 2,
+                }],
+            }),
+        };
+
+        assert!(config.prompt_prefix_blocking.is_some());
+        let ppb = config.prompt_prefix_blocking.unwrap();
+        assert_eq!(ppb.prefixes[0], "TEST*");
+        assert_eq!(ppb.messages[0].times, 2);
     }
 }
