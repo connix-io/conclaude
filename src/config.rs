@@ -21,6 +21,11 @@ pub struct StopCommand {
     #[serde(default, rename = "maxOutputLines")]
     #[schemars(range(min = 1, max = 10000))]
     pub max_output_lines: Option<u32>,
+    /// Working directory for command execution. Supports bash interpolation
+    /// (environment variables, command substitution, tilde expansion).
+    /// Relative paths are resolved relative to config file location.
+    #[serde(default, rename = "workingDir")]
+    pub working_dir: Option<String>,
 }
 
 /// Configuration for individual subagent stop commands with optional messages
@@ -37,6 +42,11 @@ pub struct SubagentStopCommand {
     #[serde(default, rename = "maxOutputLines")]
     #[schemars(range(min = 1, max = 10000))]
     pub max_output_lines: Option<u32>,
+    /// Working directory for command execution. Supports bash interpolation
+    /// (environment variables, command substitution, tilde expansion).
+    /// Relative paths are resolved relative to config file location.
+    #[serde(default, rename = "workingDir")]
+    pub working_dir: Option<String>,
 }
 
 /// Configuration for subagent stop hooks with pattern-based command execution
@@ -766,7 +776,8 @@ cd /tmp && echo "test""#;
                 "message",
                 "showStdout",
                 "showStderr",
-                "maxOutputLines"
+                "maxOutputLines",
+                "workingDir"
             ]
         );
     }

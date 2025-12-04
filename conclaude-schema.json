@@ -159,6 +159,14 @@
             "boolean",
             "null"
           ]
+        },
+        "workingDir": {
+          "default": null,
+          "description": "Working directory for command execution. Supports bash interpolation (environment variables, command substitution, tilde expansion). Relative paths are resolved relative to config file location.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
@@ -226,6 +234,14 @@
           "default": null,
           "type": [
             "boolean",
+            "null"
+          ]
+        },
+        "workingDir": {
+          "default": null,
+          "description": "Working directory for command execution. Supports bash interpolation (environment variables, command substitution, tilde expansion). Relative paths are resolved relative to config file location.",
+          "type": [
+            "string",
             "null"
           ]
         }

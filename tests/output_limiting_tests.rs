@@ -340,6 +340,7 @@ fn test_stop_command_struct_serialization() {
         show_stdout: Some(true),
         show_stderr: Some(false),
         max_output_lines: Some(50),
+        working_dir: None,
     };
 
     let yaml = serde_yaml::to_string(&cmd).unwrap();
@@ -522,6 +523,7 @@ fn test_stop_config_round_trip() {
             show_stdout: Some(true),
             show_stderr: Some(true),
             max_output_lines: Some(25),
+            working_dir: None,
         }],
         infinite: false,
         infinite_message: None,

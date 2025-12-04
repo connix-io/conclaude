@@ -26,6 +26,8 @@ struct StopCommandConfig {
     show_stdout: bool,
     show_stderr: bool,
     max_output_lines: Option<u32>,
+    /// Resolved working directory path (after bash interpolation and path resolution)
+    working_dir: Option<std::path::PathBuf>,
 }
 
 /// Represents a subagent stop command with its configuration
@@ -35,10 +37,140 @@ struct SubagentStopCommandConfig {
     show_stdout: bool,
     show_stderr: bool,
     max_output_lines: Option<u32>,
+    /// Resolved working directory path (after bash interpolation and path resolution)
+    working_dir: Option<std::path::PathBuf>,
 }
 
 /// Cached configuration instance to avoid repeated loads
 static CACHED_CONFIG: OnceLock<(ConclaudeConfig, std::path::PathBuf)> = OnceLock::new();
+
+/// Interpolate a working directory string using bash
+///
+/// This function expands environment variables, command substitution, and tilde expansion
+/// by executing the string through bash -c "echo -n ...".
+///
+/// # Arguments
+///
+/// * `working_dir` - The raw working directory string from configuration
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Bash execution fails
+/// - The interpolation results in an empty string
+fn interpolate_working_dir(working_dir: &str) -> Result<String> {
+    use std::process::Command;
+
+    // Use bash to expand the working directory string
+    // We use printf instead of echo to handle edge cases better
+    let output = Command::new("bash")
+        .arg("-c")
+        .arg(format!("printf '%s' {}", shell_escape(working_dir)))
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .context("workingDir interpolation failed: failed to execute bash")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!(
+            "workingDir interpolation failed: {}",
+            stderr.trim()
+        ));
+    }
+
+    let expanded = String::from_utf8(output.stdout)
+        .context("workingDir interpolation failed: invalid UTF-8 in output")?;
+
+    if expanded.is_empty() {
+        return Err(anyhow::anyhow!(
+            "workingDir interpolation resulted in empty path"
+        ));
+    }
+
+    Ok(expanded)
+}
+
+/// Escape a string for safe use in bash
+///
+/// Wraps the string in single quotes and escapes any internal single quotes.
+fn shell_escape(s: &str) -> String {
+    // If the string is simple (alphanumeric, slashes, dots, hyphens, underscores, tildes),
+    // we can pass it without quoting to allow bash expansion
+    if s.chars().all(|c| {
+        c.is_alphanumeric()
+            || c == '/'
+            || c == '.'
+            || c == '-'
+            || c == '_'
+            || c == '~'
+            || c == '$'
+            || c == '('
+            || c == ')'
+            || c == ' '
+    }) {
+        // Don't quote - allow bash to expand variables and command substitution
+        s.to_string()
+    } else {
+        // For complex strings, use double quotes to allow variable expansion
+        // but escape special characters
+        format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+    }
+}
+
+/// Resolve a working directory path after bash interpolation
+///
+/// This function:
+/// 1. Expands the path using bash interpolation
+/// 2. Resolves relative paths relative to the config file directory
+/// 3. Validates that the path exists and is a directory
+///
+/// # Arguments
+///
+/// * `working_dir` - The raw working directory string from configuration
+/// * `config_dir` - The directory containing the configuration file
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Bash interpolation fails
+/// - The resulting path is empty
+/// - The path does not exist
+/// - The path is not a directory
+fn resolve_working_dir(working_dir: &str, config_dir: &Path) -> Result<std::path::PathBuf> {
+    // Step 1: Interpolate using bash
+    let expanded = interpolate_working_dir(working_dir)?;
+
+    // Step 2: Resolve the path
+    let path = std::path::Path::new(&expanded);
+    let resolved = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        // Relative paths are resolved relative to config file directory
+        config_dir.join(path)
+    };
+
+    // Step 3: Canonicalize to resolve symlinks and get absolute path
+    let canonical = resolved.canonicalize().with_context(|| {
+        format!(
+            "workingDir does not exist: {} (resolved from '{}')",
+            resolved.display(),
+            working_dir
+        )
+    })?;
+
+    // Step 4: Validate it's a directory
+    if !canonical.is_dir() {
+        return Err(anyhow::anyhow!(
+            "workingDir is not a directory: {} (resolved from '{}')",
+            canonical.display(),
+            working_dir
+        ));
+    }
+
+    Ok(canonical)
+}
 
 /// Determine if a hook is a system event hook
 ///
@@ -740,11 +872,20 @@ fn truncate_output(output: &str, max_lines: u32) -> (String, bool, usize) {
 
 /// Collect stop commands from configuration
 ///
+/// # Arguments
+///
+/// * `config` - The application configuration
+/// * `config_path` - Path to the configuration file (for resolving relative working directories)
+///
 /// # Errors
 ///
-/// Returns an error if bash command extraction fails.
-fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConfig>> {
+/// Returns an error if bash command extraction fails or working directory resolution fails.
+fn collect_stop_commands(
+    config: &ConclaudeConfig,
+    config_path: &Path,
+) -> Result<Vec<StopCommandConfig>> {
     let mut commands = Vec::new();
+    let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
 
     // Add structured commands with messages and output control
     for cmd_config in &config.stop.commands {
@@ -752,6 +893,14 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
         let show_stdout = cmd_config.show_stdout.unwrap_or(false);
         let show_stderr = cmd_config.show_stderr.unwrap_or(false);
         let max_output_lines = cmd_config.max_output_lines;
+
+        // Resolve working directory if specified
+        let working_dir = if let Some(ref wd) = cmd_config.working_dir {
+            Some(resolve_working_dir(wd, config_dir)?)
+        } else {
+            None
+        };
+
         for cmd in extracted {
             commands.push(StopCommandConfig {
                 command: cmd,
@@ -759,6 +908,7 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
                 show_stdout,
                 show_stderr,
                 max_output_lines,
+                working_dir: working_dir.clone(),
             });
         }
     }
@@ -782,12 +932,21 @@ async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<
             cmd_config.command
         );
 
-        let child = TokioCommand::new("bash")
+        let mut tokio_cmd = TokioCommand::new("bash");
+        tokio_cmd
             .arg("-c")
             .arg(&cmd_config.command)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        // Set working directory if specified
+        if let Some(ref working_dir) = cmd_config.working_dir {
+            println!("  Working directory: {}", working_dir.display());
+            tokio_cmd.current_dir(working_dir);
+        }
+
+        let child = tokio_cmd
             .spawn()
             .with_context(|| format!("Failed to spawn command: {}", cmd_config.command))?;
 
@@ -907,7 +1066,7 @@ pub async fn handle_stop() -> Result<HookResult> {
         payload.base.session_id
     );
 
-    let (config, _config_path) = get_config().await?;
+    let (config, config_path) = get_config().await?;
 
     // Snapshot root directory if preventRootAdditions is enabled
     let root_snapshot = if config.pre_tool_use.prevent_root_additions {
@@ -917,7 +1076,7 @@ pub async fn handle_stop() -> Result<HookResult> {
     };
 
     // Extract and execute commands from config.stop.commands
-    let commands_with_messages = collect_stop_commands(config)?;
+    let commands_with_messages = collect_stop_commands(config, config_path)?;
 
     // Execute commands
     if let Some(result) = execute_stop_commands(&commands_with_messages).await? {
@@ -1095,14 +1254,22 @@ fn build_subagent_env_vars(payload: &SubagentStopPayload) -> HashMap<String, Str
 
 /// Collect subagent stop commands from configuration for matching patterns
 ///
+/// # Arguments
+///
+/// * `config` - The subagent stop configuration
+/// * `matching_patterns` - List of patterns that matched the agent ID
+/// * `config_path` - Path to the configuration file (for resolving relative working directories)
+///
 /// # Errors
 ///
-/// Returns an error if bash command extraction fails.
+/// Returns an error if bash command extraction fails or working directory resolution fails.
 fn collect_subagent_stop_commands(
     config: &SubagentStopConfig,
     matching_patterns: &[&str],
+    config_path: &Path,
 ) -> Result<Vec<SubagentStopCommandConfig>> {
     let mut commands = Vec::new();
+    let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
 
     for pattern in matching_patterns {
         if let Some(cmd_list) = config.commands.get(*pattern) {
@@ -1112,6 +1279,13 @@ fn collect_subagent_stop_commands(
                 let show_stderr = cmd_config.show_stderr.unwrap_or(false);
                 let max_output_lines = cmd_config.max_output_lines;
 
+                // Resolve working directory if specified
+                let working_dir = if let Some(ref wd) = cmd_config.working_dir {
+                    Some(resolve_working_dir(wd, config_dir)?)
+                } else {
+                    None
+                };
+
                 for cmd in extracted {
                     commands.push(SubagentStopCommandConfig {
                         command: cmd,
@@ -1119,6 +1293,7 @@ fn collect_subagent_stop_commands(
                         show_stdout,
                         show_stderr,
                         max_output_lines,
+                        working_dir: working_dir.clone(),
                     });
                 }
             }
@@ -1155,16 +1330,22 @@ async fn execute_subagent_stop_commands(
             cmd_config.command
         );
 
-        let child = TokioCommand::new("bash")
+        let mut tokio_cmd = TokioCommand::new("bash");
+        tokio_cmd
             .arg("-c")
             .arg(&cmd_config.command)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .envs(env_vars)
-            .spawn();
+            .envs(env_vars);
 
-        let child = match child {
+        // Set working directory if specified
+        if let Some(ref working_dir) = cmd_config.working_dir {
+            println!("  Working directory: {}", working_dir.display());
+            tokio_cmd.current_dir(working_dir);
+        }
+
+        let child = match tokio_cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
                 // Log error but continue to next command
@@ -1314,7 +1495,7 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
     );
 
     // Load configuration
-    let (config, _config_path) = get_config().await?;
+    let (config, config_path) = get_config().await?;
 
     // Check if subagentStop commands are configured
     if !config.subagent_stop.commands.is_empty() {
@@ -1328,7 +1509,7 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
             );
 
             // Collect commands for matching patterns
-            let commands = collect_subagent_stop_commands(&config.subagent_stop, &matching_patterns)?;
+            let commands = collect_subagent_stop_commands(&config.subagent_stop, &matching_patterns, config_path)?;
 
             if !commands.is_empty() {
                 // Build environment variables
@@ -1938,6 +2119,7 @@ mod tests {
                         show_stdout: Some(true),
                         show_stderr: Some(false),
                         max_output_lines: Some(10),
+                        working_dir: None,
                     },
                     StopCommand {
                         run: "ls -la".to_string(),
@@ -1945,6 +2127,7 @@ mod tests {
                         show_stdout: Some(false),
                         show_stderr: Some(true),
                         max_output_lines: Some(5),
+                        working_dir: None,
                     },
                 ],
                 infinite: false,
@@ -1953,7 +2136,8 @@ mod tests {
             ..Default::default()
         };
 
-        let commands = collect_stop_commands(&config).unwrap();
+        let config_path = Path::new("/tmp/.conclaude.yaml");
+        let commands = collect_stop_commands(&config, config_path).unwrap();
         assert_eq!(commands.len(), 2);
 
         assert_eq!(commands[0].command, "echo hello");
@@ -1981,6 +2165,7 @@ mod tests {
                     show_stdout: None,
                     show_stderr: None,
                     max_output_lines: None,
+                    working_dir: None,
                 }],
                 infinite: false,
                 infinite_message: None,
@@ -1988,7 +2173,8 @@ mod tests {
             ..Default::default()
         };
 
-        let commands = collect_stop_commands(&config).unwrap();
+        let config_path = Path::new("/tmp/.conclaude.yaml");
+        let commands = collect_stop_commands(&config, config_path).unwrap();
         assert_eq!(commands.len(), 1);
 
         // Defaults should be false for show flags and None for max_output_lines
@@ -2155,6 +2341,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
 
@@ -2183,6 +2370,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
 
@@ -2212,6 +2400,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
 
@@ -2244,6 +2433,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
 
@@ -2276,6 +2466,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
 
@@ -2311,6 +2502,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
         commands.insert(
@@ -2321,6 +2513,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
         commands.insert(
@@ -2331,6 +2524,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
 
@@ -2359,6 +2553,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
         commands.insert(
@@ -2369,6 +2564,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
 
@@ -2393,6 +2589,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
         commands.insert(
@@ -2403,6 +2600,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
 
@@ -2514,6 +2712,7 @@ mod tests {
                     show_stdout: Some(true),
                     show_stderr: Some(false),
                     max_output_lines: Some(10),
+                    working_dir: None,
                 },
                 SubagentStopCommand {
                     run: "echo second".to_string(),
@@ -2521,14 +2720,16 @@ mod tests {
                     show_stdout: None,
                     show_stderr: None,
                     max_output_lines: None,
+                    working_dir: None,
                 },
             ],
         );
 
         let config = SubagentStopConfig { commands };
         let matching_patterns = vec!["coder"];
+        let config_path = Path::new("/tmp/.conclaude.yaml");
 
-        let collected = collect_subagent_stop_commands(&config, &matching_patterns).unwrap();
+        let collected = collect_subagent_stop_commands(&config, &matching_patterns, config_path).unwrap();
 
         assert_eq!(collected.len(), 2);
         assert_eq!(collected[0].command, "echo first");
@@ -2557,6 +2758,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
         commands.insert(
@@ -2567,14 +2769,16 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
 
         let config = SubagentStopConfig { commands };
         // Wildcard first, then specific pattern (as match_subagent_patterns returns)
         let matching_patterns = vec!["*", "coder"];
+        let config_path = Path::new("/tmp/.conclaude.yaml");
 
-        let collected = collect_subagent_stop_commands(&config, &matching_patterns).unwrap();
+        let collected = collect_subagent_stop_commands(&config, &matching_patterns, config_path).unwrap();
 
         assert_eq!(collected.len(), 2);
         // Commands should be in order of patterns
@@ -2595,13 +2799,178 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                working_dir: None,
             }],
         );
 
         let config = SubagentStopConfig { commands };
         let matching_patterns: Vec<&str> = vec![];
+        let config_path = Path::new("/tmp/.conclaude.yaml");
 
-        let collected = collect_subagent_stop_commands(&config, &matching_patterns).unwrap();
+        let collected = collect_subagent_stop_commands(&config, &matching_patterns, config_path).unwrap();
         assert!(collected.is_empty());
+    }
+
+    // Tests for working directory interpolation and resolution
+
+    #[test]
+    fn test_interpolate_working_dir_simple_path() {
+        let result = interpolate_working_dir("/tmp");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "/tmp");
+    }
+
+    #[test]
+    fn test_interpolate_working_dir_tilde_expansion() {
+        let result = interpolate_working_dir("~");
+        assert!(result.is_ok());
+        // Should expand to user's home directory
+        let expanded = result.unwrap();
+        assert!(expanded.starts_with('/'), "Tilde should expand to absolute path");
+        assert!(!expanded.contains('~'), "Tilde should be expanded");
+    }
+
+    #[test]
+    fn test_interpolate_working_dir_env_variable() {
+        // Set a test environment variable
+        std::env::set_var("CONCLAUDE_TEST_DIR", "/test/path");
+        let result = interpolate_working_dir("$CONCLAUDE_TEST_DIR");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "/test/path");
+        std::env::remove_var("CONCLAUDE_TEST_DIR");
+    }
+
+    #[test]
+    fn test_interpolate_working_dir_env_variable_braces() {
+        std::env::set_var("CONCLAUDE_TEST_DIR2", "/another/path");
+        let result = interpolate_working_dir("${CONCLAUDE_TEST_DIR2}");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "/another/path");
+        std::env::remove_var("CONCLAUDE_TEST_DIR2");
+    }
+
+    #[test]
+    fn test_resolve_working_dir_absolute_path() {
+        let config_dir = Path::new("/home/user/project");
+        let result = resolve_working_dir("/tmp", config_dir);
+        assert!(result.is_ok());
+        // /tmp exists on Linux, so this should succeed
+        let resolved = result.unwrap();
+        assert!(resolved.is_absolute());
+    }
+
+    #[test]
+    fn test_resolve_working_dir_relative_path() {
+        // Use temp directory for testing
+        let temp_dir = std::env::temp_dir();
+        let result = resolve_working_dir(".", &temp_dir);
+        assert!(result.is_ok());
+        let resolved = result.unwrap();
+        assert!(resolved.is_absolute());
+    }
+
+    #[test]
+    fn test_resolve_working_dir_nonexistent_fails() {
+        let config_dir = Path::new("/tmp");
+        let result = resolve_working_dir("/this/path/does/not/exist/at/all", config_dir);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("does not exist"));
+    }
+
+    #[test]
+    fn test_resolve_working_dir_file_not_directory_fails() {
+        // Create a temporary file
+        let temp_file = std::env::temp_dir().join("conclaude_test_file.tmp");
+        std::fs::write(&temp_file, "test").unwrap();
+
+        let config_dir = Path::new("/tmp");
+        let result = resolve_working_dir(&temp_file.to_string_lossy(), config_dir);
+
+        // Clean up
+        let _ = std::fs::remove_file(&temp_file);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("not a directory"));
+    }
+
+    #[test]
+    fn test_shell_escape_simple() {
+        let escaped = shell_escape("/simple/path");
+        assert_eq!(escaped, "/simple/path");
+    }
+
+    #[test]
+    fn test_shell_escape_with_tilde() {
+        let escaped = shell_escape("~/project");
+        assert_eq!(escaped, "~/project");
+    }
+
+    #[test]
+    fn test_shell_escape_with_variable() {
+        let escaped = shell_escape("$HOME/project");
+        assert_eq!(escaped, "$HOME/project");
+    }
+
+    #[test]
+    fn test_collect_stop_commands_with_working_dir() {
+        use crate::config::StopCommand;
+        use std::env::temp_dir;
+
+        // Create a temp directory that actually exists
+        let temp = temp_dir();
+
+        let config = ConclaudeConfig {
+            stop: crate::config::StopConfig {
+                commands: vec![StopCommand {
+                    run: "echo test".to_string(),
+                    message: None,
+                    show_stdout: None,
+                    show_stderr: None,
+                    max_output_lines: None,
+                    working_dir: Some(temp.to_string_lossy().to_string()),
+                }],
+                infinite: false,
+                infinite_message: None,
+            },
+            ..Default::default()
+        };
+
+        let config_path = temp.join(".conclaude.yaml");
+        let commands = collect_stop_commands(&config, &config_path).unwrap();
+
+        assert_eq!(commands.len(), 1);
+        assert!(commands[0].working_dir.is_some());
+        // The resolved path should be the canonicalized temp directory
+        let resolved = commands[0].working_dir.as_ref().unwrap();
+        assert!(resolved.is_absolute());
+    }
+
+    #[test]
+    fn test_collect_stop_commands_working_dir_none() {
+        use crate::config::StopCommand;
+
+        let config = ConclaudeConfig {
+            stop: crate::config::StopConfig {
+                commands: vec![StopCommand {
+                    run: "echo test".to_string(),
+                    message: None,
+                    show_stdout: None,
+                    show_stderr: None,
+                    max_output_lines: None,
+                    working_dir: None,
+                }],
+                infinite: false,
+                infinite_message: None,
+            },
+            ..Default::default()
+        };
+
+        let config_path = Path::new("/tmp/.conclaude.yaml");
+        let commands = collect_stop_commands(&config, config_path).unwrap();
+
+        assert_eq!(commands.len(), 1);
+        assert!(commands[0].working_dir.is_none());
     }
 }
