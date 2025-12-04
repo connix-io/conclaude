@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Breaking Changes
+
+- **Remove rounds feature from stop hook configuration**: The `rounds` field has been removed from `StopConfig`. This feature was unreliable due to implementation issues with static counter state that reset between process invocations. Users who were using `rounds` should migrate to `infinite: true` mode for continuous operation. Configurations containing the `rounds` field will now fail validation with an "unknown field" error.
+
 ## [0.2.2] - 2025-11-29
 
 ### Features

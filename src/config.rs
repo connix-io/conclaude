@@ -59,8 +59,6 @@ pub struct StopConfig {
     pub infinite: bool,
     #[serde(default, rename = "infiniteMessage")]
     pub infinite_message: Option<String>,
-    #[serde(default)]
-    pub rounds: Option<u32>,
 }
 
 /// Tool usage validation rule
@@ -364,7 +362,7 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
         parts.push("  • Using camelCase vs snake_case incorrectly (use camelCase)".to_string());
         parts.push(String::new());
         parts.push("Valid field names by section:".to_string());
-        parts.push("  stop: commands, infinite, infiniteMessage, rounds".to_string());
+        parts.push("  stop: commands, infinite, infiniteMessage".to_string());
         parts.push("  subagentStop: commands".to_string());
         parts.push(
             "  preToolUse: preventAdditions, preventGeneratedFileEdits, generatedFileMessage, preventRootAdditions, uneditableFiles, preventUpdateGitIgnored, toolUsageValidation"
@@ -388,7 +386,6 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
         parts.push(String::new());
         parts.push("✅ Examples of correct formatting:".to_string());
         parts.push("   Boolean:  infinite: true             # no quotes".to_string());
-        parts.push("   Number:   rounds: 3                  # no quotes".to_string());
         parts.push("   Number:   maxOutputLines: 100        # no quotes".to_string());
         parts.push("   String:   run: \"cargo test\"          # with quotes".to_string());
         parts.push("   Array:    hooks: [\"Stop\"]            # square brackets".to_string());
@@ -466,26 +463,6 @@ fn validate_config_constraints(config: &ConclaudeConfig) -> Result<()> {
                 );
                 return Err(anyhow::anyhow!(error_msg));
             }
-        }
-    }
-
-    // Validate rounds if specified
-    if let Some(rounds) = config.stop.rounds {
-        if rounds == 0 {
-            let error_msg = "Range validation failed for stop.rounds\n\n\
-                 Error: Value must be at least 1\n\n\
-                 ✅ Valid range: 1 or greater (or omit for no limit)\n\n\
-                 Common causes:\n\
-                   • Using 0 (use infinite: true instead for unlimited rounds)\n\
-                   • Negative values are not allowed\n\n\
-                 Example valid configurations:\n\
-                   rounds: 1        # run once\n\
-                   rounds: 3        # run three times\n\
-                   infinite: true   # unlimited (don't use rounds)\n\n\
-                 For a valid configuration template, run:\n\
-                   conclaude init"
-                .to_string();
-            return Err(anyhow::anyhow!(error_msg));
         }
     }
 
@@ -755,7 +732,7 @@ cd /tmp && echo "test""#;
         // Verify that the generated field_names() methods return the correct field names
         assert_eq!(
             StopConfig::field_names(),
-            vec!["commands", "infinite", "infiniteMessage", "rounds"]
+            vec!["commands", "infinite", "infiniteMessage"]
         );
 
         assert_eq!(

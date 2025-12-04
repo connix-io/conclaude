@@ -389,7 +389,6 @@ stop:
     - run: "echo no limits"
       showStdout: true
   infinite: false
-  rounds: null
 preToolUse:
   preventRootAdditions: true
   uneditableFiles:
@@ -526,7 +525,6 @@ fn test_stop_config_round_trip() {
         }],
         infinite: false,
         infinite_message: None,
-        rounds: None,
     };
 
     let yaml = serde_yaml::to_string(&original).unwrap();

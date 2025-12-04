@@ -969,7 +969,6 @@ config.stop.run → extract_bash_commands() → tokio::process::Command → sequ
 - **Root Directory Protection**: Keep project root clean from unwanted files
 - **Command Validation**: Run custom validation commands (tests, linting, builds)
 - **Infinite Mode**: Continuous monitoring for long development sessions
-- **Rounds Mode**: Run validation for a specific number of iterations
 - **Grep Rules**: Content-based validation using pattern matching
 - **Tool Usage Validation**: Control which tools can operate on which files
 
@@ -1032,10 +1031,7 @@ stop:
   # Infinite mode - continue after successful validation
   infinite: false
   infiniteMessage: "Continue working on the task"
-  
-  # Rounds mode - run for specific iterations
-  rounds: 3
-  
+
   # Content validation rules
   grepRules:
     - filePattern: "**/*.rs"

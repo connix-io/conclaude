@@ -397,9 +397,6 @@ async fn handle_visualize(rule: Option<String>, show_matches: bool) -> Result<()
             config.pre_tool_use.tool_usage_validation.len()
         );
         println!("♾️  Infinite Mode: {}", config.stop.infinite);
-        if let Some(rounds) = config.stop.rounds {
-            println!("🔄 Rounds Mode: {rounds} rounds");
-        }
 
         println!("Use --rule <rule-name> to see details for a specific rule");
         println!("Use --show-matches to see which files match the patterns");
@@ -470,9 +467,6 @@ async fn handle_validate(config_path: Option<String>) -> Result<()> {
                 config.pre_tool_use.tool_usage_validation.len()
             );
             println!("   Infinite mode: {}", config.stop.infinite);
-            if let Some(rounds) = config.stop.rounds {
-                println!("   Rounds: {rounds}");
-            }
             println!("   Notifications enabled: {}", config.notifications.enabled);
             Ok(())
         }
