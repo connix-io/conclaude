@@ -144,7 +144,6 @@ stop:
   commands:
     - run: "echo test"
   infinite: false
-  rounds: 5
 preToolUse:
   preventRootAdditions: true
   uneditableFiles:
@@ -457,56 +456,6 @@ preToolUse:
 }
 
 #[test]
-fn test_validate_with_out_of_range_rounds() {
-    let temp_dir = tempdir().expect("Failed to create temp directory");
-    let temp_path = temp_dir.path();
-    let config_path = temp_path.join(".conclaude.yaml");
-
-    // Create a config with out-of-range rounds value (0)
-    let config_with_invalid_rounds = r#"
-stop:
-  commands:
-    - run: "echo test"
-  rounds: 0
-preToolUse:
-  preventRootAdditions: true
-"#;
-
-    fs::write(&config_path, config_with_invalid_rounds).expect("Failed to write config file");
-
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "--",
-            "validate",
-            "--config-path",
-            &config_path.to_string_lossy(),
-        ])
-        .output()
-        .expect("Failed to run validate command");
-
-    let stderr = String::from_utf8(output.stderr).expect("Invalid UTF-8");
-
-    // Should fail with non-zero exit code
-    assert!(
-        !output.status.success(),
-        "Validate should fail with rounds value of 0"
-    );
-    let exit_code = output.status.code();
-    assert!(
-        exit_code == Some(1) || exit_code == Some(101),
-        "Exit code should be 1 or 101 for invalid rounds, got: {:?}",
-        exit_code
-    );
-
-    // Verify error message mentions range validation for rounds
-    assert!(
-        stderr.contains("Range validation") && stderr.contains("rounds"),
-        "Error message should mention range validation for rounds. stderr: {stderr}"
-    );
-}
-
-#[test]
 fn test_validate_with_custom_config_path_file() {
     let temp_dir = tempdir().expect("Failed to create temp directory");
     let temp_path = temp_dir.path();
@@ -639,7 +588,6 @@ stop:
   commands:
     - run: "echo test"
   infinite: true
-  rounds: 10
 preToolUse:
   preventRootAdditions: false
   uneditableFiles:
@@ -682,6 +630,5 @@ notifications:
     assert!(stdout.contains("Uneditable files: 2 pattern(s)"));
     assert!(stdout.contains("Tool usage validation: 1 rule(s)"));
     assert!(stdout.contains("Infinite mode: true"));
-    assert!(stdout.contains("Rounds: 10"));
     assert!(stdout.contains("Notifications enabled: true"));
 }

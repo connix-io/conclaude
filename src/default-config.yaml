@@ -31,11 +31,6 @@ stop:
   # Message to send when infinite mode is enabled
   infiniteMessage: "continue working on the task"
 
-  # Alternative to infinite mode - run for a specific number of rounds
-  # When set, Claude will continue for the specified number of rounds
-  rounds: null
-  # Example: rounds: 3
-
 # Subagent stop hook configuration - runs when subagents are about to stop
 # This hook allows configuring different commands for different subagent names
 # using pattern matching. Commands run when a subagent finishes its work.

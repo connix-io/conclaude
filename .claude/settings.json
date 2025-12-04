@@ -4,6 +4,61 @@
     "deny": []
   },
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "conclaude UserPromptSubmit"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "conclaude PreToolUse"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "conclaude Stop"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "conclaude SubagentStop"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "conclaude PermissionRequest"
+          }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "matcher": "",
@@ -26,13 +81,24 @@
         ]
       }
     ],
-    "PreToolUse": [
+    "SubagentStart": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "conclaude PreToolUse"
+            "command": "conclaude SubagentStart"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "conclaude PostToolUse"
           }
         ]
       }
@@ -48,28 +114,6 @@
         ]
       }
     ],
-    "PermissionRequest": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "conclaude PermissionRequest"
-          }
-        ]
-      }
-    ],
-    "SubagentStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "conclaude SubagentStart"
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "matcher": "",
@@ -77,50 +121,6 @@
           {
             "type": "command",
             "command": "conclaude SessionStart"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "conclaude SubagentStop"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "conclaude UserPromptSubmit"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "conclaude Stop"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "conclaude PostToolUse"
           }
         ]
       }

@@ -16,7 +16,6 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::OnceLock;
 use tokio::process::Command as TokioCommand;
 
@@ -899,9 +898,6 @@ async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<
 /// Returns an error if payload validation fails, configuration loading fails,
 /// command execution fails, or directory operations fail.
 pub async fn handle_stop() -> Result<HookResult> {
-    // Track rounds for infinite alternative using atomic counter
-    static ROUND_COUNT: AtomicU32 = AtomicU32::new(0);
-
     let payload: StopPayload = read_payload_from_stdin()?;
 
     validate_base_payload(&payload.base).map_err(|e| anyhow::anyhow!(e))?;
@@ -955,19 +951,6 @@ pub async fn handle_stop() -> Result<HookResult> {
             );
             return Ok(result);
         }
-    }
-
-    // Check rounds mode (alternative to infinite)
-    if let Some(max_rounds) = config.stop.rounds {
-        let current_round = ROUND_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
-        if current_round < max_rounds {
-            let message = format!("Round {current_round}/{max_rounds} completed, continuing...");
-            println!("{message}");
-            // Send notification for round completion (not a failure, but continuing)
-            send_notification("Stop", "success", Some(&message));
-            return Ok(HookResult::blocked(message));
-        }
-        ROUND_COUNT.store(0, Ordering::SeqCst); // Reset for next session
     }
 
     // Check if infinite mode is enabled
@@ -1966,7 +1949,6 @@ mod tests {
                 ],
                 infinite: false,
                 infinite_message: None,
-                rounds: None,
             },
             ..Default::default()
         };
@@ -2002,7 +1984,6 @@ mod tests {
                 }],
                 infinite: false,
                 infinite_message: None,
-                rounds: None,
             },
             ..Default::default()
         };

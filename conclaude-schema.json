@@ -187,15 +187,6 @@
             "string",
             "null"
           ]
-        },
-        "rounds": {
-          "default": null,
-          "format": "uint32",
-          "minimum": 0.0,
-          "type": [
-            "integer",
-            "null"
-          ]
         }
       },
       "type": "object"
@@ -382,8 +373,7 @@
       "default": {
         "commands": [],
         "infinite": false,
-        "infiniteMessage": null,
-        "rounds": null
+        "infiniteMessage": null
       }
     },
     "subagentStop": {

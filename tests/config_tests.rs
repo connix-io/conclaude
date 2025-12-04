@@ -189,42 +189,6 @@ fn test_local_conclaude_yaml_can_be_parsed() {
 }
 
 #[test]
-fn test_config_with_null_rounds_can_be_parsed() {
-    // Test the specific case where rounds: null is used
-    let config_content = r#"
-stop:
-  commands:
-    - run: "echo test"
-  infinite: false
-  infiniteMessage: "continue"
-  rounds: null
-preToolUse:
-  preventRootAdditions: true
-  uneditableFiles: []
-  preventAdditions: []
-  preventGeneratedFileEdits: true
-notifications:
-  enabled: false
-  hooks: []
-  showErrors: false
-  showSuccess: false
-  showSystemEvents: true
-"#;
-
-    let result = serde_yaml::from_str::<conclaude::config::ConclaudeConfig>(config_content);
-
-    match result {
-        Ok(config) => {
-            // Config parsed successfully, rounds should be None
-            assert_eq!(config.stop.rounds, None);
-        }
-        Err(e) => {
-            panic!("Config with rounds: null should be parseable, but failed with: {}\n\nConfig content:\n{}", e, config_content);
-        }
-    }
-}
-
-#[test]
 fn test_default_config_with_comments_removed_can_be_parsed() {
     // Test parsing by stripping comments to see if they cause issues
     let config_content = generate_default_config();
