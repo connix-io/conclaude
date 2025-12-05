@@ -541,7 +541,11 @@ pub fn is_root_addition(_file_path: &str, relative_path: &str, config_path: &Pat
     }
 
     // Get the directory containing the config file
-    let config_dir = config_path.parent().unwrap_or(Path::new("."));
+    // Normalize empty parent (when config is in CWD) to "."
+    let config_dir = config_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
 
     // Get the current working directory
     let Ok(cwd) = std::env::current_dir() else {
@@ -938,7 +942,11 @@ pub async fn handle_stop() -> Result<HookResult> {
     );
 
     let (config, config_path) = get_config().await?;
-    let config_dir = config_path.parent().unwrap_or(Path::new("."));
+    // Normalize empty parent (when config is in CWD) to "."
+    let config_dir = config_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
 
     // Snapshot root directory if preventRootAdditions is enabled
     let root_snapshot = if config.pre_tool_use.prevent_root_additions {
@@ -1386,7 +1394,11 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
 
     // Load configuration
     let (config, config_path) = get_config().await?;
-    let config_dir = config_path.parent().unwrap_or(Path::new("."));
+    // Normalize empty parent (when config is in CWD) to "."
+    let config_dir = config_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
 
     // Check if subagentStop commands are configured
     if !config.subagent_stop.commands.is_empty() {
@@ -1658,7 +1670,11 @@ async fn check_git_ignored_file(payload: &PreToolUsePayload) -> Result<Option<Ho
 
     // Find the actual git repository root by walking up from config path
     // This is more reliable than just using config path's parent
-    let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
+    // Normalize empty parent (when config is in CWD) to "."
+    let config_dir = config_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
     let repo_root = match find_git_root(config_dir) {
         Some(root) => root,
         None => {
