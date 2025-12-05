@@ -159,6 +159,16 @@
             "boolean",
             "null"
           ]
+        },
+        "timeout": {
+          "default": null,
+          "format": "uint64",
+          "maximum": 3600.0,
+          "minimum": 1.0,
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       },
       "required": [
@@ -226,6 +236,16 @@
           "default": null,
           "type": [
             "boolean",
+            "null"
+          ]
+        },
+        "timeout": {
+          "default": null,
+          "format": "uint64",
+          "maximum": 3600.0,
+          "minimum": 1.0,
+          "type": [
+            "integer",
             "null"
           ]
         }

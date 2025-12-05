@@ -22,6 +22,12 @@ stop:
   #     showStderr: true    # Only show build errors to user/Claude, hide stdout
   #     message: "Build failed - please fix compilation errors"
   #     maxOutputLines: 50  # Limit build output to last 50 lines
+  #
+  #   - run: "npm run long-running-task"
+  #     showStderr: true
+  #     timeout: 300        # Optional: terminate command after 300 seconds (5 minutes)
+  #                         # Range: 1-3600 seconds (1 second to 1 hour)
+  #                         # When timeout occurs, command is terminated and hook is blocked
 
   # Infinite mode - allows Claude to continue automatically
   # When enabled, Claude receives the infiniteMessage to continue working
@@ -55,6 +61,9 @@ subagentStop:
   #       showStdout: true
   #       showStderr: true
   #       message: "Tests failed - please fix failing tests"
+  #       timeout: 600      # Optional: terminate command after 600 seconds (10 minutes)
+  #                         # Range: 1-3600 seconds (1 second to 1 hour)
+  #                         # When timeout occurs, command is terminated and hook is blocked
   #
   #   # Wildcard - runs for ALL subagents
   #   "*":
@@ -73,6 +82,7 @@ subagentStop:
   #   - showStderr: (optional) Show stderr to user/Claude (default: false)
   #   - message: (optional) Custom error message on non-zero exit
   #   - maxOutputLines: (optional) Limit output lines (1-10000)
+  #   - timeout: (optional) Command timeout in seconds (1-3600)
   #
   # Environment variables available in commands:
   #   - CONCLAUDE_AGENT_ID             - The subagent's identifier

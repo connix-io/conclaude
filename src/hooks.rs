@@ -18,6 +18,7 @@ use std::path::Path;
 use std::process::Stdio;
 use std::sync::OnceLock;
 use tokio::process::Command as TokioCommand;
+use tokio::time::{timeout, Duration};
 
 /// Represents a stop command with its configuration
 struct StopCommandConfig {
@@ -26,6 +27,7 @@ struct StopCommandConfig {
     show_stdout: bool,
     show_stderr: bool,
     max_output_lines: Option<u32>,
+    timeout: Option<u64>,
 }
 
 /// Represents a subagent stop command with its configuration
@@ -35,6 +37,7 @@ struct SubagentStopCommandConfig {
     show_stdout: bool,
     show_stderr: bool,
     max_output_lines: Option<u32>,
+    timeout: Option<u64>,
 }
 
 /// Cached configuration instance to avoid repeated loads
@@ -759,6 +762,7 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
                 show_stdout,
                 show_stderr,
                 max_output_lines,
+                timeout: cmd_config.timeout,
             });
         }
     }
@@ -791,10 +795,27 @@ async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<
             .spawn()
             .with_context(|| format!("Failed to spawn command: {}", cmd_config.command))?;
 
-        let output = child
-            .wait_with_output()
-            .await
-            .with_context(|| format!("Failed to wait for command: {}", cmd_config.command))?;
+        let output = if let Some(timeout_secs) = cmd_config.timeout {
+            match timeout(Duration::from_secs(timeout_secs), child.wait_with_output()).await {
+                Ok(result) => result.with_context(|| format!("Failed to wait for command: {}", cmd_config.command))?,
+                Err(_) => {
+                    // Timeout occurred - return blocked result
+                    let error_msg = format!(
+                        "Command timed out after {} seconds: {}",
+                        timeout_secs, cmd_config.command
+                    );
+                    eprintln!("{}", error_msg);
+
+                    let message = cmd_config.message.as_deref().unwrap_or(&error_msg);
+                    return Ok(Some(HookResult::blocked(message)));
+                }
+            }
+        } else {
+            child
+                .wait_with_output()
+                .await
+                .with_context(|| format!("Failed to wait for command: {}", cmd_config.command))?
+        };
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -1119,6 +1140,7 @@ fn collect_subagent_stop_commands(
                         show_stdout,
                         show_stderr,
                         max_output_lines,
+                        timeout: cmd_config.timeout,
                     });
                 }
             }
@@ -1176,15 +1198,43 @@ async fn execute_subagent_stop_commands(
             }
         };
 
-        let output = match child.wait_with_output().await {
-            Ok(o) => o,
-            Err(e) => {
-                // Log error but continue to next command
-                eprintln!(
-                    "Failed to wait for subagent stop command '{}': {}",
-                    cmd_config.command, e
-                );
-                continue;
+        let output = if let Some(timeout_secs) = cmd_config.timeout {
+            match timeout(Duration::from_secs(timeout_secs), child.wait_with_output()).await {
+                Ok(result) => match result {
+                    Ok(o) => o,
+                    Err(e) => {
+                        // Log error but continue to next command
+                        eprintln!(
+                            "Failed to wait for subagent stop command '{}': {}",
+                            cmd_config.command, e
+                        );
+                        continue;
+                    }
+                },
+                Err(_) => {
+                    // Timeout occurred - log and continue
+                    // Note: child is consumed by wait_with_output, so we can't kill it here
+                    eprintln!(
+                        "Subagent stop command timed out after {} seconds: {}",
+                        timeout_secs, cmd_config.command
+                    );
+                    if let Some(custom_msg) = &cmd_config.message {
+                        eprintln!("Message: {}", custom_msg);
+                    }
+                    continue;
+                }
+            }
+        } else {
+            match child.wait_with_output().await {
+                Ok(o) => o,
+                Err(e) => {
+                    // Log error but continue to next command
+                    eprintln!(
+                        "Failed to wait for subagent stop command '{}': {}",
+                        cmd_config.command, e
+                    );
+                    continue;
+                }
             }
         };
 
@@ -1938,6 +1988,7 @@ mod tests {
                         show_stdout: Some(true),
                         show_stderr: Some(false),
                         max_output_lines: Some(10),
+                        timeout: None,
                     },
                     StopCommand {
                         run: "ls -la".to_string(),
@@ -1945,6 +1996,7 @@ mod tests {
                         show_stdout: Some(false),
                         show_stderr: Some(true),
                         max_output_lines: Some(5),
+                        timeout: None,
                     },
                 ],
                 infinite: false,
@@ -1981,6 +2033,7 @@ mod tests {
                     show_stdout: None,
                     show_stderr: None,
                     max_output_lines: None,
+                    timeout: None,
                 }],
                 infinite: false,
                 infinite_message: None,
@@ -2155,6 +2208,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
 
@@ -2183,6 +2237,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
 
@@ -2212,6 +2267,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
 
@@ -2244,6 +2300,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
 
@@ -2276,6 +2333,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
 
@@ -2311,6 +2369,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
         commands.insert(
@@ -2321,6 +2380,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
         commands.insert(
@@ -2331,6 +2391,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
 
@@ -2359,6 +2420,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
         commands.insert(
@@ -2369,6 +2431,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
 
@@ -2393,6 +2456,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
         commands.insert(
@@ -2403,6 +2467,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
 
@@ -2514,6 +2579,7 @@ mod tests {
                     show_stdout: Some(true),
                     show_stderr: Some(false),
                     max_output_lines: Some(10),
+                    timeout: None,
                 },
                 SubagentStopCommand {
                     run: "echo second".to_string(),
@@ -2521,6 +2587,7 @@ mod tests {
                     show_stdout: None,
                     show_stderr: None,
                     max_output_lines: None,
+                    timeout: None,
                 },
             ],
         );
@@ -2557,6 +2624,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
         commands.insert(
@@ -2567,6 +2635,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
 
@@ -2595,6 +2664,7 @@ mod tests {
                 show_stdout: None,
                 show_stderr: None,
                 max_output_lines: None,
+                timeout: None,
             }],
         );
 
