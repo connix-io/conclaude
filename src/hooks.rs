@@ -1,4 +1,6 @@
-use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig, SubagentStopConfig};
+use crate::config::{
+    extract_bash_commands, load_conclaude_config, ConclaudeConfig, SubagentStopConfig,
+};
 use crate::gitignore::{find_git_root, is_path_git_ignored};
 use crate::types::{
     validate_base_payload, validate_permission_request_payload, validate_subagent_start_payload,
@@ -47,7 +49,7 @@ static CACHED_CONFIG: OnceLock<(ConclaudeConfig, std::path::PathBuf)> = OnceLock
 /// Interpolate a working directory string using bash
 ///
 /// This function expands environment variables, command substitution, and tilde expansion
-/// by executing the string through bash -c "echo -n ...".
+/// by executing the string through bash -c using printf.
 ///
 /// # Arguments
 ///
@@ -65,7 +67,7 @@ fn interpolate_working_dir(working_dir: &str) -> Result<String> {
     // We use printf instead of echo to handle edge cases better
     let output = Command::new("bash")
         .arg("-c")
-        .arg(format!("printf '%s' {}", shell_escape(working_dir)))
+        .arg(format!("printf -- '%s' {}", shell_escape(working_dir)))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -83,6 +85,8 @@ fn interpolate_working_dir(working_dir: &str) -> Result<String> {
     let expanded = String::from_utf8(output.stdout)
         .context("workingDir interpolation failed: invalid UTF-8 in output")?;
 
+    let expanded = expand_tilde(&expanded)?;
+
     if expanded.is_empty() {
         return Err(anyhow::anyhow!(
             "workingDir interpolation resulted in empty path"
@@ -94,29 +98,26 @@ fn interpolate_working_dir(working_dir: &str) -> Result<String> {
 
 /// Escape a string for safe use in bash
 ///
-/// Wraps the string in single quotes and escapes any internal single quotes.
+/// Wraps the string in double quotes and escapes any internal double quotes or backslashes,
+/// allowing bash to expand variables and command substitutions while preserving whitespace.
 fn shell_escape(s: &str) -> String {
-    // If the string is simple (alphanumeric, slashes, dots, hyphens, underscores, tildes),
-    // we can pass it without quoting to allow bash expansion
-    if s.chars().all(|c| {
-        c.is_alphanumeric()
-            || c == '/'
-            || c == '.'
-            || c == '-'
-            || c == '_'
-            || c == '~'
-            || c == '$'
-            || c == '('
-            || c == ')'
-            || c == ' '
-    }) {
-        // Don't quote - allow bash to expand variables and command substitution
-        s.to_string()
-    } else {
-        // For complex strings, use double quotes to allow variable expansion
-        // but escape special characters
-        format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+/// Expand a leading tilde using the current user's home directory
+fn expand_tilde(path: &str) -> Result<String> {
+    if let Some(rest) = path.strip_prefix('~') {
+        let home = dirs::home_dir().context("workingDir interpolation failed: HOME not set")?;
+        if rest.is_empty() {
+            return Ok(home.to_string_lossy().into_owned());
+        }
+
+        if let Some(stripped) = rest.strip_prefix('/') {
+            return Ok(home.join(stripped).to_string_lossy().into_owned());
+        }
     }
+
+    Ok(path.to_string())
 }
 
 /// Resolve a working directory path after bash interpolation
@@ -507,10 +508,7 @@ pub async fn handle_permission_request() -> Result<HookResult> {
         send_notification(
             "PermissionRequest",
             "success",
-            Some(&format!(
-                "Tool '{}' allowed by default",
-                payload.tool_name
-            )),
+            Some(&format!("Tool '{}' allowed by default", payload.tool_name)),
         );
         Ok(HookResult::success())
     } else {
@@ -1198,8 +1196,12 @@ fn match_subagent_patterns<'a>(
         }
 
         // Use glob pattern matching for other patterns
-        let pattern = Pattern::new(pattern_str)
-            .with_context(|| format!("Invalid glob pattern in subagentStop config: {}", pattern_str))?;
+        let pattern = Pattern::new(pattern_str).with_context(|| {
+            format!(
+                "Invalid glob pattern in subagentStop config: {}",
+                pattern_str
+            )
+        })?;
 
         if pattern.matches(agent_id) {
             other_matches.push(pattern_str.as_str());
@@ -1317,10 +1319,7 @@ async fn execute_subagent_stop_commands(
         return Ok(());
     }
 
-    println!(
-        "Executing {} subagent stop hook commands",
-        commands.len()
-    );
+    println!("Executing {} subagent stop hook commands", commands.len());
 
     for (index, cmd_config) in commands.iter().enumerate() {
         println!(
@@ -1509,7 +1508,11 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
             );
 
             // Collect commands for matching patterns
-            let commands = collect_subagent_stop_commands(&config.subagent_stop, &matching_patterns, config_path)?;
+            let commands = collect_subagent_stop_commands(
+                &config.subagent_stop,
+                &matching_patterns,
+                config_path,
+            )?;
 
             if !commands.is_empty() {
                 // Build environment variables
@@ -1783,7 +1786,8 @@ async fn check_git_ignored_file(payload: &PreToolUsePayload) -> Result<Option<Ho
     let (is_ignored, pattern) = is_path_git_ignored(&resolved_path, &repo_root)?;
 
     if is_ignored {
-        let pattern_display = pattern.unwrap_or_else(|| format!("(pattern in {}/.gitignore)", repo_root.display()));
+        let pattern_display =
+            pattern.unwrap_or_else(|| format!("(pattern in {}/.gitignore)", repo_root.display()));
 
         let message = format!(
             "File operation blocked: Path is git-ignored\n\
@@ -1799,7 +1803,10 @@ async fn check_git_ignored_file(payload: &PreToolUsePayload) -> Result<Option<Ho
             3. Set preventUpdateGitIgnored: false in your config",
             file_path,
             pattern_display,
-            Path::new(&file_path).file_name().and_then(|n| n.to_str()).unwrap_or(&file_path)
+            Path::new(&file_path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(&file_path)
         );
 
         eprintln!(
@@ -2639,7 +2646,10 @@ mod tests {
 
         let env_vars = build_subagent_env_vars(&payload);
 
-        assert_eq!(env_vars.get("CONCLAUDE_AGENT_ID"), Some(&"coder".to_string()));
+        assert_eq!(
+            env_vars.get("CONCLAUDE_AGENT_ID"),
+            Some(&"coder".to_string())
+        );
         assert_eq!(
             env_vars.get("CONCLAUDE_AGENT_TRANSCRIPT_PATH"),
             Some(&"/path/to/agent/transcript.json".to_string())
@@ -2729,7 +2739,8 @@ mod tests {
         let matching_patterns = vec!["coder"];
         let config_path = Path::new("/tmp/.conclaude.yaml");
 
-        let collected = collect_subagent_stop_commands(&config, &matching_patterns, config_path).unwrap();
+        let collected =
+            collect_subagent_stop_commands(&config, &matching_patterns, config_path).unwrap();
 
         assert_eq!(collected.len(), 2);
         assert_eq!(collected[0].command, "echo first");
@@ -2778,7 +2789,8 @@ mod tests {
         let matching_patterns = vec!["*", "coder"];
         let config_path = Path::new("/tmp/.conclaude.yaml");
 
-        let collected = collect_subagent_stop_commands(&config, &matching_patterns, config_path).unwrap();
+        let collected =
+            collect_subagent_stop_commands(&config, &matching_patterns, config_path).unwrap();
 
         assert_eq!(collected.len(), 2);
         // Commands should be in order of patterns
@@ -2807,7 +2819,8 @@ mod tests {
         let matching_patterns: Vec<&str> = vec![];
         let config_path = Path::new("/tmp/.conclaude.yaml");
 
-        let collected = collect_subagent_stop_commands(&config, &matching_patterns, config_path).unwrap();
+        let collected =
+            collect_subagent_stop_commands(&config, &matching_patterns, config_path).unwrap();
         assert!(collected.is_empty());
     }
 
@@ -2826,7 +2839,10 @@ mod tests {
         assert!(result.is_ok());
         // Should expand to user's home directory
         let expanded = result.unwrap();
-        assert!(expanded.starts_with('/'), "Tilde should expand to absolute path");
+        assert!(
+            expanded.starts_with('/'),
+            "Tilde should expand to absolute path"
+        );
         assert!(!expanded.contains('~'), "Tilde should be expanded");
     }
 
@@ -2898,19 +2914,47 @@ mod tests {
     #[test]
     fn test_shell_escape_simple() {
         let escaped = shell_escape("/simple/path");
-        assert_eq!(escaped, "/simple/path");
+        assert_eq!(escaped, "\"/simple/path\"");
     }
 
     #[test]
     fn test_shell_escape_with_tilde() {
         let escaped = shell_escape("~/project");
-        assert_eq!(escaped, "~/project");
+        assert_eq!(escaped, "\"~/project\"");
     }
 
     #[test]
     fn test_shell_escape_with_variable() {
         let escaped = shell_escape("$HOME/project");
-        assert_eq!(escaped, "$HOME/project");
+        assert_eq!(escaped, "\"$HOME/project\"");
+    }
+
+    #[test]
+    fn test_interpolate_working_dir_with_spaces() {
+        let temp_dir = std::env::temp_dir().join("conclaude space dir");
+        let path_str = temp_dir.to_string_lossy().to_string();
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let result = interpolate_working_dir(&path_str);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), path_str);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_interpolate_working_dir_env_with_spaces() {
+        let temp_dir = std::env::temp_dir().join("conclaude env space dir");
+        let path_str = temp_dir.to_string_lossy().to_string();
+        let _ = std::fs::create_dir_all(&temp_dir);
+        std::env::set_var("CONCLAUDE_TEST_DIR_WITH_SPACES", &path_str);
+
+        let result = interpolate_working_dir("$CONCLAUDE_TEST_DIR_WITH_SPACES");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), path_str);
+
+        std::env::remove_var("CONCLAUDE_TEST_DIR_WITH_SPACES");
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]

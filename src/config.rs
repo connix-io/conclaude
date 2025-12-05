@@ -383,8 +383,13 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
                 .to_string(),
         );
         parts.push("  permissionRequest: default, allow, deny".to_string());
-        parts.push("  commands (stop): run, message, showStdout, showStderr, maxOutputLines".to_string());
-        parts.push("  commands (subagentStop): run, message, showStdout, showStderr, maxOutputLines".to_string());
+        parts.push(
+            "  commands (stop): run, message, showStdout, showStderr, maxOutputLines".to_string(),
+        );
+        parts.push(
+            "  commands (subagentStop): run, message, showStdout, showStderr, maxOutputLines"
+                .to_string(),
+        );
     } else if base_error.contains("invalid type") {
         parts.push(String::new());
         parts.push("Type mismatch detected. Common causes:".to_string());
@@ -1097,10 +1102,7 @@ notifications:
         assert_eq!(config.pre_tool_use.uneditable_files.len(), 2);
 
         // Verify patterns extracted correctly
-        assert_eq!(
-            config.pre_tool_use.uneditable_files[0].pattern(),
-            "*.lock"
-        );
+        assert_eq!(config.pre_tool_use.uneditable_files[0].pattern(), "*.lock");
         assert_eq!(config.pre_tool_use.uneditable_files[1].pattern(), ".env");
 
         // Verify no custom messages
@@ -1138,10 +1140,7 @@ notifications:
         assert_eq!(config.pre_tool_use.uneditable_files.len(), 2);
 
         // Verify patterns extracted correctly
-        assert_eq!(
-            config.pre_tool_use.uneditable_files[0].pattern(),
-            "*.lock"
-        );
+        assert_eq!(config.pre_tool_use.uneditable_files[0].pattern(), "*.lock");
         assert_eq!(config.pre_tool_use.uneditable_files[1].pattern(), ".env");
 
         // Verify custom messages
@@ -1185,10 +1184,7 @@ notifications:
         assert_eq!(config.pre_tool_use.uneditable_files.len(), 3);
 
         // First is simple format
-        assert_eq!(
-            config.pre_tool_use.uneditable_files[0].pattern(),
-            "*.lock"
-        );
+        assert_eq!(config.pre_tool_use.uneditable_files[0].pattern(), "*.lock");
         assert!(config.pre_tool_use.uneditable_files[0].message().is_none());
 
         // Second is detailed format with message
@@ -1231,10 +1227,7 @@ notifications:
 "#;
         let config: ConclaudeConfig = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(config.pre_tool_use.uneditable_files.len(), 1);
-        assert_eq!(
-            config.pre_tool_use.uneditable_files[0].pattern(),
-            "*.lock"
-        );
+        assert_eq!(config.pre_tool_use.uneditable_files[0].pattern(), "*.lock");
         assert!(config.pre_tool_use.uneditable_files[0].message().is_none());
     }
 

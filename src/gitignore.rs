@@ -486,17 +486,11 @@ mod tests {
     fn test_is_path_git_ignored_convenience_function() -> Result<()> {
         let temp_dir = create_test_repo("*.tmp\ncache/\n")?;
 
-        let (is_ignored, pattern) = is_path_git_ignored(
-            Path::new("file.tmp"),
-            temp_dir.path()
-        )?;
+        let (is_ignored, pattern) = is_path_git_ignored(Path::new("file.tmp"), temp_dir.path())?;
         assert!(is_ignored);
         assert!(pattern.is_some());
 
-        let (is_ignored, pattern) = is_path_git_ignored(
-            Path::new("file.txt"),
-            temp_dir.path()
-        )?;
+        let (is_ignored, pattern) = is_path_git_ignored(Path::new("file.txt"), temp_dir.path())?;
         assert!(!is_ignored);
         assert!(pattern.is_none());
 
@@ -549,7 +543,10 @@ mod tests {
         fs::create_dir(&git_dir)?;
 
         // From repo root
-        assert_eq!(find_git_root(temp_dir.path()), Some(temp_dir.path().to_path_buf()));
+        assert_eq!(
+            find_git_root(temp_dir.path()),
+            Some(temp_dir.path().to_path_buf())
+        );
 
         // From subdirectory
         let sub_dir = temp_dir.path().join("src/nested");
