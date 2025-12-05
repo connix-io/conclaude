@@ -1,13 +1,13 @@
 use crate::config::{
-    extract_bash_commands, load_conclaude_config, ConclaudeConfig, SubagentStopConfig,
+    ConclaudeConfig, SubagentStopConfig, extract_bash_commands, load_conclaude_config,
 };
 use crate::gitignore::{find_git_root, is_path_git_ignored};
 use crate::types::{
-    validate_base_payload, validate_permission_request_payload, validate_subagent_start_payload,
-    validate_subagent_stop_payload, HookResult, NotificationPayload, PermissionRequestPayload,
-    PostToolUsePayload, PreCompactPayload, PreToolUsePayload, SessionEndPayload,
-    SessionStartPayload, StopPayload, SubagentStartPayload, SubagentStopPayload,
-    UserPromptSubmitPayload,
+    HookResult, NotificationPayload, PermissionRequestPayload, PostToolUsePayload,
+    PreCompactPayload, PreToolUsePayload, SessionEndPayload, SessionStartPayload, StopPayload,
+    SubagentStartPayload, SubagentStopPayload, UserPromptSubmitPayload, validate_base_payload,
+    validate_permission_request_payload, validate_subagent_start_payload,
+    validate_subagent_stop_payload,
 };
 use anyhow::{Context, Result};
 use glob::Pattern;
@@ -20,7 +20,7 @@ use std::path::Path;
 use std::process::Stdio;
 use std::sync::OnceLock;
 use tokio::process::Command as TokioCommand;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 /// Represents a stop command with its configuration
 struct StopCommandConfig {
@@ -82,6 +82,26 @@ async fn get_config() -> Result<&'static (ConclaudeConfig, std::path::PathBuf)> 
         let config = load_conclaude_config(None).await?;
         Ok(CACHED_CONFIG.get_or_init(|| config))
     }
+}
+
+/// Extract the directory containing the config file
+///
+/// Normalizes empty parent paths (when config is in CWD) to "." for consistent
+/// directory reference across the codebase.
+///
+/// # Arguments
+///
+/// * `config_path` - Path to the configuration file
+///
+/// # Returns
+///
+/// The directory containing the config file, or "." if the parent is empty
+#[must_use]
+fn get_config_dir(config_path: &Path) -> &Path {
+    config_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."))
 }
 
 /// Send a system notification for hook execution
@@ -466,9 +486,7 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
 
             eprintln!(
                 "PreToolUse blocked by preToolUse.uneditableFiles pattern: tool_name={}, file_path={}, pattern={}",
-                payload.tool_name,
-                file_path,
-                pattern
+                payload.tool_name, file_path, pattern
             );
 
             return Ok(Some(HookResult::blocked(error_message)));
@@ -492,9 +510,7 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
 
                 eprintln!(
                     "PreToolUse blocked by preToolUse.preventAdditions pattern: tool_name={}, file_path={}, pattern={}",
-                    payload.tool_name,
-                    file_path,
-                    pattern
+                    payload.tool_name, file_path, pattern
                 );
 
                 return Ok(Some(HookResult::blocked(error_message)));
@@ -541,11 +557,7 @@ pub fn is_root_addition(_file_path: &str, relative_path: &str, config_path: &Pat
     }
 
     // Get the directory containing the config file
-    // Normalize empty parent (when config is in CWD) to "."
-    let config_dir = config_path
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
+    let config_dir = get_config_dir(config_path);
 
     // Get the current working directory
     let Ok(cwd) = std::env::current_dir() else {
@@ -801,7 +813,7 @@ async fn execute_stop_commands(
             .current_dir(config_dir)
             .env(
                 "CONCLAUDE_CONFIG_DIR",
-                config_dir.to_string_lossy().as_ref(),
+                config_dir.to_string_lossy().to_string(),
             )
             .spawn()
             .with_context(|| format!("Failed to spawn command: {}", cmd_config.command))?;
@@ -942,11 +954,7 @@ pub async fn handle_stop() -> Result<HookResult> {
     );
 
     let (config, config_path) = get_config().await?;
-    // Normalize empty parent (when config is in CWD) to "."
-    let config_dir = config_path
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
+    let config_dir = get_config_dir(config_path);
 
     // Snapshot root directory if preventRootAdditions is enabled
     let root_snapshot = if config.pre_tool_use.prevent_root_additions {
@@ -1394,11 +1402,7 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
 
     // Load configuration
     let (config, config_path) = get_config().await?;
-    // Normalize empty parent (when config is in CWD) to "."
-    let config_dir = config_path
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
+    let config_dir = get_config_dir(config_path);
 
     // Check if subagentStop commands are configured
     if !config.subagent_stop.commands.is_empty() {
@@ -1670,11 +1674,7 @@ async fn check_git_ignored_file(payload: &PreToolUsePayload) -> Result<Option<Ho
 
     // Find the actual git repository root by walking up from config path
     // This is more reliable than just using config path's parent
-    // Normalize empty parent (when config is in CWD) to "."
-    let config_dir = config_path
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
+    let config_dir = get_config_dir(config_path);
     let repo_root = match find_git_root(config_dir) {
         Some(root) => root,
         None => {
@@ -1890,21 +1890,25 @@ mod tests {
 
     #[test]
     fn test_matches_uneditable_pattern() {
-        assert!(matches_uneditable_pattern(
-            "package.json",
-            "package.json",
-            "/path/package.json",
-            "package.json"
-        )
-        .unwrap());
+        assert!(
+            matches_uneditable_pattern(
+                "package.json",
+                "package.json",
+                "/path/package.json",
+                "package.json"
+            )
+            .unwrap()
+        );
         assert!(matches_uneditable_pattern("test.md", "test.md", "/path/test.md", "*.md").unwrap());
-        assert!(matches_uneditable_pattern(
-            "src/index.ts",
-            "src/index.ts",
-            "/path/src/index.ts",
-            "src/**/*.ts"
-        )
-        .unwrap());
+        assert!(
+            matches_uneditable_pattern(
+                "src/index.ts",
+                "src/index.ts",
+                "/path/src/index.ts",
+                "src/**/*.ts"
+            )
+            .unwrap()
+        );
         assert!(
             !matches_uneditable_pattern("other.txt", "other.txt", "/path/other.txt", "*.md")
                 .unwrap()

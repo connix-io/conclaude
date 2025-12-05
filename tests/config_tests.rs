@@ -1,5 +1,5 @@
 use conclaude::config::{
-    extract_bash_commands, generate_default_config, load_conclaude_config, ConclaudeConfig,
+    ConclaudeConfig, extract_bash_commands, generate_default_config, load_conclaude_config,
 };
 use std::fs;
 use tempfile::tempdir;
@@ -236,7 +236,10 @@ fn test_default_config_without_uncommented_grep_rules_can_be_parsed() {
             assert!(config.pre_tool_use.prevent_root_additions);
         }
         Err(e) => {
-            panic!("Config without grepRules should be parseable, but failed with: {}\n\nConfig content:\n{}", e, cleaned_config);
+            panic!(
+                "Config without grepRules should be parseable, but failed with: {}\n\nConfig content:\n{}",
+                e, cleaned_config
+            );
         }
     }
 }
