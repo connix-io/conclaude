@@ -150,6 +150,18 @@ preToolUse:
   #     pattern: ".env*"
   #     action: "block"
   #     message: "Environment files cannot be modified"
+  #
+  #   # Block dangerous git force push operations
+  #   - tool: "Bash"
+  #     commandPattern: "git push --force*"
+  #     action: "block"
+  #     message: "Force push is not allowed - please use regular push"
+  #
+  #   # Block all git commands (uncomment to completely disable git via Bash tool)
+  #   # - tool: "Bash"
+  #   #   commandPattern: "git *"
+  #   #   action: "block"
+  #   #   message: "Git commands are not permitted in this session"
 
   # Directories where file additions are prevented (in addition to root)
   # List of directory paths where new files cannot be created
