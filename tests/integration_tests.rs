@@ -632,3 +632,149 @@ notifications:
     assert!(stdout.contains("Infinite mode: true"));
     assert!(stdout.contains("Notifications enabled: true"));
 }
+
+// ========== Stop Hook Working Directory Tests ==========
+
+#[test]
+fn test_stop_commands_execute_from_config_directory() {
+    use std::env;
+    use std::io::Write as IoWrite;
+    use std::path::PathBuf;
+    use std::process::{Command, Stdio};
+
+    // First, get the path to the built binary
+    // The binary is in target/debug/conclaude or target/release/conclaude
+    let mut binary_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    binary_path.push("target");
+
+    // Determine if we're in debug or release mode by checking CARGO_CFG_DEBUG_ASSERTIONS
+    #[cfg(debug_assertions)]
+    binary_path.push("debug");
+    #[cfg(not(debug_assertions))]
+    binary_path.push("release");
+
+    binary_path.push("conclaude");
+
+    // Build the binary if it doesn't exist
+    if !binary_path.exists() {
+        let build_output = Command::new("cargo")
+            .args(["build"])
+            .output()
+            .expect("Failed to build conclaude");
+        assert!(
+            build_output.status.success(),
+            "Failed to build conclaude: {}",
+            String::from_utf8_lossy(&build_output.stderr)
+        );
+    }
+
+    let temp_dir = tempdir().expect("Failed to create temp directory");
+    let project_root = temp_dir.path().join("project_root");
+    let subdirectory = project_root.join("subdirectory");
+
+    // Create directory structure
+    fs::create_dir_all(&subdirectory).expect("Failed to create subdirectory");
+
+    // Create unique temp file paths to avoid conflicts with parallel tests
+    let test_id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let cwd_file = temp_dir.path().join(format!("test_cwd_{}.txt", test_id));
+    let config_dir_file = temp_dir
+        .path()
+        .join(format!("test_config_dir_{}.txt", test_id));
+
+    // Create config with stop command that outputs pwd and CONCLAUDE_CONFIG_DIR
+    let config_content = format!(
+        r#"
+stop:
+  commands:
+    - run: "pwd > {} && echo $CONCLAUDE_CONFIG_DIR > {}"
+preToolUse:
+  preventRootAdditions: true
+"#,
+        cwd_file.to_string_lossy(),
+        config_dir_file.to_string_lossy()
+    );
+
+    let config_path = project_root.join(".conclaude.yaml");
+    fs::write(&config_path, config_content).expect("Failed to write config file");
+
+    // Prepare JSON payload for Stop hook
+    // cwd is the subdirectory, but command should execute from project_root (config dir)
+    let payload = serde_json::json!({
+        "session_id": "test-session-stop-cwd",
+        "transcript_path": "/tmp/test-transcript.jsonl",
+        "hook_event_name": "Stop",
+        "cwd": subdirectory.to_string_lossy(),
+        "permission_mode": "default",
+        "stop_hook_active": true
+    });
+
+    let payload_json = serde_json::to_string(&payload).expect("Failed to serialize payload");
+
+    // Execute Stop hook by piping JSON to stdin
+    // Run from project_root so config is found there
+    let mut child = Command::new(&binary_path)
+        .arg("Stop")
+        .current_dir(&project_root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn Stop hook");
+
+    // Write payload to stdin
+    {
+        let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+        stdin
+            .write_all(payload_json.as_bytes())
+            .expect("Failed to write to stdin");
+    }
+
+    // Wait for command to complete
+    let output = child
+        .wait_with_output()
+        .expect("Failed to wait for Stop hook");
+
+    // The hook should succeed
+    assert!(
+        output.status.success(),
+        "Stop hook should succeed. stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Read the output files
+    let cwd_output = fs::read_to_string(&cwd_file)
+        .expect("Failed to read cwd output file")
+        .trim()
+        .to_string();
+    let config_dir_output = fs::read_to_string(&config_dir_file)
+        .expect("Failed to read config_dir output file")
+        .trim()
+        .to_string();
+
+    // Verify pwd matches the config directory (project_root), not the subdirectory
+    let expected_cwd = fs::canonicalize(&project_root)
+        .expect("Failed to canonicalize project_root")
+        .to_string_lossy()
+        .to_string();
+
+    assert_eq!(
+        cwd_output, expected_cwd,
+        "Stop command should execute from config directory, not cwd. Got: {}, Expected: {}",
+        cwd_output, expected_cwd
+    );
+
+    // Verify CONCLAUDE_CONFIG_DIR env var is set to config directory
+    assert_eq!(
+        config_dir_output, expected_cwd,
+        "CONCLAUDE_CONFIG_DIR should be set to config directory. Got: {}, Expected: {}",
+        config_dir_output, expected_cwd
+    );
+
+    // Clean up temp files
+    let _ = fs::remove_file(&cwd_file);
+    let _ = fs::remove_file(&config_dir_file);
+}

@@ -747,6 +747,7 @@ $CONCLAUDE_TRANSCRIPT_PATH     # Main transcript path
 $CONCLAUDE_CWD                 # Working directory
 $CONCLAUDE_HOOK_EVENT          # "SubagentStart"
 $CONCLAUDE_PERMISSION_MODE     # Permission mode
+$CONCLAUDE_CONFIG_DIR          # Directory containing the config file
 
 # Subagent-specific context
 $CONCLAUDE_AGENT_ID            # The subagent identifier
@@ -831,6 +832,7 @@ $CONCLAUDE_SESSION_ID          # Session ID
 $CONCLAUDE_TRANSCRIPT_PATH     # Main transcript path
 $CONCLAUDE_CWD                 # Working directory
 $CONCLAUDE_HOOK_EVENT          # "SubagentStop"
+$CONCLAUDE_CONFIG_DIR          # Directory containing the config file
 
 # Subagent-specific context
 $CONCLAUDE_AGENT_ID            # The subagent identifier
@@ -1214,6 +1216,9 @@ preToolUse:
 **SubagentStop Hook Variables** (Available when SubagentStop hook executes):
 - `CONCLAUDE_AGENT_ID`: Identifier for the subagent that completed (e.g., "coder", "tester", "stuck")
 - `CONCLAUDE_AGENT_TRANSCRIPT_PATH`: Path to the subagent's transcript file for accessing its work history
+
+**Available in all stop hooks:**
+- `CONCLAUDE_CONFIG_DIR`: Directory containing the configuration file (commands execute from this directory)
 
 ## CI/CD Integration
 

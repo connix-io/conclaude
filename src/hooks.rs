@@ -1,11 +1,13 @@
-use crate::config::{extract_bash_commands, load_conclaude_config, ConclaudeConfig, SubagentStopConfig};
+use crate::config::{
+    ConclaudeConfig, SubagentStopConfig, extract_bash_commands, load_conclaude_config,
+};
 use crate::gitignore::{find_git_root, is_path_git_ignored};
 use crate::types::{
-    validate_base_payload, validate_permission_request_payload, validate_subagent_start_payload,
-    validate_subagent_stop_payload, HookResult, NotificationPayload, PermissionRequestPayload,
-    PostToolUsePayload, PreCompactPayload, PreToolUsePayload, SessionEndPayload,
-    SessionStartPayload, StopPayload, SubagentStartPayload, SubagentStopPayload,
-    UserPromptSubmitPayload,
+    HookResult, NotificationPayload, PermissionRequestPayload, PostToolUsePayload,
+    PreCompactPayload, PreToolUsePayload, SessionEndPayload, SessionStartPayload, StopPayload,
+    SubagentStartPayload, SubagentStopPayload, UserPromptSubmitPayload, validate_base_payload,
+    validate_permission_request_payload, validate_subagent_start_payload,
+    validate_subagent_stop_payload,
 };
 use anyhow::{Context, Result};
 use glob::Pattern;
@@ -18,7 +20,7 @@ use std::path::Path;
 use std::process::Stdio;
 use std::sync::OnceLock;
 use tokio::process::Command as TokioCommand;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 /// Represents a stop command with its configuration
 struct StopCommandConfig {
@@ -80,6 +82,26 @@ async fn get_config() -> Result<&'static (ConclaudeConfig, std::path::PathBuf)> 
         let config = load_conclaude_config(None).await?;
         Ok(CACHED_CONFIG.get_or_init(|| config))
     }
+}
+
+/// Extract the directory containing the config file
+///
+/// Normalizes empty parent paths (when config is in CWD) to "." for consistent
+/// directory reference across the codebase.
+///
+/// # Arguments
+///
+/// * `config_path` - Path to the configuration file
+///
+/// # Returns
+///
+/// The directory containing the config file, or "." if the parent is empty
+#[must_use]
+fn get_config_dir(config_path: &Path) -> &Path {
+    config_path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."))
 }
 
 /// Send a system notification for hook execution
@@ -378,10 +400,7 @@ pub async fn handle_permission_request() -> Result<HookResult> {
         send_notification(
             "PermissionRequest",
             "success",
-            Some(&format!(
-                "Tool '{}' allowed by default",
-                payload.tool_name
-            )),
+            Some(&format!("Tool '{}' allowed by default", payload.tool_name)),
         );
         Ok(HookResult::success())
     } else {
@@ -467,9 +486,7 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
 
             eprintln!(
                 "PreToolUse blocked by preToolUse.uneditableFiles pattern: tool_name={}, file_path={}, pattern={}",
-                payload.tool_name,
-                file_path,
-                pattern
+                payload.tool_name, file_path, pattern
             );
 
             return Ok(Some(HookResult::blocked(error_message)));
@@ -493,9 +510,7 @@ async fn check_file_validation_rules(payload: &PreToolUsePayload) -> Result<Opti
 
                 eprintln!(
                     "PreToolUse blocked by preToolUse.preventAdditions pattern: tool_name={}, file_path={}, pattern={}",
-                    payload.tool_name,
-                    file_path,
-                    pattern
+                    payload.tool_name, file_path, pattern
                 );
 
                 return Ok(Some(HookResult::blocked(error_message)));
@@ -542,7 +557,7 @@ pub fn is_root_addition(_file_path: &str, relative_path: &str, config_path: &Pat
     }
 
     // Get the directory containing the config file
-    let config_dir = config_path.parent().unwrap_or(Path::new("."));
+    let config_dir = get_config_dir(config_path);
 
     // Get the current working directory
     let Ok(cwd) = std::env::current_dir() else {
@@ -775,7 +790,10 @@ fn collect_stop_commands(config: &ConclaudeConfig) -> Result<Vec<StopCommandConf
 /// # Errors
 ///
 /// Returns an error if command execution fails or process spawning fails.
-async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<HookResult>> {
+async fn execute_stop_commands(
+    commands: &[StopCommandConfig],
+    config_dir: &Path,
+) -> Result<Option<HookResult>> {
     println!("Executing {} stop hook commands", commands.len());
 
     for (index, cmd_config) in commands.iter().enumerate() {
@@ -792,12 +810,19 @@ async fn execute_stop_commands(commands: &[StopCommandConfig]) -> Result<Option<
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
+            .current_dir(config_dir)
+            .env(
+                "CONCLAUDE_CONFIG_DIR",
+                config_dir.to_string_lossy().to_string(),
+            )
             .spawn()
             .with_context(|| format!("Failed to spawn command: {}", cmd_config.command))?;
 
         let output = if let Some(timeout_secs) = cmd_config.timeout {
             match timeout(Duration::from_secs(timeout_secs), child.wait_with_output()).await {
-                Ok(result) => result.with_context(|| format!("Failed to wait for command: {}", cmd_config.command))?,
+                Ok(result) => result.with_context(|| {
+                    format!("Failed to wait for command: {}", cmd_config.command)
+                })?,
                 Err(_) => {
                     // Timeout occurred - return blocked result
                     let error_msg = format!(
@@ -928,7 +953,8 @@ pub async fn handle_stop() -> Result<HookResult> {
         payload.base.session_id
     );
 
-    let (config, _config_path) = get_config().await?;
+    let (config, config_path) = get_config().await?;
+    let config_dir = get_config_dir(config_path);
 
     // Snapshot root directory if preventRootAdditions is enabled
     let root_snapshot = if config.pre_tool_use.prevent_root_additions {
@@ -941,7 +967,7 @@ pub async fn handle_stop() -> Result<HookResult> {
     let commands_with_messages = collect_stop_commands(config)?;
 
     // Execute commands
-    if let Some(result) = execute_stop_commands(&commands_with_messages).await? {
+    if let Some(result) = execute_stop_commands(&commands_with_messages, config_dir).await? {
         // Send notification for blocked/failed stop hook
         send_notification(
             "Stop",
@@ -1060,8 +1086,12 @@ fn match_subagent_patterns<'a>(
         }
 
         // Use glob pattern matching for other patterns
-        let pattern = Pattern::new(pattern_str)
-            .with_context(|| format!("Invalid glob pattern in subagentStop config: {}", pattern_str))?;
+        let pattern = Pattern::new(pattern_str).with_context(|| {
+            format!(
+                "Invalid glob pattern in subagentStop config: {}",
+                pattern_str
+            )
+        })?;
 
         if pattern.matches(agent_id) {
             other_matches.push(pattern_str.as_str());
@@ -1085,8 +1115,12 @@ fn match_subagent_patterns<'a>(
 /// # Arguments
 ///
 /// * `payload` - The SubagentStopPayload containing subagent information
+/// * `config_dir` - The directory containing the configuration file
 #[must_use]
-fn build_subagent_env_vars(payload: &SubagentStopPayload) -> HashMap<String, String> {
+fn build_subagent_env_vars(
+    payload: &SubagentStopPayload,
+    config_dir: &Path,
+) -> HashMap<String, String> {
     let mut env_vars = HashMap::new();
 
     // Agent-specific environment variables
@@ -1110,6 +1144,10 @@ fn build_subagent_env_vars(payload: &SubagentStopPayload) -> HashMap<String, Str
         "SubagentStop".to_string(),
     );
     env_vars.insert("CONCLAUDE_CWD".to_string(), payload.base.cwd.clone());
+    env_vars.insert(
+        "CONCLAUDE_CONFIG_DIR".to_string(),
+        config_dir.to_string_lossy().to_string(),
+    );
 
     env_vars
 }
@@ -1159,15 +1197,13 @@ fn collect_subagent_stop_commands(
 async fn execute_subagent_stop_commands(
     commands: &[SubagentStopCommandConfig],
     env_vars: &HashMap<String, String>,
+    config_dir: &Path,
 ) -> Result<()> {
     if commands.is_empty() {
         return Ok(());
     }
 
-    println!(
-        "Executing {} subagent stop hook commands",
-        commands.len()
-    );
+    println!("Executing {} subagent stop hook commands", commands.len());
 
     for (index, cmd_config) in commands.iter().enumerate() {
         println!(
@@ -1184,6 +1220,7 @@ async fn execute_subagent_stop_commands(
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .envs(env_vars)
+            .current_dir(config_dir)
             .spawn();
 
         let child = match child {
@@ -1364,7 +1401,8 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
     );
 
     // Load configuration
-    let (config, _config_path) = get_config().await?;
+    let (config, config_path) = get_config().await?;
+    let config_dir = get_config_dir(config_path);
 
     // Check if subagentStop commands are configured
     if !config.subagent_stop.commands.is_empty() {
@@ -1378,14 +1416,15 @@ pub async fn handle_subagent_stop() -> Result<HookResult> {
             );
 
             // Collect commands for matching patterns
-            let commands = collect_subagent_stop_commands(&config.subagent_stop, &matching_patterns)?;
+            let commands =
+                collect_subagent_stop_commands(&config.subagent_stop, &matching_patterns)?;
 
             if !commands.is_empty() {
                 // Build environment variables
-                let env_vars = build_subagent_env_vars(&payload);
+                let env_vars = build_subagent_env_vars(&payload, config_dir);
 
                 // Execute commands (graceful failure handling)
-                execute_subagent_stop_commands(&commands, &env_vars).await?;
+                execute_subagent_stop_commands(&commands, &env_vars, config_dir).await?;
             }
         } else {
             println!(
@@ -1635,7 +1674,7 @@ async fn check_git_ignored_file(payload: &PreToolUsePayload) -> Result<Option<Ho
 
     // Find the actual git repository root by walking up from config path
     // This is more reliable than just using config path's parent
-    let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
+    let config_dir = get_config_dir(config_path);
     let repo_root = match find_git_root(config_dir) {
         Some(root) => root,
         None => {
@@ -1652,7 +1691,8 @@ async fn check_git_ignored_file(payload: &PreToolUsePayload) -> Result<Option<Ho
     let (is_ignored, pattern) = is_path_git_ignored(&resolved_path, &repo_root)?;
 
     if is_ignored {
-        let pattern_display = pattern.unwrap_or_else(|| format!("(pattern in {}/.gitignore)", repo_root.display()));
+        let pattern_display =
+            pattern.unwrap_or_else(|| format!("(pattern in {}/.gitignore)", repo_root.display()));
 
         let message = format!(
             "File operation blocked: Path is git-ignored\n\
@@ -1668,7 +1708,10 @@ async fn check_git_ignored_file(payload: &PreToolUsePayload) -> Result<Option<Ho
             3. Set preventUpdateGitIgnored: false in your config",
             file_path,
             pattern_display,
-            Path::new(&file_path).file_name().and_then(|n| n.to_str()).unwrap_or(&file_path)
+            Path::new(&file_path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(&file_path)
         );
 
         eprintln!(
@@ -1847,21 +1890,25 @@ mod tests {
 
     #[test]
     fn test_matches_uneditable_pattern() {
-        assert!(matches_uneditable_pattern(
-            "package.json",
-            "package.json",
-            "/path/package.json",
-            "package.json"
-        )
-        .unwrap());
+        assert!(
+            matches_uneditable_pattern(
+                "package.json",
+                "package.json",
+                "/path/package.json",
+                "package.json"
+            )
+            .unwrap()
+        );
         assert!(matches_uneditable_pattern("test.md", "test.md", "/path/test.md", "*.md").unwrap());
-        assert!(matches_uneditable_pattern(
-            "src/index.ts",
-            "src/index.ts",
-            "/path/src/index.ts",
-            "src/**/*.ts"
-        )
-        .unwrap());
+        assert!(
+            matches_uneditable_pattern(
+                "src/index.ts",
+                "src/index.ts",
+                "/path/src/index.ts",
+                "src/**/*.ts"
+            )
+            .unwrap()
+        );
         assert!(
             !matches_uneditable_pattern("other.txt", "other.txt", "/path/other.txt", "*.md")
                 .unwrap()
@@ -2504,9 +2551,12 @@ mod tests {
             agent_transcript_path: "/path/to/agent/transcript.json".to_string(),
         };
 
-        let env_vars = build_subagent_env_vars(&payload);
+        let env_vars = build_subagent_env_vars(&payload, Path::new("/test/config"));
 
-        assert_eq!(env_vars.get("CONCLAUDE_AGENT_ID"), Some(&"coder".to_string()));
+        assert_eq!(
+            env_vars.get("CONCLAUDE_AGENT_ID"),
+            Some(&"coder".to_string())
+        );
         assert_eq!(
             env_vars.get("CONCLAUDE_AGENT_TRANSCRIPT_PATH"),
             Some(&"/path/to/agent/transcript.json".to_string())
@@ -2527,6 +2577,10 @@ mod tests {
             env_vars.get("CONCLAUDE_CWD"),
             Some(&"/home/user/project".to_string())
         );
+        assert_eq!(
+            env_vars.get("CONCLAUDE_CONFIG_DIR"),
+            Some(&"/test/config".to_string())
+        );
     }
 
     #[test]
@@ -2546,7 +2600,7 @@ mod tests {
             agent_transcript_path: "/agent/transcript".to_string(),
         };
 
-        let env_vars = build_subagent_env_vars(&payload);
+        let env_vars = build_subagent_env_vars(&payload, Path::new("."));
 
         // Verify all expected keys are present
         let expected_keys = [
@@ -2556,6 +2610,7 @@ mod tests {
             "CONCLAUDE_TRANSCRIPT_PATH",
             "CONCLAUDE_HOOK_EVENT",
             "CONCLAUDE_CWD",
+            "CONCLAUDE_CONFIG_DIR",
         ];
 
         for key in &expected_keys {

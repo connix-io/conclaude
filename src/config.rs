@@ -379,7 +379,10 @@ fn format_parse_error(error: &serde_yaml::Error, config_path: &Path) -> String {
                 .to_string(),
         );
         parts.push("  permissionRequest: default, allow, deny".to_string());
-        parts.push("  commands (stop): run, message, showStdout, showStderr, maxOutputLines, timeout".to_string());
+        parts.push(
+            "  commands (stop): run, message, showStdout, showStderr, maxOutputLines, timeout"
+                .to_string(),
+        );
         parts.push("  commands (subagentStop): run, message, showStdout, showStderr, maxOutputLines, timeout".to_string());
     } else if base_error.contains("invalid type") {
         parts.push(String::new());
@@ -1137,10 +1140,7 @@ notifications:
         assert_eq!(config.pre_tool_use.uneditable_files.len(), 2);
 
         // Verify patterns extracted correctly
-        assert_eq!(
-            config.pre_tool_use.uneditable_files[0].pattern(),
-            "*.lock"
-        );
+        assert_eq!(config.pre_tool_use.uneditable_files[0].pattern(), "*.lock");
         assert_eq!(config.pre_tool_use.uneditable_files[1].pattern(), ".env");
 
         // Verify no custom messages
@@ -1178,10 +1178,7 @@ notifications:
         assert_eq!(config.pre_tool_use.uneditable_files.len(), 2);
 
         // Verify patterns extracted correctly
-        assert_eq!(
-            config.pre_tool_use.uneditable_files[0].pattern(),
-            "*.lock"
-        );
+        assert_eq!(config.pre_tool_use.uneditable_files[0].pattern(), "*.lock");
         assert_eq!(config.pre_tool_use.uneditable_files[1].pattern(), ".env");
 
         // Verify custom messages
@@ -1225,10 +1222,7 @@ notifications:
         assert_eq!(config.pre_tool_use.uneditable_files.len(), 3);
 
         // First is simple format
-        assert_eq!(
-            config.pre_tool_use.uneditable_files[0].pattern(),
-            "*.lock"
-        );
+        assert_eq!(config.pre_tool_use.uneditable_files[0].pattern(), "*.lock");
         assert!(config.pre_tool_use.uneditable_files[0].message().is_none());
 
         // Second is detailed format with message
@@ -1271,10 +1265,7 @@ notifications:
 "#;
         let config: ConclaudeConfig = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(config.pre_tool_use.uneditable_files.len(), 1);
-        assert_eq!(
-            config.pre_tool_use.uneditable_files[0].pattern(),
-            "*.lock"
-        );
+        assert_eq!(config.pre_tool_use.uneditable_files[0].pattern(), "*.lock");
         assert!(config.pre_tool_use.uneditable_files[0].message().is_none());
     }
 
@@ -1378,7 +1369,11 @@ notifications:
   showSystemEvents: true
 "#;
         let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
-        assert!(result.is_ok(), "Config with timeout should parse: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Config with timeout should parse: {:?}",
+            result.err()
+        );
 
         let config = result.unwrap();
         assert_eq!(config.stop.commands.len(), 2);
@@ -1407,9 +1402,16 @@ notifications:
   showSystemEvents: true
 "#;
         let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
-        assert!(result.is_err(), "Config with timeout > 3600 should fail validation");
+        assert!(
+            result.is_err(),
+            "Config with timeout > 3600 should fail validation"
+        );
         let error = result.err().unwrap().to_string();
-        assert!(error.contains("timeout") || error.contains("3600"), "Error should mention timeout issue: {}", error);
+        assert!(
+            error.contains("timeout") || error.contains("3600"),
+            "Error should mention timeout issue: {}",
+            error
+        );
     }
 
     #[test]
@@ -1433,7 +1435,10 @@ notifications:
   showSystemEvents: true
 "#;
         let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
-        assert!(result.is_err(), "Config with timeout = 0 should fail validation");
+        assert!(
+            result.is_err(),
+            "Config with timeout = 0 should fail validation"
+        );
     }
 
     #[test]
@@ -1460,7 +1465,11 @@ notifications:
   showSystemEvents: true
 "#;
         let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
-        assert!(result.is_ok(), "Config with subagent timeout should parse: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Config with subagent timeout should parse: {:?}",
+            result.err()
+        );
 
         let config = result.unwrap();
         let cmds = config.subagent_stop.commands.get("*").unwrap();
@@ -1490,7 +1499,11 @@ notifications:
   showSystemEvents: true
 "#;
         let result = parse_and_validate_config(yaml, Path::new("test.yaml"));
-        assert!(result.is_ok(), "Config without timeout should still parse: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Config without timeout should still parse: {:?}",
+            result.err()
+        );
 
         let config = result.unwrap();
         assert_eq!(config.stop.commands[0].timeout, None);
@@ -1499,6 +1512,9 @@ notifications:
     #[test]
     fn test_stop_command_field_list_includes_timeout() {
         let fields = StopCommand::field_names();
-        assert!(fields.contains(&"timeout"), "StopCommand field_names should include 'timeout'");
+        assert!(
+            fields.contains(&"timeout"),
+            "StopCommand field_names should include 'timeout'"
+        );
     }
 }
